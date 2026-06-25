@@ -1,7 +1,8 @@
 """AI providers and the provider factory.
 
-All provider SDK imports (openai, anthropic, ollama) are isolated inside the
-individual provider modules. This package also hosts:
+All provider SDK imports (openai, anthropic, ollama, mistralai) are isolated
+inside the individual provider modules; DeepSeek reuses the OpenAI-compatible
+SDK from within ``deepseek.py``. This package also hosts:
 
 - ``SYSTEM_PROMPT`` — the shared structured-output instruction
 - ``parse_diagnostic_response`` — shared raw-text → ``DiagnosticResult`` parser
@@ -230,10 +231,18 @@ def create_provider(config: PipelineConfig, override: str | None = None) -> LLMP
         from pipelinekit.ai.providers.ollama import OllamaProvider
 
         return OllamaProvider()
+    if name == "deepseek":
+        from pipelinekit.ai.providers.deepseek import DeepSeekProvider
+
+        return DeepSeekProvider()
+    if name == "mistral":
+        from pipelinekit.ai.providers.mistral import MistralProvider
+
+        return MistralProvider()
 
     raise LLMError(
         "PK-AI-001",
         f"Unknown or unconfigured AI provider: '{name or 'none'}'. "
-        "Set diagnostics.provider to openai, anthropic, or ollama.",
+        "Set diagnostics.provider to openai, anthropic, ollama, deepseek, or mistral.",
         {"provider": name},
     )

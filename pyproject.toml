@@ -24,6 +24,7 @@ jsonschema = "^4.0"
 openai = "^1.0"
 anthropic = "^0.25"
 ollama = "^0.2"
+mistralai = "^1.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0"
@@ -60,7 +61,7 @@ warn_unused_configs = true
 # them rather than crash. The adapters reference these libs only via lazy,
 # type-ignored imports.
 [[tool.mypy.overrides]]
-module = ["dlt.*", "soda.*", "openai.*", "anthropic.*", "ollama.*"]
+module = ["dlt.*", "soda.*", "openai.*", "anthropic.*", "ollama.*", "mistralai.*"]
 follow_imports = "skip"
 ignore_missing_imports = true
 

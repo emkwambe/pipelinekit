@@ -1,0 +1,104 @@
+"""Mistral provider — EU-based provider for GDPR diversity (ADR-016).
+
+All ``mistralai`` imports stay inside this file (lazily, in ``_complete``).
+API key from ``MISTRAL_API_KEY`` (BYOK, ADR-005). Missing key or transport
+failure → ``LLMError(PK-AI-001)``; malformed output → ``LLMError(PK-AI-002)``.
+"""
+
+from __future__ import annotations
+
+import os
+from typing import TYPE_CHECKING
+
+from pipelinekit.ai.evidence import EvidencePackage
+from pipelinekit.ai.models import DiagnosticResult, RecommendedAction
+from pipelinekit.ai.providers import (
+    ARCH_SYSTEM_PROMPT,
+    SYSTEM_PROMPT,
+    build_arch_user_prompt,
+    build_user_prompt,
+    parse_architecture_response,
+    parse_diagnostic_response,
+)
+from pipelinekit.core.errors import LLMError
+
+if TYPE_CHECKING:
+    from pipelinekit.ai.arch_evidence import ArchitectureContext
+    from pipelinekit.ai.arch_models import ArchitectureResult
+
+_ENV_KEY = "MISTRAL_API_KEY"
+
+
+class MistralProvider:
+    """Mistral AI provider.
+
+    Data residency: France, European Union (GDPR compliant).
+    Suitable for: EU customers with GDPR data residency requirements.
+    API key: MISTRAL_API_KEY environment variable.
+    Model default: mistral-large-latest
+
+    ADR-016: EU-based provider for GDPR compliance.
+    """
+
+    name = "mistral"
+
+    def __init__(self, model: str = "mistral-large-latest") -> None:
+        self.model = model
+
+    def _complete(self, system: str, user: str) -> str:
+        """Call the Mistral API and return the raw text response."""
+        api_key = os.environ.get(_ENV_KEY)
+        if not api_key:
+            raise LLMError(
+                "PK-AI-001",
+                f"Set {_ENV_KEY} to use the Mistral provider.",
+                {"provider": self.name},
+            )
+        try:
+            import mistralai  # noqa: PLC0415 — provider import isolated here
+
+            client = mistralai.Mistral(api_key=api_key)
+            response = client.chat.complete(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                response_format={"type": "json_object"},
+            )
+            return response.choices[0].message.content or ""
+        except LLMError:
+            raise
+        except Exception as exc:
+            raise LLMError(
+                "PK-AI-001",
+                f"Mistral provider unavailable: {exc}",
+                {"provider": self.name},
+            ) from exc
+
+    def diagnose(self, evidence: EvidencePackage) -> DiagnosticResult:
+        """Diagnose a run from structured evidence."""
+        raw = self._complete(SYSTEM_PROMPT, build_user_prompt(evidence))
+        return parse_diagnostic_response(raw, evidence)
+
+    def summarize(self, logs: list[str]) -> str:
+        """Summarize log lines in plain English."""
+        prompt = "Summarize these log lines factually:\n" + "\n".join(logs)
+        return self._complete("You are a concise log summarizer.", prompt)
+
+    def recommend(self, diagnosis: DiagnosticResult) -> list[RecommendedAction]:
+        """Return the diagnosis's recommended actions (never executed)."""
+        return list(diagnosis.recommended_actions)
+
+    def architect(
+        self,
+        context: "ArchitectureContext",
+        reasoning_type: str,
+        question: str | None = None,
+    ) -> "ArchitectureResult":
+        """Reason about architecture from structured context (SPEC-011)."""
+        raw = self._complete(
+            ARCH_SYSTEM_PROMPT,
+            build_arch_user_prompt(context, reasoning_type, question),
+        )
+        return parse_architecture_response(raw, context, reasoning_type)

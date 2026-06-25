@@ -9,3 +9,8 @@ dist/
 build/
 .vscode/
 .idea/
+
+# MCP runtime logs
+.mcp/logs/*.log
+.mcp/logs/*.jsonl
+.mcp/logs/*.tmp

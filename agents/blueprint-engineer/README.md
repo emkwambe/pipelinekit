@@ -1,1 +1,3 @@
-# agents / blueprint-engineer / README.md
+# Blueprint Engineer
+
+See AGENT.md.

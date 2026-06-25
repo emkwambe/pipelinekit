@@ -1,1 +1,3 @@
-# agents / diagnostics-engineer / README.md
+# Diagnostics Engineer
+
+See AGENT.md.

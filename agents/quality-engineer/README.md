@@ -1,1 +1,3 @@
-# agents / quality-engineer / README.md
+# Quality Engineer
+
+See AGENT.md.

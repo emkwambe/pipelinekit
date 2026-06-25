@@ -1,1 +1,3 @@
-# agents / documentation-engineer / README.md
+# Documentation Engineer
+
+See AGENT.md.

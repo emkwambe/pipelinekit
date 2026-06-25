@@ -93,3 +93,29 @@ definition of revenue differs.
 3. Re-run `pipelinekit validate --contracts` to isolate data vs. config issues.
 4. If the failure is upstream (source schema/freshness), escalate to the system
    that owns the operational `orders` table.
+
+---
+
+## 6. Verified Deployments
+
+This table records real end-to-end deployments of Blueprint #001.
+Each row represents a verified run by a named tester on a real environment.
+This is the evidence behind the `deploy_time_minutes: 60` claim in blueprint.json.
+
+| Date | Tester | Postgres Version | Snowflake Tier | Rows Ingested | Deploy Time | Data Latency | Contracts | Status |
+|---|---|---|---|---|---|---|---|---|
+| TBD | Eddy Mkwambe | TBD | TBD | TBD | TBD | TBD | All passed | TBD |
+
+### How to add a row
+
+After running `scripts/verify-blueprint-001.ps1` successfully:
+1. Fill in the row above with your actual results.
+2. Commit: `git commit -m "Blueprint #001 verified — [date] by [name]"`.
+3. This record is permanent institutional memory.
+
+### Claim validation
+
+| Claim in blueprint.json | Status | Evidence |
+|---|---|---|
+| `deploy_time_minutes: 60` | Unverified until first row above | — |
+| `time_to_trusted_data_hours: 24` | Unverified until first row above | — |

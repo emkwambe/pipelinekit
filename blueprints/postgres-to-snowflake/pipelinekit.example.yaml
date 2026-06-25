@@ -1,0 +1,44 @@
+# pipelinekit.example.yaml
+# Copy to your project root as pipelinekit.yaml and fill in your credentials
+
+pipeline:
+  name: postgres-to-snowflake-blueprint-001
+  version: "1.0.0"
+  description: "Blueprint #001 — Postgres to Snowflake trusted analytics"
+
+runtime:
+  environment: local
+
+# Connection credentials are passed via environment variables.
+# See runbook.md Prerequisites for required env vars.
+# POSTGRES_CONN_STR, SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_PASSWORD etc.
+ingestion:
+  source:
+    type: postgres
+    host: "${PG_HOST}"
+    port: 5432
+    database: "${PG_DATABASE}"
+  destination:
+    type: snowflake
+    account: "${SNOWFLAKE_ACCOUNT}"
+    database: "${SNOWFLAKE_DATABASE}"
+
+transformation:
+  enabled: true
+  project_dir: ./transform
+
+contracts:
+  enabled: true
+  directory: ./contracts
+
+quality:
+  enabled: true
+  checks_dir: ./quality
+
+diagnostics:
+  enabled: true
+  provider: anthropic
+
+notifications:
+  enabled: false
+  channels: []

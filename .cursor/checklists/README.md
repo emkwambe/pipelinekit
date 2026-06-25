@@ -1,1 +1,0 @@
-# .cursor / checklists / README.md

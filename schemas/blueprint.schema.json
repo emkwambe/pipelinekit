@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PipelineKit Blueprint",
+  "type": "object",
+  "required": ["name", "version", "source", "destination", "contracts"],
+  "properties": {
+    "name": { "type": "string" },
+    "version": { "type": "string" },
+    "source": { "type": "object" },
+    "destination": { "type": "object" },
+    "contracts": { "type": "array" }
+  }
+}

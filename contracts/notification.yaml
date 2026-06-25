@@ -1,0 +1,15 @@
+# Notification Interface Contract
+
+version: 1
+
+required:
+  - channel
+  - recipient
+  - severity
+  - message
+  - evidence
+
+rules:
+  - Notifications must include actionable context.
+  - Failure notifications must include evidence.
+  - Notification providers must be replaceable.

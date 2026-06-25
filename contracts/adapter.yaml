@@ -1,0 +1,15 @@
+# Adapter Interface Contract
+
+version: 1
+
+adapter_types:
+  - ingestion
+  - transformation
+  - quality
+  - notification
+  - ai
+
+rules:
+  - Adapters must implement stable interfaces.
+  - Adapters must return structured results.
+  - Adapters must not bypass contracts.

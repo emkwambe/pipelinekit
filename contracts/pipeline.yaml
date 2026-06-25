@@ -1,0 +1,16 @@
+# Pipeline Interface Contract
+
+version: 1
+
+required:
+  - name
+  - runtime
+  - ingestion
+  - transformation
+  - contracts
+  - diagnostics
+
+rules:
+  - Pipeline execution must be deterministic.
+  - Pipeline configuration must be human-readable.
+  - AI may diagnose but not silently modify production.

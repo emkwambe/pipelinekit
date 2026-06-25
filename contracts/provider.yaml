@@ -1,0 +1,14 @@
+# Provider Interface Contract
+
+version: 1
+
+required_methods:
+  - initialize
+  - validate
+  - execute
+  - status
+
+rules:
+  - Providers must be replaceable.
+  - Provider-specific code must not leak into core runtime.
+  - Provider errors must map to PipelineKit error codes.

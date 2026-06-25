@@ -105,6 +105,23 @@ CONFIG · CONTRACT · RUNTIME · ADAPTER · AI · STATE · BLUEPRINT · NOTIFY
 
 ---
 
+## Phase 5 Registry — Architecture Layer
+
+### ARCH
+
+| Code | Meaning |
+|---|---|
+| PK-ARCH-001 | Architecture context collection failed |
+| PK-ARCH-002 | Architecture result failed schema validation |
+| PK-ARCH-003 | ADR parsing failed |
+| PK-ARCH-004 | Insufficient run history for analysis (< 5 runs) |
+
+Architecture schema-validation failures surface as `PK-AI-002` at the engine
+trust boundary (shared with Phase 4); `PK-ARCH-002` is reserved for the SPEC-011
+contract. `ArchitectureError` carries the `PK-ARCH-*` codes.
+
+---
+
 ## Error Class Hierarchy
 
 ```python
@@ -115,7 +132,8 @@ PipelineKitError(code, message, context)
 ├── ContractError        PK-CONTRACT-*
 ├── BlueprintError       PK-BLUEPRINT-*
 ├── NotificationError    PK-NOTIFY-*      (use PipelineKitError directly for now)
-└── AIError              PK-AI-*          (Phase 4)
+├── AIError              PK-AI-*          (Phase 4)
+└── ArchitectureError    PK-ARCH-*        (Phase 5)
 ```
 
 All errors carry structured code, message, and context dict.

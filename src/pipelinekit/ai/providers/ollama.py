@@ -9,15 +9,23 @@ from ``OLLAMA_HOST`` (default ``http://localhost:11434``) — no API key needed
 from __future__ import annotations
 
 import os
+from typing import TYPE_CHECKING
 
 from pipelinekit.ai.evidence import EvidencePackage
 from pipelinekit.ai.models import DiagnosticResult, RecommendedAction
 from pipelinekit.ai.providers import (
+    ARCH_SYSTEM_PROMPT,
     SYSTEM_PROMPT,
+    build_arch_user_prompt,
     build_user_prompt,
+    parse_architecture_response,
     parse_diagnostic_response,
 )
 from pipelinekit.core.errors import LLMError
+
+if TYPE_CHECKING:
+    from pipelinekit.ai.arch_evidence import ArchitectureContext
+    from pipelinekit.ai.arch_models import ArchitectureResult
 
 _ENV_HOST = "OLLAMA_HOST"
 _DEFAULT_HOST = "http://localhost:11434"
@@ -68,3 +76,16 @@ class OllamaProvider:
     def recommend(self, diagnosis: DiagnosticResult) -> list[RecommendedAction]:
         """Return the diagnosis's recommended actions (never executed)."""
         return list(diagnosis.recommended_actions)
+
+    def architect(
+        self,
+        context: "ArchitectureContext",
+        reasoning_type: str,
+        question: str | None = None,
+    ) -> "ArchitectureResult":
+        """Reason about architecture from structured context (SPEC-011)."""
+        raw = self._complete(
+            ARCH_SYSTEM_PROMPT,
+            build_arch_user_prompt(context, reasoning_type, question),
+        )
+        return parse_architecture_response(raw, context, reasoning_type)

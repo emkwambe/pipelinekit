@@ -68,6 +68,19 @@ CREATE TABLE IF NOT EXISTS diagnostic_results (
     diagnosed_at    TEXT NOT NULL,
     provider        TEXT
 );
+
+CREATE TABLE IF NOT EXISTS architecture_results (
+    id              TEXT PRIMARY KEY,
+    reasoning_type  TEXT NOT NULL,
+    question        TEXT,
+    confidence      REAL NOT NULL,
+    recommendation  TEXT,
+    tradeoffs       TEXT,
+    adr_compliance  TEXT,
+    can_auto_apply  INTEGER DEFAULT 0,
+    analyzed_at     TEXT NOT NULL,
+    provider        TEXT
+);
 """
 
 
@@ -296,6 +309,55 @@ def insert_diagnostic_result(
         raise StateError(
             "PK-STATE-002",
             f"Cannot write diagnostic result for run {run_id}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def insert_architecture_result(
+    reasoning_type: str,
+    result: dict,
+    provider: str,
+    question: str | None = None,
+    cwd: Path | None = None,
+) -> None:
+    """Store an architecture result (SPEC-011). Called by ArchitectureEngine only.
+
+    ``result`` is a serialized ``ArchitectureResult`` (its ``model_dump``).
+    Recommendation, tradeoffs, and ADR compliance are stored as JSON. The AI
+    layer never writes state directly — it goes through this function
+    (ADR-007, ADR-015). ``can_auto_apply`` is always stored as 0 in Phase 5.
+    """
+    initialize(cwd)
+    db_path = get_db_path(cwd)
+    result_id = f"arch-{uuid.uuid4().hex[:8]}"
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO architecture_results (
+                    id, reasoning_type, question, confidence,
+                    recommendation, tradeoffs, adr_compliance,
+                    can_auto_apply, analyzed_at, provider
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    result_id,
+                    reasoning_type,
+                    question,
+                    float(result.get("confidence", 0.0)),
+                    json.dumps(result.get("recommendation", {})),
+                    json.dumps(result.get("tradeoffs", [])),
+                    json.dumps(result.get("adr_compliance", [])),
+                    1 if result.get("can_auto_apply") else 0,
+                    _utc_now(),
+                    provider,
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot write architecture result for {reasoning_type}",
             {"path": str(db_path), "detail": str(exc)},
         ) from exc
 

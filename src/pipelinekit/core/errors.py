@@ -54,3 +54,7 @@ class DiagnosticsError(PipelineKitError):
 
 class LLMError(PipelineKitError):
     """Raised when an AI provider is unavailable or returns invalid output."""
+
+
+class ArchitectureError(PipelineKitError):
+    """Raised when architecture context collection or reasoning fails."""

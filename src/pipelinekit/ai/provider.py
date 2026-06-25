@@ -7,10 +7,14 @@ calls this interface only and never knows which provider is active.
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from pipelinekit.ai.evidence import EvidencePackage
 from pipelinekit.ai.models import DiagnosticResult, RecommendedAction
+
+if TYPE_CHECKING:
+    from pipelinekit.ai.arch_evidence import ArchitectureContext
+    from pipelinekit.ai.arch_models import ArchitectureResult
 
 
 @runtime_checkable
@@ -33,4 +37,19 @@ class LLMProvider(Protocol):
 
     def recommend(self, diagnosis: DiagnosticResult) -> list[RecommendedAction]:
         """Return recommended actions for a diagnosis (never executed)."""
+        ...
+
+    def architect(
+        self,
+        context: "ArchitectureContext",
+        reasoning_type: str,
+        question: str | None = None,
+    ) -> "ArchitectureResult":
+        """Perform architectural reasoning from context (SPEC-011, ADR-015).
+
+        Output must validate against ``schemas/architecture.schema.json``.
+        Raises ``LLMError(PK-AI-001)`` if the provider is unavailable and
+        ``LLMError(PK-AI-002)`` if the response fails schema validation. The
+        result never auto-applies — ``can_auto_apply`` is always False.
+        """
         ...

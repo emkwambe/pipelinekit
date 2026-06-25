@@ -17,12 +17,17 @@ AI package respects the boundary. (Flagged deviation from the brief's
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
+from pipelinekit.ai.arch_models import ArchitectureResult
 from pipelinekit.ai.evidence import EvidencePackage
 from pipelinekit.ai.models import DiagnosticResult
 from pipelinekit.ai.provider import LLMProvider
 from pipelinekit.config.schema import PipelineConfig
 from pipelinekit.core.errors import LLMError
+
+if TYPE_CHECKING:
+    from pipelinekit.ai.arch_evidence import ArchitectureContext
 
 SYSTEM_PROMPT = """You are a data pipeline diagnostics assistant.
 Analyze the provided pipeline evidence and return a JSON diagnostic result.
@@ -40,6 +45,36 @@ data_quality|freshness_violation|unknown",
 }
 Never invent evidence. Only use what is provided.
 can_auto_fix must always be false."""
+
+
+ARCH_SYSTEM_PROMPT = """You are a senior data architecture advisor for PipelineKit.
+Analyze the provided architecture context and return a JSON recommendation.
+Your response must be valid JSON matching this schema:
+{
+  "reasoning_type": "tool_selection|cost_optimization|adr_compliance|\
+stack_evolution|blueprint_selection",
+  "confidence": 0.0-1.0,
+  "current_state": {"description": "...", "tools": {}},
+  "recommendation": {
+    "action": "...",
+    "tool_from": "...",
+    "tool_to": "...",
+    "rationale": "...",
+    "effort": "low|medium|high",
+    "reversible": true,
+    "requires_approval": true
+  },
+  "tradeoffs": [{"dimension": "...", "current": "...", "proposed": "...", \
+"direction": "better|worse|neutral", "evidence": "..."}],
+  "evidence": [{"type": "...", "detail": "..."}],
+  "adr_compliance": {"checked": [], "violations": [], "compliant": []},
+  "can_auto_apply": false,
+  "estimated_impact": {},
+  "explanation": "Human-readable reasoning"
+}
+Never invent evidence. Only use what is provided.
+can_auto_apply must always be false.
+Base recommendations on the specific data profile, not generic best practices."""
 
 
 def build_user_prompt(evidence: EvidencePackage) -> str:
@@ -76,6 +111,91 @@ def parse_diagnostic_response(raw: str, evidence: EvidencePackage) -> Diagnostic
             f"AI response did not match the diagnostic model: {exc}",
             {"detail": str(exc)},
         ) from exc
+
+
+def build_arch_user_prompt(
+    context: "ArchitectureContext",
+    reasoning_type: str,
+    question: str | None = None,
+) -> str:
+    """Render architecture context as the user prompt (structured, never raw)."""
+    payload = {
+        "reasoning_type": reasoning_type,
+        "question": question,
+        "context": context.to_dict(),
+    }
+    return (
+        "Reason about this analytics architecture using only the context below.\n\n"
+        + json.dumps(payload, indent=2, default=str)
+    )
+
+
+def parse_architecture_response(
+    raw: str,
+    context: "ArchitectureContext",
+    reasoning_type: str,
+) -> ArchitectureResult:
+    """Parse a provider's raw text response into an ``ArchitectureResult``.
+
+    The model's ``adr_compliance`` object form (``{checked, violations,
+    compliant}``) is normalized into the list[ADRComplianceCheck] the model
+    expects. ``can_auto_apply`` is forced False at this boundary (the engine
+    re-forces it as well).
+
+    Raises:
+        LLMError: ``PK-AI-002`` if the text is not valid JSON or does not
+            satisfy the ``ArchitectureResult`` model.
+    """
+    text = _strip_code_fences(raw)
+    try:
+        data = json.loads(text)
+    except ValueError as exc:
+        raise LLMError(
+            "PK-AI-002",
+            "AI response was not valid JSON",
+            {"detail": str(exc)},
+        ) from exc
+
+    data.setdefault("reasoning_type", reasoning_type)
+    data["adr_compliance"] = _normalize_adr_compliance(data.get("adr_compliance"))
+    data["can_auto_apply"] = False  # Phase 5 invariant (ADR-015)
+    try:
+        return ArchitectureResult(**data)
+    except Exception as exc:
+        raise LLMError(
+            "PK-AI-002",
+            f"AI response did not match the architecture model: {exc}",
+            {"detail": str(exc)},
+        ) from exc
+
+
+def _normalize_adr_compliance(raw: object) -> list[dict]:
+    """Normalize provider ``adr_compliance`` into a list of check dicts.
+
+    Accepts either the prompt's object form ``{checked, violations, compliant}``
+    or a direct list of check objects.
+    """
+    if isinstance(raw, list):
+        return [_coerce_check(item, True) for item in raw]
+    if isinstance(raw, dict):
+        checks: list[dict] = []
+        for item in raw.get("compliant") or []:
+            checks.append(_coerce_check(item, True))
+        for item in raw.get("violations") or []:
+            checks.append(_coerce_check(item, False))
+        return checks
+    return []
+
+
+def _coerce_check(item: object, default_compliant: bool) -> dict:
+    """Coerce one ADR compliance entry into a check dict."""
+    if isinstance(item, dict):
+        return {
+            "adr_id": str(item.get("adr_id") or item.get("id") or "ADR-unknown"),
+            "compliant": bool(item.get("compliant", default_compliant)),
+            "note": str(item.get("note", "")),
+        }
+    return {"adr_id": str(item), "compliant": default_compliant, "note": ""}
 
 
 def _strip_code_fences(text: str) -> str:

@@ -22,6 +22,7 @@ for _stream in (sys.stdout, sys.stderr):
 import typer  # noqa: E402 — must follow stdout reconfiguration above
 
 from pipelinekit.cli.init import init_command  # noqa: E402
+from pipelinekit.cli.run import run_command  # noqa: E402
 from pipelinekit.cli.status import status_command  # noqa: E402
 from pipelinekit.cli.validate import validate_command  # noqa: E402
 
@@ -57,3 +58,4 @@ def main(
 app.command("init")(init_command)
 app.command("validate")(validate_command)
 app.command("status")(status_command)
+app.command("run")(run_command)

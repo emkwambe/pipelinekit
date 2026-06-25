@@ -13,6 +13,12 @@ typer = {extras = ["all"], version = ">=0.16,<1.0"}
 pydantic = "^2.0"
 pyyaml = "^6.0"
 rich = "^13.0"
+dlt = {extras = ["snowflake", "bigquery", "duckdb"], version = "^1.0"}
+dbt-core = "^1.8"
+dbt-snowflake = "^1.8"
+dbt-bigquery = "^1.8"
+soda-core = "^3.0"
+soda-core-postgres = "^3.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0"
@@ -42,6 +48,16 @@ strict = false
 ignore_missing_imports = true
 warn_return_any = true
 warn_unused_configs = true
+
+# Provider libraries are wrapped behind adapters and are intentionally not
+# type-checked. Their typed stubs (e.g. numpy's PEP 695 `type` statement) target
+# Python 3.12+, which mypy cannot parse under python_version 3.11; skip following
+# them rather than crash. The adapters reference these libs only via lazy,
+# type-ignored imports.
+[[tool.mypy.overrides]]
+module = ["dlt.*", "soda.*"]
+follow_imports = "skip"
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

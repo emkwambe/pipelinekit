@@ -1,0 +1,1 @@
+"""Soda quality-check adapter."""

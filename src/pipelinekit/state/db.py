@@ -14,6 +14,7 @@ See: SPEC-007, ADR-004 (local-first), docs/reference/Error-Codes.md.
 from __future__ import annotations
 
 import sqlite3
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -41,6 +42,16 @@ CREATE TABLE IF NOT EXISTS validation_runs (
     ran_at      TEXT NOT NULL,
     error_count INTEGER DEFAULT 0,
     errors      TEXT
+);
+
+CREATE TABLE IF NOT EXISTS contract_results (
+    id              TEXT PRIMARY KEY,
+    run_id          TEXT NOT NULL,
+    table_name      TEXT NOT NULL,
+    status          TEXT NOT NULL,
+    violation_count INTEGER DEFAULT 0,
+    violations      TEXT,
+    checked_at      TEXT NOT NULL
 );
 """
 
@@ -182,6 +193,46 @@ def update_run(
         raise StateError(
             "PK-STATE-002",
             f"Cannot update run {run_id} in state database",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def insert_contract_result(
+    run_id: str,
+    table_name: str,
+    status: str,
+    violation_count: int,
+    violations_json: str,
+    cwd: Path | None = None,
+) -> None:
+    """Store a contract validation result for a table (SPEC-004)."""
+    initialize(cwd)
+    db_path = get_db_path(cwd)
+    result_id = f"cr-{uuid.uuid4().hex[:8]}"
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO contract_results (
+                    id, run_id, table_name, status,
+                    violation_count, violations, checked_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    result_id,
+                    run_id,
+                    table_name,
+                    status,
+                    violation_count,
+                    violations_json,
+                    _utc_now(),
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot write contract result for {table_name}",
             {"path": str(db_path), "detail": str(exc)},
         ) from exc
 

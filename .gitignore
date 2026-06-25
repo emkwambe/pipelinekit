@@ -17,3 +17,5 @@ build/
 
 # PipelineKit state
 .pipelinekit/
+
+pipelinekit.yaml

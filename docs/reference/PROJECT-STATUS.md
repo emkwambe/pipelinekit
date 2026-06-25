@@ -8,223 +8,184 @@
 
 ## Current State
 
-**Active Phase:** Phase 5 — Architecture Layer  
-**Last Completed Phase:** Phase 4 — Intelligence Layer  
+**Active Phase:** Post-Phase-5 — Hardening + Extensions  
+**Last Completed Phase:** Phase 5 — Architecture Layer  
 **Last Updated:** June 25, 2026  
-**Main Branch:** `47bdd51` (Phase 4 intelligence layer)
+**Main Branch:** `ede343a` (Phase 5 architecture layer)
 
 ---
 
 ## Phase Completion Record
 
 ### ✅ Phase 1 — Foundation
-**Completed:** June 25, 2026 | **Commit:** `8d8865f`
-
-- CLI (init, validate, status), config system, SQLite state, error hierarchy
-- 36 tests, 92.65% coverage
-- SPECs: SPEC-001, 002, 007, 010 | Agents: cli-engineer, quality-engineer
-
----
+**Commit:** `8d8865f` | 36 tests | 92.65% coverage  
+CLI (init, validate, status), config, state, error hierarchy  
+SPECs: SPEC-001, 002, 007, 010 | Agents: cli-engineer, quality-engineer
 
 ### ✅ Phase 2 — Data Layer
-**Completed:** June 25, 2026 | **Commit:** `f337cfe`
-
-- Runtime (PipelineRunner), adapters (dlt/dbt/Soda), contracts (6 checks), pipelinekit run
-- 87 tests, 84.70% coverage
-- SPECs: SPEC-003, 004, 009 | Agent: runtime-engineer
-
----
+**Commit:** `f337cfe` | 87 tests | 84.70% coverage  
+Runtime, adapters (dlt/dbt/Soda), contracts, pipelinekit run  
+SPECs: SPEC-003, 004, 009 | Agent: runtime-engineer
 
 ### ✅ Phase 3 — Trust Layer
-**Completed:** June 25, 2026 | **Commit:** `d938e50`
-
-- Blueprint engine, Blueprint #001 (Postgres→Snowflake complete), notifications, Resend adapter, CI pipeline
-- 112 tests, 82.00% coverage, 45 source files
-- SPECs: SPEC-006, 008 | Agents: blueprint-engineer, release-engineer
-- First MCP: Resend (ADR-013)
-
----
+**Commit:** `d938e50` | 112 tests | 82.00% coverage  
+Blueprints, Blueprint #001, notifications, Resend, CI pipeline  
+SPECs: SPEC-006, 008 | Agents: blueprint-engineer, release-engineer  
+First MCP: Resend (ADR-013)
 
 ### ✅ Phase 4 — Intelligence Layer
+**Commit:** `47bdd51` | 151 tests | 82.16% coverage  
+AI diagnostics, LLMProvider, DiagnosticsEngine, 3 providers, pipelinekit diagnose  
+SPECs: SPEC-005 | ADR: ADR-014 | Agent: diagnostics-engineer
+
+### ✅ Phase 5 — Architecture Layer
 **Completed:** June 25, 2026  
-**Commit:** `47bdd51`  
-**Branch:** `phase-4-intelligence-layer` → fast-forward merged to `main`
+**Commit:** `ede343a`  
+**Branch:** `phase-5-architecture-intelligence` → fast-forward merged to `main`
 
 **What was built:**
-- `src/pipelinekit/ai/provider.py` — LLMProvider Protocol
-- `src/pipelinekit/ai/evidence.py` — EvidenceCollector + EvidencePackage (read-only)
-- `src/pipelinekit/ai/models.py` — DiagnosticResult, RecommendedAction
-- `src/pipelinekit/ai/diagnostics.py` — DiagnosticsEngine (schema validation trust boundary)
-- `src/pipelinekit/ai/providers/openai.py` — OpenAIProvider
-- `src/pipelinekit/ai/providers/anthropic.py` — AnthropicProvider
-- `src/pipelinekit/ai/providers/ollama.py` — OllamaProvider (local/air-gapped)
-- `src/pipelinekit/cli/diagnose.py` — pipelinekit diagnose command
-- `src/pipelinekit/state/db.py` — diagnostic_results table + insert_diagnostic_result()
-- `src/pipelinekit/core/errors.py` — DiagnosticsError + LLMError
-- `tests/ai/` — 39 new tests
+- `schemas/architecture.schema.json` — new output contract for architectural reasoning
+- `src/pipelinekit/ai/arch_models.py` — ArchitectureResult, ArchitectureRecommendation, ADRComplianceCheck
+- `src/pipelinekit/ai/arch_evidence.py` — ArchitectureContext, ArchitectureContextCollector
+- `src/pipelinekit/ai/arch_engine.py` — ArchitectureEngine (can_auto_apply=False enforced)
+- `src/pipelinekit/ai/adr_reader.py` — ADRReader (reads docs/decisions/, never writes)
+- `src/pipelinekit/cli/architect.py` — pipelinekit architect analyze, check-adrs, compare
+- LLMProvider Protocol extended — architect() method added
+- All 3 providers extended — architect() implemented
+- `src/pipelinekit/core/errors.py` — ArchitectureError added
+- `src/pipelinekit/state/db.py` — architecture_results table
 
 **Quality gates (all green):**
 | Gate | Result |
 |---|---|
-| pytest --cov-fail-under=80 | 151 passed (112 prior + 39 new), 82.16% coverage |
+| pytest | 174 passed (151 prior + 23 new), 81.27% coverage |
 | ruff check | All checks passed |
-| black --check | 97 files unchanged |
-| mypy src/pipelinekit | No issues, 55 files |
+| black --check | 107 files clean |
+| mypy | No issues, 60 files |
+| ai/ coverage | 93% (≥85% target ✓) |
 
-**ai/ coverage vs SPEC-005 target (≥85%):**
-| Module | Coverage |
-|---|---|
-| ai/diagnostics.py | 100% |
-| ai/providers/__init__.py | 100% |
-| ai/providers/ollama.py | 100% |
-| ai/evidence.py | 96% |
-| ai/models.py | 96% |
-| ai/providers/anthropic.py | 88% |
-| ai/providers/openai.py | 88% |
-| **ai/ overall** | **~95%** |
-
-**SPECs satisfied:** SPEC-005  
-**ADR satisfied:** ADR-014 (AI provider MCP layer)  
-**Agent activated:** diagnostics-engineer  
-**AI boundary enforced by design:**
-- `can_auto_fix` forced False in engine — provider returning True is corrected (tested)
-- No execution path exists — `test_no_action_is_auto_executed` asserts this
-- Schema validation mandatory — invalid output raises `LLMError(PK-AI-002)`, never reaches CLI
-- EvidenceCollector is read-only — no writes to state.db
-- Provider imports isolated — exactly 3 files, each inside its own provider file (verified by grep)
-- BYOK via env vars: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OLLAMA_HOST`
-
+**SPECs satisfied:** SPEC-011  
+**ADR satisfied:** ADR-015  
 **Key decisions:**
-- Provider factory in `ai/providers/__init__.py` not `adapters/factory.py` — adapters/ was READ ONLY; documents win over prompt (CLAUDE.md v3)
-- `confidence_threshold` as module default (0.7) not config — config/schema.py was READ ONLY; **SPEC-005 drift flagged — add to housekeeping**
-- mypy overrides extended for openai/anthropic/ollama — same numpy PEP 695 pattern as Phase 2
-- No MCP added — ADR-014 mandates direct API calls in Phase 4
+- adr_compliance schema conflict (object vs list) — engine wraps list to object for validation, keeps list internally. **Post-phase fix: update architecture.schema.json to use array type**
+- providers/__init__.py modified — shared ARCH_SYSTEM_PROMPT placed there (not on READ ONLY list, avoids triplicated code)
+- markdown dependency not added — stdlib re sufficient for ADR parsing
 
 ---
 
-### ⏳ Phase 5 — Architecture Layer
-**Status:** Named, not started  
-**Target:** Post-Phase 4 validation with design partners
-
-**What Architecture Intelligence means:**
-- Phase 4 AI answers: "Why did this pipeline fail?"
-- Phase 5 AI answers: "What architecture should this pipeline use?"
-
-**Capabilities planned:**
-- Tool selection reasoning (dbt vs SQLMesh, Fivetran vs dlt, DuckDB vs Snowflake)
-- Cost and reliability architecture comparison
-- ADR compliance checking for proposed changes
-- Continuous architecture monitoring across the stack
-
-**SPECs to write:** SPEC-011 (Architecture Intelligence)  
-**ADRs to write:** ADR-015 (Architecture Intelligence scope), ADR-016 (can_auto_fix=True gate)  
-**Agent activating:** documentation-engineer (post-implementation doc updates)
-
----
-
-## Post-Phase-4 Housekeeping (before Phase 5 or design partner outreach)
+## Complete CLI Surface (All 5 Phases)
 
 ```
-□ SPEC-005 drift: add confidence_threshold to pipelinekit.yaml config schema
-  (currently module default 0.7 — should be configurable per SPEC-005)
-□ Update config/schema.py DiagnosticsSection to include confidence_threshold field
-□ Update SPEC-002 to reflect DiagnosticsSection extension
-□ Confirm CI green on GitHub after 47bdd51 push
-□ Update HANDOVER-TO-NEW-CHAT.md to reflect Phase 4 complete
-□ Write ICP-001, ICP-002, ICP-003 stubs (ICP-004 already written)
-□ Update PRD in-file (not just the summary doc) with v2 executive summary
+pipelinekit init
+pipelinekit validate [--contracts]
+pipelinekit run [--dry-run]
+pipelinekit status
+pipelinekit blueprint list
+pipelinekit blueprint validate
+pipelinekit blueprint info <name>
+pipelinekit diagnose [run_id] [--provider] [--approve]
+pipelinekit architect analyze [question] [--type] [--provider] [--approve]
+pipelinekit architect check-adrs <change>
+pipelinekit architect compare <tool_a> <tool_b>
+```
+
+---
+
+## Post-Phase-5 Hardening (do before design partner outreach)
+
+```
+□ Fix architecture.schema.json — adr_compliance type: object → array
+□ Add deepseek.py provider (ADR-016)
+□ Add mistral.py provider (ADR-016)
+□ Implement pipelinekit health command group (SPEC-012)
+□ Add pip-audit as dev dependency
+□ Fix SPEC-005 drift — confidence_threshold from pipelinekit.yaml config
+□ Update config/schema.py DiagnosticsSection with confidence_threshold field
+□ Confirm CI green on GitHub after Phase 5 push
+□ Write ICP-001, ICP-002, ICP-003 stubs (ICP-004 already done)
+□ Update PRD in-file with v2 executive summary
 □ Update Strategic Operating Document with market context section
 ```
 
 ---
 
-## What PipelineKit Can Do Now (Post Phase 4)
-
-A user with PipelineKit installed can:
-
-```
-pipelinekit init                          Initialize a project
-pipelinekit validate                      Validate configuration
-pipelinekit validate --contracts          Validate data contracts
-pipelinekit run                           Execute pipeline
-pipelinekit run --dry-run                 Validate without executing
-pipelinekit status                        View run history
-pipelinekit blueprint list                List installed blueprints
-pipelinekit blueprint validate            Validate blueprint structure
-pipelinekit blueprint info <name>         Show blueprint details
-pipelinekit diagnose                      AI root cause analysis (last run)
-pipelinekit diagnose <run_id>             AI root cause analysis (specific run)
-pipelinekit diagnose --approve            Review recommended actions
-```
-
-Blueprint #001 (Postgres → Snowflake) is deployable.  
-AI diagnostics work with Anthropic, OpenAI, or local Ollama.  
-CI gates every push.  
-Email alerts on failure via Resend.
-
-**This is a complete product.** Phase 5 adds Architecture Intelligence on top of it.
-
----
-
-## Repository Structure — Current
+## Repository Structure — Complete
 
 ```
 src/pipelinekit/
-├── core/           ✅ errors (PK error hierarchy + DiagnosticsError + LLMError)
+├── core/           ✅ errors (full hierarchy + DiagnosticsError + LLMError + ArchitectureError)
 ├── config/         ✅ PipelineConfig (8 sections)
-├── state/          ✅ SQLite (pipeline_runs, validation_runs, contract_results, diagnostic_results)
-├── cli/            ✅ init, validate, status, run, blueprint, diagnose
+├── state/          ✅ SQLite (5 tables: pipeline_runs, validation_runs,
+│                       contract_results, diagnostic_results, architecture_results)
+├── cli/            ✅ init, validate, status, run, blueprint, diagnose, architect
 ├── runtime/        ✅ PipelineRunner, PipelineResult
 ├── adapters/       ✅ dlt, dbt, Soda, Resend
 ├── contracts/      ✅ ContractValidator (6 checks)
 ├── blueprints/     ✅ BlueprintRegistry, BlueprintValidator
 ├── notifications/  ✅ NotificationDispatcher, templates
-└── ai/             ✅ LLMProvider, EvidenceCollector, DiagnosticsEngine, 3 providers
+└── ai/             ✅ LLMProvider, EvidenceCollector, DiagnosticsEngine,
+                        ArchitectureEngine, ADRReader, 3 providers
 
 blueprints/
 └── postgres-to-snowflake/  ✅ Blueprint #001 — complete
 
+schemas/
+├── blueprint.schema.json    ✅
+├── diagnostic.schema.json   ✅
+└── architecture.schema.json ✅ (adr_compliance type fix pending)
+
 .github/workflows/ci.yml    ✅ CI pipeline live
-.mcp/registry/servers.md    ✅ Resend entry (Phase 3)
+.mcp/registry/servers.md    ✅ Resend entry
+docs/reference/
+├── Architectural-Smells.md  ✅ v3 — 16 smells with direction
+├── Sustainability-Policy.md ✅ v2 — DeepSeek/Mistral, health commands
+└── PROJECT-STATUS.md        ✅ This file
 ```
 
-**Total tests:** 151 | **Coverage:** 82.16% | **Source files:** 55
+**Total tests:** 174 | **Coverage:** 81.27% | **Source files:** 60 | **State tables:** 5
 
 ---
 
-## Decision Log
+## Decision Log (complete)
 
 | Date | Decision | Reason |
 |---|---|---|
 | 2026-06-24 | typer `>=0.16,<1.0` | click 8.4 compatibility |
 | 2026-06-24 | `cwd: Path \| None = None` | Path.cwd() binds at import time |
 | 2026-06-24 | Feature branch per sprint | Safety — fast-forward after verification |
-| 2026-06-25 | mypy overrides dlt/soda/openai/anthropic/ollama | numpy PEP 695 crash Python 3.13 |
+| 2026-06-25 | mypy overrides for all provider SDKs | numpy PEP 695 crash Python 3.13 |
 | 2026-06-25 | AcceptedValuesRule as plain dict | Pydantic v2 removed `__root__` |
-| 2026-06-25 | run --dry-run exits 0 | Informational preview |
-| 2026-06-25 | Resend adapter (ADR-013) | First MCP — email alerts Phase 3 |
-| 2026-06-25 | Control plane → intelligence layer | Avoid orchestrator bucket post-merger |
-| 2026-06-25 | TTTD 5 dimensions as design principles | No benchmarks without real customer data |
+| 2026-06-25 | Resend via adapter (ADR-013) | First MCP — email alerts |
+| 2026-06-25 | Intelligence layer not control plane | Avoid orchestrator bucket post-merger |
+| 2026-06-25 | TTTD 5 dimensions as design principles | No benchmarks without real data |
 | 2026-06-25 | ICP-004 Mixed-Stack Enterprise | Post-merger customer opportunity |
-| 2026-06-25 | Phase 5 Architecture Intelligence named | Pre-empt decision layer opportunity |
-| 2026-06-25 | Provider factory in ai/providers/ not adapters/ | adapters/ READ ONLY — documents win |
-| 2026-06-25 | confidence_threshold as module default | config/schema.py READ ONLY this phase — drift flagged |
-| 2026-06-25 | ADR-014: direct API calls not MCP for Phase 4 | MCP complexity unjustified for Phase 4 frequency |
-| 2026-06-25 | can_auto_fix forced False in engine | ADR-007 + Smell 13 — AI boundary enforced by design |
+| 2026-06-25 | Phase 5 Architecture Intelligence | Pre-empt decision layer opportunity |
+| 2026-06-25 | Provider factory in ai/providers/ | adapters/ READ ONLY — documents win |
+| 2026-06-25 | confidence_threshold as module default | config/schema.py READ ONLY — drift flagged |
+| 2026-06-25 | ADR-014: direct API not MCP (Phase 4/5) | MCP complexity unjustified at this frequency |
+| 2026-06-25 | can_auto_fix/apply always False | ADR-007 + Smell 13 enforced by design |
+| 2026-06-25 | adr_compliance list→object wrapping | Schema/model conflict — fix pending |
+| 2026-06-25 | providers/__init__.py for shared prompts | Avoids triplicated ARCH_SYSTEM_PROMPT |
+| 2026-06-25 | markdown dep not added | stdlib re sufficient for ADR parsing |
+| 2026-06-25 | ADR-016: DeepSeek + Mistral | Provider diversity — non-US required |
+| 2026-06-25 | SPEC-012: pipelinekit health | Programmed sustainability policy |
 
 ---
 
-## Key File Locations
+## What PipelineKit Is Now
 
-| Artifact | Path |
-|---|---|
-| Master Architecture v2 | `docs/institutional-memory/strategy-archive/PIPELINEKIT-MASTER-ARCHITECTURE.md` |
-| Architectural Smells v3 | `docs/reference/Architectural-Smells.md` |
-| Phase 4 Sprint Prompt | `docs/institutional-memory/strategy-archive/PHASE-4-CLAUDE-CODE-PROMPT.md` |
-| SPEC-005 AI Diagnostics | `docs/specifications/SPEC-005-AI-Diagnostics.md` |
-| ADR-014 AI Provider Governance | `docs/decisions/ADR-014-AI-Provider-MCP-Layer.md` |
-| Diagnostic Schema | `schemas/diagnostic.schema.json` |
-| Product Constitution | `docs/constitution/Product-Constitution.md` |
+PipelineKit is the AI-native operating system for trusted analytics pipelines.
+
+It can:
+- Initialize, configure, and validate pipeline projects
+- Run pipelines with dlt ingestion, dbt transformation, Soda quality checks
+- Enforce data contracts with 6 validation checks
+- Deploy production-ready blueprints (Blueprint #001: Postgres → Snowflake)
+- Alert operators on failures via email (Resend)
+- Diagnose pipeline failures with AI root cause analysis (3 providers)
+- Reason about architecture decisions — tool selection, cost, ADR compliance, stack evolution
+
+All CLI-first. All deterministic before AI. All evidence-grounded. All human-approved before action.
 
 ---
 

@@ -58,3 +58,7 @@ class LLMError(PipelineKitError):
 
 class ArchitectureError(PipelineKitError):
     """Raised when architecture context collection or reasoning fails."""
+
+
+class HealthError(PipelineKitError):
+    """Raised when a health check cannot run (tooling unavailable or failed)."""

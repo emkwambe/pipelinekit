@@ -81,6 +81,18 @@ CREATE TABLE IF NOT EXISTS architecture_results (
     analyzed_at     TEXT NOT NULL,
     provider        TEXT
 );
+
+CREATE TABLE IF NOT EXISTS health_runs (
+    id                TEXT PRIMARY KEY,
+    ran_at            TEXT NOT NULL,
+    deps_status       TEXT,
+    security_status   TEXT,
+    blueprints_status TEXT,
+    specs_status      TEXT,
+    tests_status      TEXT,
+    overall_status    TEXT,
+    summary           TEXT
+);
 """
 
 
@@ -358,6 +370,46 @@ def insert_architecture_result(
         raise StateError(
             "PK-STATE-002",
             f"Cannot write architecture result for {reasoning_type}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def insert_health_run(results: dict, cwd: Path | None = None) -> None:
+    """Store a health run result (SPEC-012). Called by the health command only.
+
+    ``results`` carries the per-check statuses, the overall status, and a JSON
+    ``summary``. Lets ``pipelinekit status`` surface the last health check date.
+    """
+    initialize(cwd)
+    db_path = get_db_path(cwd)
+    result_id = f"health-{uuid.uuid4().hex[:8]}"
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO health_runs (
+                    id, ran_at, deps_status, security_status,
+                    blueprints_status, specs_status, tests_status,
+                    overall_status, summary
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    result_id,
+                    _utc_now(),
+                    results.get("deps_status"),
+                    results.get("security_status"),
+                    results.get("blueprints_status"),
+                    results.get("specs_status"),
+                    results.get("tests_status"),
+                    results.get("overall_status"),
+                    results.get("summary"),
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            "Cannot write health run to state database",
             {"path": str(db_path), "detail": str(exc)},
         ) from exc
 

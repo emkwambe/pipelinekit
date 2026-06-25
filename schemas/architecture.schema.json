@@ -13,7 +13,7 @@
     "recommendation": {"type": "object"},
     "tradeoffs": {"type": "array"},
     "evidence": {"type": "array"},
-    "adr_compliance": {"type": "object"},
+    "adr_compliance": {"type": "array"},
     "can_auto_apply": {"type": "boolean", "default": false},
     "estimated_impact": {"type": "object"}
   }

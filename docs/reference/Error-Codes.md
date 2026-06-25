@@ -122,6 +122,22 @@ contract. `ArchitectureError` carries the `PK-ARCH-*` codes.
 
 ---
 
+## Phase 6 Registry — Catalog + Ecosystem
+
+### HEALTH
+
+| Code | Meaning |
+|---|---|
+| PK-HEALTH-001 | Dependency check failed (poetry unavailable) |
+| PK-HEALTH-002 | Security check failed (pip-audit error) |
+| PK-HEALTH-003 | Blueprint validation failed |
+| PK-HEALTH-004 | SPEC drift detected |
+
+`HealthError` carries the `PK-HEALTH-*` codes. Health checks are non-blocking:
+a missing tool resolves to an `info` result rather than raising.
+
+---
+
 ## Error Class Hierarchy
 
 ```python
@@ -133,7 +149,8 @@ PipelineKitError(code, message, context)
 ├── BlueprintError       PK-BLUEPRINT-*
 ├── NotificationError    PK-NOTIFY-*      (use PipelineKitError directly for now)
 ├── AIError              PK-AI-*          (Phase 4)
-└── ArchitectureError    PK-ARCH-*        (Phase 5)
+├── ArchitectureError    PK-ARCH-*        (Phase 5)
+└── HealthError          PK-HEALTH-*      (Phase 6)
 ```
 
 All errors carry structured code, message, and context dict.

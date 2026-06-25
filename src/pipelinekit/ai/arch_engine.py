@@ -100,15 +100,6 @@ class ArchitectureEngine:
         payload = (
             result.model_dump(mode="json") if hasattr(result, "model_dump") else result
         )
-        # Flagged reconciliation: schema requires adr_compliance to be an object;
-        # the model serializes it as a list. Wrap for validation only.
-        if isinstance(payload, dict) and isinstance(
-            payload.get("adr_compliance"), list
-        ):
-            payload = {
-                **payload,
-                "adr_compliance": {"checks": payload["adr_compliance"]},
-            }
         try:
             schema = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
             jsonschema.validate(instance=payload, schema=schema)

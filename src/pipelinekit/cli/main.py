@@ -22,6 +22,7 @@ for _stream in (sys.stdout, sys.stderr):
 import typer  # noqa: E402 — must follow stdout reconfiguration above
 
 from pipelinekit.cli.blueprint import blueprint_app  # noqa: E402
+from pipelinekit.cli.diagnose import diagnose_command  # noqa: E402
 from pipelinekit.cli.init import init_command  # noqa: E402
 from pipelinekit.cli.run import run_command  # noqa: E402
 from pipelinekit.cli.status import status_command  # noqa: E402
@@ -61,3 +62,4 @@ app.command("validate")(validate_command)
 app.command("status")(status_command)
 app.command("run")(run_command)
 app.add_typer(blueprint_app, name="blueprint")
+app.command("diagnose")(diagnose_command)

@@ -85,15 +85,23 @@ CONFIG · CONTRACT · RUNTIME · ADAPTER · AI · STATE · BLUEPRINT · NOTIFY
 
 ---
 
-## Phase 4 Registry — Intelligence Layer (reserved)
+## Phase 4 Registry — Intelligence Layer
 
 ### AI
 
 | Code | Meaning |
 |---|---|
-| PK-AI-001 | AI provider unavailable |
+| PK-AI-001 | AI provider unavailable (missing key / unreachable) |
 | PK-AI-002 | AI response failed schema validation |
 | PK-AI-003 | AI confidence below threshold |
+
+### DIAG
+
+| Code | Meaning |
+|---|---|
+| PK-DIAG-001 | Run ID not found in state.db |
+| PK-DIAG-002 | Evidence collection failed |
+| PK-DIAG-003 | Diagnosis engine initialization failed |
 
 ---
 

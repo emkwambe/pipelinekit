@@ -46,3 +46,11 @@ class ContractError(PipelineKitError):
 
 class BlueprintError(PipelineKitError):
     """Raised when a blueprint is missing, invalid, or cannot be executed."""
+
+
+class DiagnosticsError(PipelineKitError):
+    """Raised when evidence collection or the diagnostics engine fails."""
+
+
+class LLMError(PipelineKitError):
+    """Raised when an AI provider is unavailable or returns invalid output."""

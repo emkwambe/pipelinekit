@@ -13,6 +13,7 @@ See: SPEC-007, ADR-004 (local-first), docs/reference/Error-Codes.md.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import uuid
 from datetime import datetime, timezone
@@ -52,6 +53,20 @@ CREATE TABLE IF NOT EXISTS contract_results (
     violation_count INTEGER DEFAULT 0,
     violations      TEXT,
     checked_at      TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS diagnostic_results (
+    id              TEXT PRIMARY KEY,
+    run_id          TEXT NOT NULL,
+    status          TEXT NOT NULL,
+    finding_type    TEXT NOT NULL,
+    confidence      REAL NOT NULL,
+    explanation     TEXT,
+    evidence        TEXT,
+    actions         TEXT,
+    can_auto_fix    INTEGER DEFAULT 0,
+    diagnosed_at    TEXT NOT NULL,
+    provider        TEXT
 );
 """
 
@@ -233,6 +248,54 @@ def insert_contract_result(
         raise StateError(
             "PK-STATE-002",
             f"Cannot write contract result for {table_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def insert_diagnostic_result(
+    run_id: str,
+    result: dict,
+    provider: str,
+    cwd: Path | None = None,
+) -> None:
+    """Store an AI diagnostic result (SPEC-005). Called by DiagnosticsEngine only.
+
+    ``result`` is a serialized ``DiagnosticResult`` (its ``model_dump``). Evidence
+    and recommended actions are stored as JSON. The AI layer never writes state
+    directly — it goes through this function (ADR-007, ADR-014).
+    """
+    initialize(cwd)
+    db_path = get_db_path(cwd)
+    result_id = f"diag-{uuid.uuid4().hex[:8]}"
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO diagnostic_results (
+                    id, run_id, status, finding_type, confidence,
+                    explanation, evidence, actions, can_auto_fix,
+                    diagnosed_at, provider
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    result_id,
+                    run_id,
+                    result.get("status", ""),
+                    result.get("finding_type", ""),
+                    float(result.get("confidence", 0.0)),
+                    result.get("explanation", ""),
+                    json.dumps(result.get("evidence", [])),
+                    json.dumps(result.get("recommended_actions", [])),
+                    1 if result.get("can_auto_fix") else 0,
+                    _utc_now(),
+                    provider,
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot write diagnostic result for run {run_id}",
             {"path": str(db_path), "detail": str(exc)},
         ) from exc
 

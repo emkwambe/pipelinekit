@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PipelineSection(BaseModel):
@@ -32,14 +32,32 @@ class SourceConfig(BaseModel):
     """Connection descriptor for an ingestion source or destination.
 
     Only ``type`` is required; the remaining fields are optional so the same
-    model serves heterogeneous backends (e.g. postgres vs snowflake).
+    model serves heterogeneous backends (postgres, snowflake, bigquery, duckdb).
+    Credential fields are first-class (ADR-017): ``pipelinekit.yaml`` is the
+    single source of credential truth, populated via ``${VAR}`` interpolation in
+    the loader. The model never stores secrets at rest — values arrive from the
+    environment at load time (BYOK, ADR-005).
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
     type: str
+    # Postgres / MySQL
     host: Optional[str] = None
     port: Optional[int] = None
     database: Optional[str] = None
+    user: Optional[str] = None
+    password: Optional[str] = None
+    tables: Optional[list[str]] = None
+    # Snowflake
     account: Optional[str] = None
+    warehouse: Optional[str] = None
+    schema_name: Optional[str] = Field(None, alias="schema")
+    # BigQuery
+    project: Optional[str] = None
+    location: Optional[str] = None
+    # DuckDB
+    path: Optional[str] = None
 
 
 class IngestionSection(BaseModel):

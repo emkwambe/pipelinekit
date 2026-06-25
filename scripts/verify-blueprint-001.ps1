@@ -14,13 +14,28 @@ $start = Get-Date
 Write-Host "=== Blueprint #001 Verification ===" -ForegroundColor Cyan
 Write-Host "Started: $start"
 
-# Step 1: Initialize project
+# Step 0: Preflight — required environment variables must be set
+$required = @("POSTGRES_CONN_STR", "PG_HOST", "PG_DATABASE",
+              "SNOWFLAKE_ACCOUNT", "SNOWFLAKE_USER", "SNOWFLAKE_PASSWORD",
+              "SNOWFLAKE_DATABASE", "SNOWFLAKE_WAREHOUSE")
+$missing = $required | Where-Object { -not [Environment]::GetEnvironmentVariable($_) }
+if ($missing) {
+    Write-Host "✗ Missing env vars: $($missing -join ', ')" -ForegroundColor Red
+    Write-Host "  Set all required variables before running this script."
+    exit 1
+}
+
+# Step 1: Use Blueprint #001 config (copy example config — not pipelinekit init)
 $step1_start = Get-Date
-poetry run pipelinekit init
+Copy-Item "blueprints\postgres-to-snowflake\pipelinekit.example.yaml" "pipelinekit.yaml" -Force
+# Point contracts at the blueprint's data contract, not the repo architecture contracts.
+$config = Get-Content "pipelinekit.yaml" -Raw
+$config = $config -replace "directory: ./contracts", "directory: ./blueprints/postgres-to-snowflake/contracts"
+Set-Content "pipelinekit.yaml" $config
 poetry run pipelinekit validate
 $step1_end = Get-Date
 $step1_time = ($step1_end - $step1_start).TotalSeconds
-Write-Host "Step 1 (init + validate): ${step1_time}s" -ForegroundColor Green
+Write-Host "Step 1 (config + validate): ${step1_time}s" -ForegroundColor Green
 
 # Step 2: Run blueprint validate
 $step2_start = Get-Date

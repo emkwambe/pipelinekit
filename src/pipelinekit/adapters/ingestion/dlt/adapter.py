@@ -2,9 +2,12 @@
 
 Wraps dlt pipeline execution behind the stable :class:`BaseAdapter` interface.
 **All dlt imports stay inside this file** (lazily, inside methods) — never in
-runtime, cli, config, state, or core (SPEC-009).
+runtime, cli, config, state, or core (SPEC-009, Smell 2).
 
-Phase 2 scope: PostgreSQL source → Snowflake / BigQuery / DuckDB destination.
+Credentials come from ``PipelineConfig`` (ADR-017): the adapter translates
+``SourceConfig`` fields into a Postgres connection string and dlt destination
+credentials. ``pipelinekit.yaml`` is the single source of credential truth —
+the adapter never reads ``.dlt/secrets.toml`` or dlt's own env convention.
 
 dlt exceptions never propagate raw: connectivity failures map to
 ``PK-ADAPTER-001`` and execution failures to ``PK-ADAPTER-002``.
@@ -14,9 +17,10 @@ from __future__ import annotations
 
 import socket
 import time
+from typing import Any
 
 from pipelinekit.adapters.base import BaseAdapter
-from pipelinekit.config.schema import IngestionSection
+from pipelinekit.config.schema import IngestionSection, SourceConfig
 from pipelinekit.core.errors import PipelineKitError
 from pipelinekit.runtime.result import PipelineStatus, StepResult
 
@@ -30,6 +34,7 @@ class DltIngestionAdapter(BaseAdapter):
     def __init__(self, config: IngestionSection) -> None:
         self.config = config
         self._initialized = False
+        self._pipeline: Any = None
 
     # -- naming (human-readable, version-controllable per ADR-009) -----------
 
@@ -42,7 +47,21 @@ class DltIngestionAdapter(BaseAdapter):
     # -- BaseAdapter ---------------------------------------------------------
 
     def initialize(self) -> None:
-        """Mark the adapter ready. dlt objects are built lazily in execute()."""
+        """Build the dlt pipeline object from config.
+
+        The runtime does not require ``initialize`` before ``validate`` or
+        ``execute`` (the executor calls those directly), but building the
+        pipeline here keeps the adapter contract complete and lets ``execute``
+        reuse the object. dlt source/destination credentials are resolved
+        lazily so a dry-run never needs live destination credentials.
+        """
+        import dlt  # type: ignore  # provider lib: treated as Any, not followed
+
+        self._pipeline = dlt.pipeline(
+            pipeline_name=self._pipeline_name(),
+            destination=self._destination(),
+            dataset_name=self._dataset_name(),
+        )
         self._initialized = True
 
     def _check_connectivity(self) -> None:
@@ -73,17 +92,24 @@ class DltIngestionAdapter(BaseAdapter):
         return StepResult(_STEP, PipelineStatus.VALID, time.perf_counter() - start)
 
     def execute(self) -> StepResult:
-        """Run the dlt pipeline and report rows processed."""
+        """Run the dlt pipeline and report rows processed.
+
+        Builds a real ``sql_database`` source when the source declares tables;
+        otherwise runs an empty source (nothing to ingest). All dlt failures —
+        including a missing ``sql_database`` extra — map to ``PK-ADAPTER-002``.
+        """
         start = time.perf_counter()
         try:
             import dlt  # type: ignore  # provider lib: treated as Any, not followed
 
-            pipeline = dlt.pipeline(
-                pipeline_name=self._pipeline_name(),
-                destination=self.config.destination.type,
-                dataset_name=self._dataset_name(),
-            )
-            load_info = pipeline.run(self._source_rows())
+            pipeline = self._pipeline
+            if pipeline is None:
+                pipeline = dlt.pipeline(
+                    pipeline_name=self._pipeline_name(),
+                    destination=self._destination(),
+                    dataset_name=self._dataset_name(),
+                )
+            load_info = pipeline.run(self._build_source())
             rows = self._rows_loaded(load_info)
         except PipelineKitError:
             raise
@@ -112,15 +138,60 @@ class DltIngestionAdapter(BaseAdapter):
             "destination": self.config.destination.type,
         }
 
-    # -- helpers -------------------------------------------------------------
+    # -- credential + source wiring (ADR-017) --------------------------------
 
-    def _source_rows(self) -> object:
-        """Build the dlt source. Phase 2 placeholder for the SQL source.
+    def _build_postgres_conn_str(self, source: SourceConfig) -> str:
+        """Build a ``postgresql://`` connection string from ``SourceConfig``."""
+        return (
+            f"postgresql://{source.user}:{source.password}"
+            f"@{source.host}:{source.port or 5432}/{source.database}"
+        )
 
-        The concrete SQL-source wiring is exercised against a live database,
-        not in tests; tests mock ``dlt.pipeline``. Returning an empty list keeps
-        the call shape valid when no rows are configured.
+    def _build_snowflake_credentials(self, dest: SourceConfig) -> dict:
+        """Build a Snowflake credentials dict for dlt from ``SourceConfig``."""
+        return {
+            "account": dest.account,
+            "user": dest.user,
+            "password": dest.password,
+            "database": dest.database,
+            "warehouse": dest.warehouse,
+            "schema": dest.schema_name or "raw",
+        }
+
+    def _destination(self) -> object:
+        """Resolve the dlt destination.
+
+        Snowflake is built with explicit credentials from config (ADR-017);
+        other destinations (duckdb, bigquery) are passed by type name and let
+        dlt resolve them. Snowflake credentials are constructed lazily here so a
+        non-Snowflake destination never imports Snowflake-specific dlt code.
         """
+        dest = self.config.destination
+        if dest.type == "snowflake":
+            import dlt  # type: ignore  # provider lib: treated as Any
+
+            return dlt.destinations.snowflake(
+                credentials=self._build_snowflake_credentials(dest)
+            )
+        return dest.type
+
+    def _build_source(self) -> object:
+        """Build the dlt source from config.
+
+        When the Postgres source declares tables, build a real ``sql_database``
+        source (requires the dlt ``sql_database`` extra / SQLAlchemy at runtime).
+        With no tables there is nothing to ingest, so return an empty source —
+        this keeps validate/dry-run and unit tests free of a live database.
+        """
+        source = self.config.source
+        tables = source.tables or []
+        if source.type == "postgres" and tables:
+            from dlt.sources.sql_database import (  # type: ignore  # provider lib
+                sql_database,
+            )
+
+            conn_str = self._build_postgres_conn_str(source)
+            return sql_database(conn_str).with_resources(*tables)
         return []
 
     def _rows_loaded(self, load_info: object) -> int:

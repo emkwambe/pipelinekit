@@ -9,19 +9,26 @@ pipeline:
 runtime:
   environment: local
 
-# Connection credentials are passed via environment variables.
-# See runbook.md Prerequisites for required env vars.
-# POSTGRES_CONN_STR, SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_PASSWORD etc.
+# Credentials are read from environment variables via ${VAR} interpolation
+# (ADR-017). Set the referenced vars before running. See runbook.md Prerequisites.
 ingestion:
   source:
     type: postgres
     host: "${PG_HOST}"
     port: 5432
     database: "${PG_DATABASE}"
+    user: "${PG_USER}"
+    password: "${PG_PASSWORD}"
+    tables:
+      - orders
   destination:
     type: snowflake
     account: "${SNOWFLAKE_ACCOUNT}"
     database: "${SNOWFLAKE_DATABASE}"
+    user: "${SNOWFLAKE_USER}"
+    password: "${SNOWFLAKE_PASSWORD}"
+    warehouse: "${SNOWFLAKE_WAREHOUSE}"
+    schema: "raw"
 
 transformation:
   enabled: true

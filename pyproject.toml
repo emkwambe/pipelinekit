@@ -13,7 +13,7 @@ typer = {extras = ["all"], version = ">=0.16,<1.0"}
 pydantic = "^2.0"
 pyyaml = "^6.0"
 rich = "^13.0"
-dlt = {extras = ["snowflake", "bigquery", "duckdb"], version = "^1.0"}
+dlt = {extras = ["snowflake", "bigquery", "duckdb", "sql_database"], version = "^1.0"}
 dbt-core = "^1.8"
 dbt-snowflake = "^1.8"
 dbt-bigquery = "^1.8"

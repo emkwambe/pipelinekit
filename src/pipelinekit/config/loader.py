@@ -15,13 +15,37 @@ See: SPEC-002, ADR-009 (human-readable), docs/reference/Error-Codes.md.
 
 from __future__ import annotations
 
+import os
+import re
 from pathlib import Path
+from typing import Any
 
 import yaml  # type: ignore[import-untyped]
 from pydantic import ValidationError
 
 from pipelinekit.config.schema import PipelineConfig
 from pipelinekit.core.errors import ConfigurationError
+
+# ``${VAR}`` reference in a config string (ADR-017).
+_ENV_VAR_PATTERN = re.compile(r"\$\{([^}]+)\}")
+
+
+def _interpolate_env_vars(obj: Any) -> Any:
+    """Recursively replace ``${VAR}`` patterns with environment values.
+
+    Applied to the raw YAML structure before Pydantic validation so that
+    ``pipelinekit.yaml`` is the single source of credential truth (ADR-017).
+    An unset variable resolves to an empty string — interpolation never raises;
+    empty required credentials are caught later as ``PK-CONFIG-006``.
+    """
+    if isinstance(obj, str):
+        return _ENV_VAR_PATTERN.sub(lambda m: os.environ.get(m.group(1), ""), obj)
+    if isinstance(obj, dict):
+        return {key: _interpolate_env_vars(value) for key, value in obj.items()}
+    if isinstance(obj, list):
+        return [_interpolate_env_vars(item) for item in obj]
+    return obj
+
 
 CONFIG_FILENAME = "pipelinekit.yaml"
 
@@ -119,6 +143,9 @@ def load_config(cwd: Path | None = None) -> PipelineConfig:
             f"{CONFIG_FILENAME} must contain a YAML mapping of sections",
             {"path": str(path)},
         )
+
+    # Expand ${VAR} references from the environment before validation (ADR-017).
+    raw = _interpolate_env_vars(raw)
 
     try:
         return PipelineConfig(**raw)

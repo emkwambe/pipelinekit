@@ -19,6 +19,7 @@ CONFIG · CONTRACT · RUNTIME · ADAPTER · AI · STATE · BLUEPRINT · NOTIFY
 | PK-CONFIG-003 | pipelinekit.yaml not found in cwd |
 | PK-CONFIG-004 | pipelinekit.yaml is not valid YAML |
 | PK-CONFIG-005 | Failed to write pipelinekit.yaml |
+| PK-CONFIG-006 | Required credential field empty after env var interpolation |
 
 ### STATE
 

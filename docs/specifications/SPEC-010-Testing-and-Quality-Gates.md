@@ -1,4 +1,4 @@
-# SPEC-001-CLI-Framework.md
+# SPEC-010-Testing-and-Quality-Gates.md
 
 Status: Draft
 

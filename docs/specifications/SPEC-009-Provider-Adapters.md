@@ -1,4 +1,4 @@
-# SPEC-001-CLI-Framework.md
+# SPEC-009-Provider-Adapters.md
 
 Status: Draft
 

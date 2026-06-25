@@ -1,4 +1,4 @@
-# SPEC-001-CLI-Framework.md
+# SPEC-008-Notification-System.md
 
 Status: Draft
 

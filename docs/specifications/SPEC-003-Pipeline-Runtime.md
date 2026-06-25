@@ -1,4 +1,4 @@
-# SPEC-001-CLI-Framework.md
+# SPEC-003-Pipeline-Runtime.md
 
 Status: Draft
 

@@ -1,4 +1,4 @@
-# SPEC-001-CLI-Framework.md
+# SPEC-002-Configuration-System.md
 
 Status: Draft
 

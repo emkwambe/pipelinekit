@@ -1,4 +1,4 @@
-# SPEC-001-CLI-Framework.md
+# SPEC-005-AI-Diagnostics.md
 
 Status: Draft
 

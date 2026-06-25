@@ -1,4 +1,4 @@
-# SPEC-001-CLI-Framework.md
+# SPEC-006-Blueprint-Engine.md
 
 Status: Draft
 

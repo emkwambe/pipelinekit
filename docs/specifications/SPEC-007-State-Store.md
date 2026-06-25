@@ -1,4 +1,4 @@
-# SPEC-001-CLI-Framework.md
+# SPEC-007-State-Store.md
 
 Status: Draft
 

@@ -1,4 +1,4 @@
-# SPEC-001-CLI-Framework.md
+# SPEC-004-Contracts.md
 
 Status: Draft
 

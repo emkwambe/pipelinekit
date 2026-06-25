@@ -9,89 +9,88 @@
 ## Current State
 
 **Active Phase:** Phase 6 — Blueprint Catalog + Ecosystem  
-**Last Completed:** Sprint 6-1 — pipelinekit health  
+**Last Completed:** Sprint 6-2a — dlt Adapter Completion + Credential Wiring  
 **Last Updated:** June 25, 2026  
-**Main Branch:** `c613640` (Sprint 6-1 health + schema fix)
+**Main Branch:** `fe6341f` (Sprint 6-2a)
 
 ---
 
 ## Phase Completion Record
 
-### ✅ Phase 1 — Foundation
-**Commit:** `8d8865f` | 36 tests | 92.65%
+### ✅ Phase 1 — Foundation | `8d8865f` | 36 tests | 92.65%
+### ✅ Phase 2 — Data Layer | `f337cfe` | 87 tests | 84.70%
+### ✅ Phase 3 — Trust Layer | `d938e50` | 112 tests | 82.00%
+### ✅ Phase 4 — Intelligence Layer | `47bdd51` | 151 tests | 82.16%
+### ✅ Phase 5 — Architecture Layer | `ede343a` | 174 tests | 81.27%
+### ✅ Provider Diversity (ADR-016) | `d6e4a4b` | 184 tests | 5 providers
+### ✅ Sprint 6-1 — pipelinekit health | `c613640` | 209 tests | 82.42%
 
-### ✅ Phase 2 — Data Layer
-**Commit:** `f337cfe` | 87 tests | 84.70%
+---
 
-### ✅ Phase 3 — Trust Layer
-**Commit:** `d938e50` | 112 tests | 82.00%
-
-### ✅ Phase 4 — Intelligence Layer
-**Commit:** `47bdd51` | 151 tests | 82.16%
-
-### ✅ Phase 5 — Architecture Layer
-**Commit:** `ede343a` | 174 tests | 81.27%
-
-### ✅ Provider Diversity Extension (ADR-016)
-**Commit:** `d6e4a4b` + `1c04c9a` | 184 tests | 5 providers
-
-### ✅ Sprint 6-1 — pipelinekit health
+### ✅ Sprint 6-2a — dlt Adapter Completion + Credential Wiring
 **Completed:** June 25, 2026  
-**Commit:** `c613640` | 209 tests | 82.42% | 22 files +1426/−23
+**Commit:** `fe6341f` | 225 tests | 82.67% | 11 files +627/−27
 
 **What was built:**
-- `src/pipelinekit/health/` — DepsChecker, SecurityChecker, BlueprintHealthChecker, SpecDriftChecker, TestsChecker
-- `src/pipelinekit/cli/health.py` — 5 subcommands + `--strict` flag
-- `schemas/architecture.schema.json` — adr_compliance fixed (object → array)
-- `src/pipelinekit/ai/arch_engine.py` — obsolete list→object wrap removed (paired fix)
-- `pyproject.toml` — pip-audit ^2.0 added to dev dependencies
-- `src/pipelinekit/state/db.py` — health_runs table + insert_health_run()
-- `src/pipelinekit/core/errors.py` — HealthError added
-- `tests/health/` — 25 new tests (9 planned + 6 additional for coverage gate)
+- `src/pipelinekit/config/schema.py` — SourceConfig extended with first-class credential fields (user, password, host, port, database, tables, account, warehouse, schema_name, project, path)
+- `src/pipelinekit/config/loader.py` — `${VAR}` environment variable interpolation before Pydantic validation
+- `src/pipelinekit/adapters/ingestion/dlt/adapter.py` — real `sql_database` dlt source, Postgres connection string, Snowflake credentials from PipelineConfig
+- `scripts/verify-blueprint-001.ps1` — fixed harness (copies example config, env preflight guard, blueprint contracts path)
+- `blueprints/postgres-to-snowflake/pipelinekit.example.yaml` — credential fields restored as first-class config
+- `pyproject.toml` — `dlt[sql_database]` extra added (SQLAlchemy 2.0.51)
+- `docs/reference/Error-Codes.md` — PK-CONFIG-006 registered
+- 3 new test files (test_dlt_adapter_integration, test_loader_interpolation, test_schema_credentials)
 
 **Quality gates:**
 | Gate | Result |
 |---|---|
-| pytest | 209 passed (184 prior + 25 new) |
-| coverage | 82.42% (≥80% ✓) |
-| ruff / black / mypy | All clean |
+| pytest | 225 passed (209 prior + 16 new) |
+| coverage | 82.67% (adapter 90%, loader 93%, schema 100%) |
+| ruff / black / mypy | Clean, 69 source files |
+| sql_database import | Resolves (SQLAlchemy installed) |
+| db.py / PROJECT-STATUS | Untouched |
+
+**ADR satisfied:** ADR-017 (dlt Credential Integration Policy)
 
 **Key decisions:**
-- 3 extra test files added (test_security, test_tests, test_health_cli) — coverage gate (80%) required them; purely additive, mock-only
-- poetry-unavailable → `info` not `error` — consistent with security/tests pattern; test wins over prose
-- pip-audit found 3 real advisories in current venv — surfaced as non-blocking warnings; address in next monthly maintenance cycle
-- 18 major dependency updates available — informational; review quarterly per Sustainability Policy
-- arch_engine.py docstring fixed in same commit — included in c613640
+- Position A chosen — PipelineKit owns credentials, not dlt
+- New sibling test files created (not modifying READ ONLY existing tests)
+- `dlt[sql_database]` extra authorized mid-sprint — direct requirement of completed adapter
+- Credential fields restored to example.yaml — now first-class SourceConfig fields
 
-**SPEC-012 satisfied.** Sustainability policy is now programmed, not just documented.
+**Carry-forward (not blockers):**
+- PK-CONFIG-006 registered but not enforced — CLI/runtime wiring in next sprint
+- Blueprint #001 is now genuinely runnable end-to-end
 
 ---
 
-## Complete CLI Surface
+## Blueprint #001 Status
 
-```
-pipelinekit init
-pipelinekit validate [--contracts]
-pipelinekit run [--dry-run]
-pipelinekit status
-pipelinekit blueprint list / validate / info <name>
-pipelinekit diagnose [run_id] [--provider] [--approve]
-pipelinekit architect analyze / check-adrs / compare
-pipelinekit health [deps|security|blueprints|specs|tests] [--strict]
-```
+**Blueprint #001 (Postgres → Snowflake) is now runnable.**
+
+The dlt adapter builds a real `sql_database` source from config. Credentials flow from `pipelinekit.yaml` → `SourceConfig` → dlt. The path exists.
+
+**Next manual step (Eddy):**
+1. Set real environment variables (not `"..."` placeholders)
+2. Run `.\scripts\verify-blueprint-001.ps1`
+3. Fill in `blueprints/postgres-to-snowflake/docs/runbook.md` §6 with real numbers
+4. Commit: `"Blueprint #001 verified — [date] by Eddy Mkwambe"`
+
+That commit closes the 60-minute claim and clears the last gate before design partner outreach.
 
 ---
 
 ## Phase 6 Sprint Queue
 
 ```
-✅ Sprint 6-1: pipelinekit health      DONE — c613640
-⏳ Blueprint #001 verification         Eddy runs on real Postgres + Snowflake
-⏳ Sprint 6-2: Blueprint #002          Salesforce → Snowflake (write SPEC-013 first)
-📋 Sprint 6-3: Blueprint #003          Stripe → Snowflake (write SPEC-014 first)
-📋 Sprint 6-4: AI Blueprint Gen        ADR-017 + SPEC-015 first
-📋 Sprint 6-5: Remote Registry         ADR-018 + SPEC-016 first
-📋 Sprint 6-6: Migration Intelligence  SPEC-017 first
+✅ Sprint 6-1:   pipelinekit health              c613640
+✅ Sprint 6-2a:  dlt adapter + credential wiring  fe6341f
+⏳ Blueprint #001 real verification               Eddy manual run
+⏳ Sprint 6-2b:  PK-CONFIG-006 wiring             CLI/runtime sprint
+⏳ Sprint 6-3:   Blueprint #002 Salesforce → Snowflake
+📋 Sprint 6-4:   AI Blueprint Generation
+📋 Sprint 6-5:   Remote Blueprint Registry
+📋 Sprint 6-6:   Migration Intelligence
 ```
 
 ---
@@ -99,12 +98,14 @@ pipelinekit health [deps|security|blueprints|specs|tests] [--strict]
 ## Hardening Checklist
 
 ```
-✅ pipelinekit health implemented (SPEC-012)
-✅ architecture.schema.json adr_compliance fixed (object → array)
-✅ pip-audit in dev toolchain
+✅ pipelinekit health (SPEC-012)
+✅ architecture.schema.json adr_compliance fixed
+✅ dlt adapter real implementation (ADR-017)
+✅ SourceConfig credential fields first-class
+✅ ${VAR} interpolation in config loader
+✅ dlt[sql_database] extra installed
 □  Blueprint #001 verified deployment on real Postgres + Snowflake
-□  3 pip-audit advisories — review and patch (monthly cycle)
-□  18 major dep updates available — review quarterly
+□  PK-CONFIG-006 wired into validate/run (Sprint 6-2b)
 □  SPEC-005 confidence_threshold drift fix
 □  ICP-001, ICP-002, ICP-003 stubs
 □  PRD in-file update with v2 executive summary
@@ -115,9 +116,9 @@ pipelinekit health [deps|security|blueprints|specs|tests] [--strict]
 
 ## Repository Numbers
 
-**Tests:** 209 | **Coverage:** 82.42% | **Source files:** ~65  
-**State tables:** 6 | **AI providers:** 5 | **CLI commands:** 8 groups / 11+ commands  
-**ADRs:** 016 | **SPECs:** 12 (SPEC-012 satisfied) | **Smells:** 16
+**Tests:** 225 | **Coverage:** 82.67% | **Source files:** 69  
+**State tables:** 6 | **AI providers:** 5 | **CLI commands:** 11+  
+**ADRs:** 017 | **SPECs:** 12 | **Smells:** 16
 
 ---
 

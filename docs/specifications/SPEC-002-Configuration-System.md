@@ -1,6 +1,6 @@
 # SPEC-002-Configuration-System.md
 
-**Status:** Approved  
+**Status:** Implemented  
 **Owner:** cli-engineer (Phase 1 scaffold), runtime-engineer (Phase 2 extension)  
 **Phase:** 1 — Foundation  
 **Date:** June 24, 2026  
@@ -190,11 +190,11 @@ from pipelinekit.core.errors import ConfigurationError
 
 CONFIG_FILENAME = "pipelinekit.yaml"
 
-def config_exists(cwd: Path = Path.cwd()) -> bool:
+def config_exists(cwd: Path | None = None) -> bool:
     """Return True if pipelinekit.yaml exists in cwd."""
     ...
 
-def load_config(cwd: Path = Path.cwd()) -> PipelineConfig:
+def load_config(cwd: Path | None = None) -> PipelineConfig:
     """
     Load and validate pipelinekit.yaml from cwd.
     Raises ConfigurationError on failure.
@@ -202,7 +202,7 @@ def load_config(cwd: Path = Path.cwd()) -> PipelineConfig:
     """
     ...
 
-def write_default_config(cwd: Path = Path.cwd()) -> None:
+def write_default_config(cwd: Path | None = None) -> None:
     """
     Write the default pipelinekit.yaml to cwd.
     Raises ConfigurationError if write fails.

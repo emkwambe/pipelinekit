@@ -1,6 +1,6 @@
 # SPEC-007-State-Store.md
 
-**Status:** Approved  
+**Status:** Implemented  
 **Owner:** cli-engineer (Phase 1 scaffold), runtime-engineer (Phase 2 writes runs)  
 **Phase:** 1 — Foundation  
 **Date:** June 24, 2026  

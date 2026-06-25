@@ -1,0 +1,37 @@
+﻿version: 2
+
+sources:
+  - name: postgres_raw
+    description: >
+      Raw operational data ingested from the source Postgres database
+      via the dlt pipeline. Tables land in the raw schema before
+      staging models transform them.
+    database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
+    schema: raw
+    tables:
+      - name: orders
+        description: Raw orders table ingested from Postgres source.
+        columns:
+          - name: id
+            description: Primary key. Unique order identifier.
+            tests:
+              - unique
+              - not_null
+          - name: customer_id
+            description: Foreign key to the customers table.
+            tests:
+              - not_null
+          - name: status
+            description: Order fulfillment status.
+            tests:
+              - not_null
+              - accepted_values:
+                  values: ['pending', 'processing', 'shipped', 'delivered', 'cancelled']
+          - name: amount
+            description: Order total in the source currency.
+            tests:
+              - not_null
+          - name: created_at
+            description: Timestamp when the order was created in the source system.
+            tests:
+              - not_null

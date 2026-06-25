@@ -1,6 +1,6 @@
 # SPEC-008-Notification-System.md
 
-**Status:** Approved  
+**Status:** Implemented  
 **Owner:** runtime-engineer  
 **Phase:** 3 — Trust Layer  
 **Date:** June 25, 2026  

@@ -1,6 +1,6 @@
 # SPEC-009-Provider-Adapters.md
 
-**Status:** Approved  
+**Status:** Implemented  
 **Owner:** runtime-engineer  
 **Phase:** 2 — Data Layer  
 **Date:** June 25, 2026  

@@ -1,6 +1,6 @@
 # SPEC-006-Blueprint-Engine.md
 
-**Status:** Approved  
+**Status:** Implemented  
 **Owner:** blueprint-engineer  
 **Phase:** 3 — Trust Layer  
 **Date:** June 25, 2026  

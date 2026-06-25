@@ -1,0 +1,15 @@
+# Notification configuration for Blueprint #001.
+# Mirrors the `notifications` section of pipelinekit.yaml.
+# The Resend API key is read from the RESEND_API_KEY environment variable
+# (BYOK, ADR-005) — never stored in this file.
+
+notifications:
+  enabled: true
+  provider: resend
+  from_address: "pipelinekit@yourdomain.com"
+  recipients:
+    - "data-team@yourcompany.com"
+  notify_on:
+    - pipeline_failed
+    - contract_violated
+    # - pipeline_succeeded   # opt-in: uncomment to receive success emails

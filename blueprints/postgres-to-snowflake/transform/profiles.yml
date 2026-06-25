@@ -1,0 +1,17 @@
+# dbt profile for Blueprint #001 (Postgres -> Snowflake).
+# Credentials are supplied via environment variables (BYOK, ADR-005).
+# Never commit real account details, passwords, or keys.
+
+postgres_to_snowflake:
+  target: prod
+  outputs:
+    prod:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE', 'TRANSFORMER') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
+      schema: analytics
+      threads: 4

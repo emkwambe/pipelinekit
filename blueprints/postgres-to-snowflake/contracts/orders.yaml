@@ -1,0 +1,24 @@
+version: 1
+table: orders
+description: "Order transaction records"
+
+freshness:
+  max_age_hours: 12
+  column: updated_at
+
+required_columns:
+  - order_id
+  - customer_id
+  - amount
+  - status
+
+uniqueness:
+  - order_id
+
+not_null:
+  - order_id
+  - customer_id
+  - amount
+
+row_count:
+  min: 1

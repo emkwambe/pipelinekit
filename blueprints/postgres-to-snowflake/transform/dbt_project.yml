@@ -1,0 +1,14 @@
+name: postgres_to_snowflake
+version: "1.0.0"
+config-version: 2
+
+profile: postgres_to_snowflake
+
+model-paths: ["models"]
+
+models:
+  postgres_to_snowflake:
+    staging:
+      +materialized: view
+    core:
+      +materialized: table

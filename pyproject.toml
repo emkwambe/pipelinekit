@@ -19,6 +19,8 @@ dbt-snowflake = "^1.8"
 dbt-bigquery = "^1.8"
 soda-core = "^3.0"
 soda-core-postgres = "^3.0"
+resend = "^2.0"
+jsonschema = "^4.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0"

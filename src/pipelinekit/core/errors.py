@@ -42,3 +42,7 @@ class RuntimeError(
 
 class ContractError(PipelineKitError):
     """Raised when a data contract is violated (Phase 2+)."""
+
+
+class BlueprintError(PipelineKitError):
+    """Raised when a blueprint is missing, invalid, or cannot be executed."""

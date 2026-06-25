@@ -16,6 +16,7 @@ from pipelinekit.adapters.base import BaseAdapter
 from pipelinekit.adapters.factory import AdapterFactory
 from pipelinekit.config.schema import PipelineConfig
 from pipelinekit.core.errors import PipelineKitError
+from pipelinekit.notifications.dispatcher import NotificationDispatcher
 from pipelinekit.runtime.executor import execute_step, validate_step
 from pipelinekit.runtime.result import PipelineResult, PipelineStatus, StepResult
 from pipelinekit.state import db
@@ -98,18 +99,28 @@ class PipelineRunner:
                 str(exc),
             )
         finally:
+            # 1. Always update state first — this must never be skipped.
             duration = time.perf_counter() - start
             db.update_run(run_id, status.value, duration, error_code, error_msg)
+            result = PipelineResult(
+                run_id=run_id,
+                pipeline_name=name,
+                status=status,
+                duration_s=duration,
+                steps=steps,
+                error_code=error_code,
+                error_msg=error_msg,
+            )
+            # 2. Then dispatch notifications — failure must not corrupt state.
+            if self.config.notifications.enabled:
+                try:
+                    dispatcher = NotificationDispatcher(self.config.notifications)
+                    dispatcher.initialize()
+                    dispatcher.notify_pipeline_result(result, None)
+                except Exception:
+                    pass  # Notification failure is never propagated (SPEC-008).
 
-        return PipelineResult(
-            run_id=run_id,
-            pipeline_name=name,
-            status=status,
-            duration_s=duration,
-            steps=steps,
-            error_code=error_code,
-            error_msg=error_msg,
-        )
+        return result
 
     def validate(self) -> PipelineResult:
         """Validate config and adapter connectivity without executing."""

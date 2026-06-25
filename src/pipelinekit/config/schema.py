@@ -78,10 +78,20 @@ class DiagnosticsSection(BaseModel):
 
 
 class NotificationsSection(BaseModel):
-    """Notification settings."""
+    """Notification settings.
+
+    Phase 1 shipped ``enabled`` and ``channels``. Phase 3 adds the fields the
+    notification dispatcher needs (provider, sender, recipients, and which
+    events to notify on). The Resend API key is never stored here — it is read
+    from the ``RESEND_API_KEY`` environment variable (ADR-005, BYOK).
+    """
 
     enabled: bool = False
     channels: list[str] = []
+    provider: str = "resend"
+    from_address: str = ""
+    recipients: list[str] = []
+    notify_on: list[str] = ["pipeline_failed", "contract_violated"]
 
 
 class PipelineConfig(BaseModel):

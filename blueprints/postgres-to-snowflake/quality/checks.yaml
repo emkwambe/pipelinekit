@@ -1,0 +1,21 @@
+# Soda checks for the orders table (Blueprint #001).
+# Executed by the Soda quality adapter against the Snowflake destination.
+
+checks for orders:
+  # Freshness — orders should be no older than 12 hours.
+  - freshness(updated_at) < 12h
+
+  # Volume — the table should never be empty.
+  - row_count > 0
+
+  # Completeness — key columns must never be null.
+  - missing_count(order_id) = 0
+  - missing_count(customer_id) = 0
+  - missing_count(amount) = 0
+
+  # Uniqueness — order_id is the primary key.
+  - duplicate_count(order_id) = 0
+
+  # Validity — status is a known value.
+  - invalid_count(status) = 0:
+      valid values: [pending, confirmed, shipped, delivered, cancelled]

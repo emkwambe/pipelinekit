@@ -1,0 +1,18 @@
+{
+  "name": "postgres-to-snowflake",
+  "version": "1.0.0",
+  "description": "Postgres to Snowflake trusted analytics pipeline",
+  "source": {
+    "type": "postgres",
+    "dlt_source": "sql_database"
+  },
+  "destination": {
+    "type": "snowflake",
+    "dlt_destination": "snowflake"
+  },
+  "contracts": ["contracts/orders.yaml"],
+  "tags": ["postgres", "snowflake", "product-analytics"],
+  "kpis": ["Daily Orders", "Revenue", "Customers", "Order Value", "Retention"],
+  "deploy_time_minutes": 60,
+  "time_to_trusted_data_hours": 24
+}

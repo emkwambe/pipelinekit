@@ -4,7 +4,7 @@
 **Owner:** Command Center (Claude Chat)  
 **Purpose:** Pre-flight checklist evaluated before any new capability, dependency, or structural change is approved.  
 **Rule:** Claude Chat evaluates every proposed change against this list before Claude Code writes a single line.  
-**Version:** 2.0 — directional guidance added to all smells
+**Version:** 3.0 — Smell 16 (Control Plane Inversion) added post-dbt/Fivetran merger
 
 ---
 
@@ -335,11 +335,33 @@ Smell 12 — Trust Regression                 □ trust improves or holds
 Smell 13 — Observer Becomes Actor           □ AI stays in advisory role
 Smell 14 — State Orphan                     □ all executions recorded
 Smell 15 — Blueprint Shortcut               □ all required assets present
+Smell 16 — Control Plane Inversion          □ PipelineKit coordinates, not implements
 ```
 
-All 15 must pass before the sprint prompt is sent.  
+All 16 must pass before the sprint prompt is sent.  
 Any failure triggers a pause and a deliberate decision.  
 Decisions that override a smell go through an ADR.
+
+---
+
+
+### Smell 16 — Control Plane Inversion
+
+**Signal:** PipelineKit implements provider-specific behavior directly instead of exposing a control interface that providers plug into. The tool starts telling PipelineKit how to behave, rather than PipelineKit telling the tool what to do.
+
+**Examples:**
+- A CLI command is written specifically for Snowflake instead of for any warehouse — smell
+- The runtime branches on `if provider == "fivetran"` instead of calling `adapter.execute()` — smell
+- A blueprint hardcodes dbt model syntax instead of delegating to the transformation adapter — smell
+- A diagnostic checks for "dbt-specific errors" instead of reading structured StepResult evidence — smell
+
+**Test:** Does PipelineKit coordinate providers through stable interfaces, or does it contain provider-specific logic outside adapters?
+
+**Direction:** Move toward the interface, not toward the implementation. PipelineKit's value is that it operates above any provider. The moment provider-specific logic appears in the runtime, CLI, contracts, or schemas — PipelineKit has inverted from control plane to tool wrapper. A tool wrapper can be replaced by the next better tool. A control plane cannot.
+
+The test is simple: if Snowflake were replaced by DuckDB tomorrow, how much of PipelineKit's code would need to change? The answer should be: one adapter file. If the answer is more than that — the control plane has inverted somewhere.
+
+**Action:** Move provider-specific logic into the appropriate adapter. Define the behavior as a method on `BaseAdapter`. The control plane calls the interface. The adapter implements the provider detail. The rest of PipelineKit never knows which provider is underneath.
 
 ---
 
@@ -352,4 +374,4 @@ A new smell is added when:
 
 New smells require Command Center review and a commit to this file.  
 Smells are never added speculatively — only from observed evidence.  
-Current count: 15 smells. Target: the minimum number that prevents the maximum damage.
+Current count: 16 smells. Target: the minimum number that prevents the maximum damage.

@@ -1,89 +1,103 @@
 # PipelineKit — Vision Statement Update
-## Post-dbt/Fivetran Merger Reshaping
+## Post-dbt/Fivetran Merger Reshaping — Version 2
 
 **Date:** June 25, 2026  
+**Supersedes:** VISION-STATEMENT-UPDATE.md (v1 — June 25, 2026)  
 **Type:** Vision clarification — governing principle unchanged  
-**Affects:** PRD executive summary, Strategic Operating Document executive summary  
 **Owner:** Command Center
 
 ---
 
-## What Changed and Why
+## What Changed from v1
 
-The dbt Labs / Fivetran merger confirmed that the market is consolidating around vertically integrated platforms. That consolidation creates a distinct, complementary position for PipelineKit: not another platform, but the AI-native operating system that coordinates above them.
+Version 1 introduced "control plane" as the primary positioning term. That language is technically accurate but strategically weak — Dagster, Kestra, Prefect, and Microsoft Fabric all use control plane language. It puts PipelineKit in the same mental bucket as orchestrators.
 
-The governing principle does not change:
+Version 2 removes "control plane" as a positioning term and replaces it with "intelligence layer" and "operating system" — language that is already in the governing principle and is broader, more accurate, and more differentiated.
+
+Version 2 also replaces "using AI" with "AI-native engineering" in the vision statement — a category, not a feature.
+
+Version 2 removes negative definitions ("PipelineKit is not an ingestion tool") and replaces them with positive definitions of what PipelineKit provides.
+
+---
+
+## The Governing Principle — Unchanged
 
 > **PipelineKit is the AI-native operating system for trusted analytics pipelines.**
 
-What changes is the vision statement and executive summary framing — from "what PipelineKit produces" to "what PipelineKit coordinates."
+This does not change. Everything else evolves beneath it.
 
 ---
 
 ## Updated Vision Statement
 
-**Previous (both PRD and Strategic Operating Document):**
-> PipelineKit is a blueprint-driven analytics platform that enables small and mid-sized data teams to deploy trusted analytics pipelines without becoming infrastructure experts.
-
-**Updated:**
+**Previous (v1):**
 > PipelineKit enables organizations to design, validate, operate, and continuously improve trusted analytics pipelines using AI — coordinating across whatever infrastructure they already run.
 
----
+**Updated (v2):**
+> PipelineKit enables organizations to design, validate, operate, and continuously evolve trusted analytics pipelines through AI-native engineering.
 
-## Updated PRD Executive Summary
-
-**Replace the current PRD executive summary with:**
-
-PipelineKit is the AI-native operating system for trusted analytics pipelines.
-
-PipelineKit is not an ingestion tool.  
-PipelineKit is not an orchestration tool.  
-PipelineKit is not a data quality tool.  
-PipelineKit is not competing with Fivetran, dbt, Airbyte, or Snowflake.
-
-PipelineKit is the control plane that sits above them — planning, validating, operating, diagnosing, and continuously improving trusted analytics systems regardless of which tools are underneath.
-
-The primary goal is: **Reduce Time-to-Trusted-Data.**
-
-As the data infrastructure market consolidates into larger integrated platforms, two effects emerge simultaneously: platforms become more powerful for customers who fit their stack, and harder to customize for customers who don't. The enterprise running Informatica, Fivetran, dbt, and custom Python pipelines cannot be served by any single platform. PipelineKit serves that customer — not by replacing their tools, but by operating above them.
+**Why the change:**
+- "Using AI" is a feature description. "AI-native engineering" is a category.
+- "Continuously improve" is generic. "Continuously evolve" implies architectural maturity — systems that adapt, not just systems that get tuned.
+- Removed the "coordinating across whatever infrastructure" clause — it is accurate but leads readers toward orchestrator comparisons. The PRD executive summary handles the heterogeneous stack story more precisely.
 
 ---
 
-## Updated Strategic Operating Document — Executive Summary Addition
+## Positioning Language — What to Use and Avoid
 
-**Add after the current executive summary:**
+### Use
 
-### Market Context — June 2026
+> PipelineKit provides the intelligence layer that designs, validates, governs, diagnoses, and continuously improves trusted analytics pipelines throughout their lifecycle.
 
-The dbt Labs / Fivetran merger represents the largest consolidation in the modern data stack. The merged company has stated its intent to build "the data infrastructure for trusted AI agents" — combining ingestion, transformation, semantic layer, governance, and AI-assisted development into one platform.
+> PipelineKit operates across the analytics stack — coordinating infrastructure, enforcing standards, validating architecture, and enabling AI-driven development regardless of the underlying tools.
 
-PipelineKit's response is not to compete with that platform. It is to operate above it.
+> PipelineKit is designed for organizations that run heterogeneous data environments and need a single operating model above their tools.
 
-Large integrated platforms create two effects:
-1. Power for customers who fit entirely within their stack
-2. Rigidity for customers running heterogeneous environments
+### Avoid
 
-The Fortune 500 enterprise running legacy Informatica alongside Fivetran alongside custom Python pipelines alongside Spark does not fit any single platform. That customer needs a control plane — a system that can plan, validate, operate, diagnose, and govern analytics systems across whatever infrastructure exists.
-
-That is PipelineKit.
-
-The governing principle — **PipelineKit is the AI-native operating system for trusted analytics pipelines** — was correct before the merger and remains correct after it. The merger clarified why.
+| Avoid | Because | Use instead |
+|---|---|---|
+| "Control plane" | Puts PipelineKit with Dagster/Kestra/Prefect | "Intelligence layer" or "operating system" |
+| "PipelineKit is not an ingestion tool" | Negative definition, competitor-first framing | Describe what PipelineKit provides positively |
+| "PipelineKit sits above them" | Implies subordination rather than coordination | "PipelineKit operates across the stack" |
+| "Using AI" | Generic feature description | "AI-native engineering" |
+| "Replaces existing infrastructure" | Creates resistance | "Operates above existing infrastructure" |
 
 ---
 
-## Instructions for Implementation
+## The TTTD Optimization Metric
 
-These updates apply to:
+Time-to-Trusted-Data is the primary metric. It is already in the Constitution, PRD, and CLI help text.
+
+The five dimensions are **design principles**, not promised benchmarks:
+
+1. **Design speed** — how quickly from requirements to deployable pipeline
+2. **Validation speed** — how quickly correctness is confirmed
+3. **Deployment safety** — how confidently changes are deployed
+4. **Diagnostic speed** — how quickly failures are explained
+5. **Pipeline confidence** — how certain teams are about analytics correctness
+
+These are stated as design intent. Numbers are earned from real usage, not asserted upfront.
+
+Every new feature evaluation asks: which of these five dimensions does this improve?
+If it improves none — it does not belong in PipelineKit.
+
+---
+
+## Documents to Update
 
 1. `docs/prd/PipelineKit — Final Product Requirements Document.md`
-   — Replace executive summary section only
+   — Replace executive summary with PRD-Executive-Summary-v2.md content
+   — Add TTTD dimensions table
+   — Update version to 2.0
 
 2. `docs/institutional-memory/strategy-archive/Strategic-Operating-Document.md`
-   — Add market context section after existing executive summary
+   — Add market context section (already drafted in VISION-STATEMENT-UPDATE v1)
+   — Remove "PipelineKit is not..." language from positioning sections
+   — Add intelligence layer framing
 
-Both are documentation updates — no code change, no SPEC change, no ADR required.
-The governing principle is unchanged.
-The Constitution is unchanged.
-The ADRs are unchanged.
+3. `docs/constitution/Product-Constitution.md`
+   — Add TTTD five dimensions as design principles under the Mission section
+   — Do not change the governing principle
 
-Document these as a documentation update commit, not an architectural decision.
+All three are documentation updates — no code change, no SPEC change, no ADR required.

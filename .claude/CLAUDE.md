@@ -1,5 +1,10 @@
 # PipelineKit Claude Code Instructions
 
+**Version:** 3.0  
+**Change from v2:** TTTD design dimensions added as feature evaluation lens; "control plane" replaced with "intelligence layer"; negative product definitions replaced with positive framing.
+
+---
+
 PipelineKit is an AI-native, CLI-first trusted analytics infrastructure project.
 
 ## Primary Mission
@@ -18,11 +23,16 @@ Before implementing any feature, ask:
 
 If the answer is not obvious — do not build it. Stop and ask.
 
-## Product Definition
+## What PipelineKit Provides
 
-PipelineKit is a terminal-first system for building, validating, diagnosing, and operating trusted data pipelines.
+PipelineKit provides the intelligence layer that designs, validates, governs, diagnoses, and continuously improves trusted analytics pipelines throughout their lifecycle.
 
-PipelineKit is not:
+PipelineKit operates across the analytics stack — coordinating infrastructure, enforcing standards, validating architecture, and enabling AI-driven development regardless of the underlying tools.
+
+PipelineKit is a terminal-first system. Every capability is accessible from the CLI.
+
+## What PipelineKit Is Not
+
 - a BI dashboard
 - a hosted cloud platform
 - a general AI chatbot
@@ -31,6 +41,22 @@ PipelineKit is not:
 - a workflow scheduler replacement
 - a Kubernetes platform
 - a general-purpose MCP aggregator
+
+## The TTTD Feature Evaluation Lens
+
+Every proposed feature must improve at least one dimension of Time-to-Trusted-Data:
+
+| Dimension | Question to ask |
+|---|---|
+| Design speed | Does this help teams go from requirements to deployable pipeline faster? |
+| Validation speed | Does this help teams confirm correctness faster? |
+| Deployment safety | Does this reduce the risk of introducing data failures on deploy? |
+| Diagnostic speed | Does this help teams find and explain failures faster? |
+| Pipeline confidence | Does this increase certainty that analytics are producing correct results? |
+
+If a proposed feature improves none of these dimensions — it does not belong in PipelineKit.
+
+These are design principles. Numbers are earned from real usage, not asserted upfront.
 
 ## Authoritative Documents
 
@@ -91,7 +117,7 @@ The Command Center decides whether to update the SPEC or revert the code.
 
 Before writing code, check `docs/reference/Architectural-Smells.md`.
 
-If any smell is detected — stop and ask before proceeding.
+If any of the 16 smells is detected — stop and ask before proceeding.
 Do not self-approve a smell. Bring it to the surface.
 
 ## MCP Rule
@@ -152,11 +178,12 @@ For any feature:
 1. Identify the relevant SPEC file.
 2. Check applicable ADRs.
 3. Check contracts and schemas.
-4. Check `docs/reference/Architectural-Smells.md`.
-5. Implement the smallest useful version.
-6. Add tests.
-7. Update SPEC if implementation deviated.
-8. Update docs only when necessary.
+4. Check `docs/reference/Architectural-Smells.md` (16 smells).
+5. Ask: which TTTD dimension does this improve?
+6. Implement the smallest useful version.
+7. Add tests.
+8. Update SPEC if implementation deviated.
+9. Update docs only when necessary.
 
 ## Definition of Done
 
@@ -168,3 +195,4 @@ A feature is done only when:
 - SPEC reflects actual implementation
 - no production mutation happens without explicit user approval
 - no architectural smells introduced
+- the feature improves at least one TTTD dimension

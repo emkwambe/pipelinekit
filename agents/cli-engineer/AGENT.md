@@ -90,3 +90,13 @@ tests/cli/
 documentation updates
 
 Nothing else.
+
+## Agent Status
+
+Status: Active
+
+Primary SPEC:
+docs/specifications/SPEC-001-CLI-Framework.md
+
+Primary Output:
+src/pipelinekit/cli/

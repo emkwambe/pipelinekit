@@ -1,0 +1,25 @@
+version: 1
+table: opportunities
+description: "Salesforce opportunity records"
+
+freshness:
+  max_age_hours: 4
+  column: last_modified_date
+
+required_columns:
+  - id
+  - amount
+  - stage_name
+  - close_date
+
+uniqueness:
+  - id
+
+not_null:
+  - id
+  - amount
+  - stage_name
+  - close_date
+
+row_count:
+  min: 1

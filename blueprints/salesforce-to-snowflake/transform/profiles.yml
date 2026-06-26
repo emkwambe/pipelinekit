@@ -1,0 +1,28 @@
+# dbt profile for Blueprint #002 (Salesforce -> Snowflake).
+# Credentials are supplied via environment variables (BYOK, ADR-005).
+# Never commit real account details, passwords, or keys.
+#
+# Target selection is env-driven and defaults to the Snowflake `prod` target,
+# so production behavior is unchanged when DBT_TARGET is unset. Local
+# verification (scripts/verify-blueprint-002.ps1 -Local) sets DBT_TARGET=local
+# to build against a seeded local DuckDB file instead — no Salesforce or cloud
+# credentials required.
+
+salesforce_to_snowflake:
+  target: "{{ env_var('DBT_TARGET', 'prod') }}"
+  outputs:
+    prod:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE', 'TRANSFORMER') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
+      schema: analytics
+      threads: 4
+    local:
+      type: duckdb
+      path: "{{ env_var('DUCKDB_PATH', 'pipelinekit_pipeline.duckdb') }}"
+      schema: main
+      threads: 4

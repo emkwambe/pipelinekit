@@ -186,10 +186,14 @@ class DltIngestionAdapter(BaseAdapter):
     def _build_source(self) -> object:
         """Build the dlt source from config.
 
-        When the Postgres source declares tables, build a real ``sql_database``
-        source (requires the dlt ``sql_database`` extra / SQLAlchemy at runtime).
-        With no tables there is nothing to ingest, so return an empty source —
-        this keeps validate/dry-run and unit tests free of a live database.
+        For a Postgres source with tables, build a real ``sql_database`` source
+        (requires the dlt ``sql_database`` extra / SQLAlchemy). For a Salesforce
+        source, build a ``salesforce_source`` (requires the dlt ``salesforce``
+        extra). Each provider import is lazy and isolated here (Smell 2); a
+        missing extra surfaces as ``PK-ADAPTER-002`` via ``execute``. With no
+        tables (non-Salesforce) there is nothing to ingest, so return an empty
+        source — keeping validate/dry-run and unit tests free of a live
+        connection.
         """
         source = self.config.source
         tables = source.tables or []
@@ -200,6 +204,17 @@ class DltIngestionAdapter(BaseAdapter):
 
             conn_str = self._build_postgres_conn_str(source)
             return sql_database(conn_str).with_resources(*tables)
+        if source.type == "salesforce":
+            from dlt.sources.salesforce import (  # type: ignore  # provider lib
+                salesforce_source,
+            )
+
+            sf_tables = source.tables or ["accounts", "opportunities", "contacts"]
+            return salesforce_source(
+                username=source.username,
+                password=source.password,
+                security_token=source.security_token,
+            ).with_resources(*sf_tables)
         return []
 
     @staticmethod

@@ -49,6 +49,9 @@ class SourceConfig(BaseModel):
     user: Optional[str] = None
     password: Optional[str] = None
     tables: Optional[list[str]] = None
+    # Salesforce
+    username: Optional[str] = None
+    security_token: Optional[str] = None
     # Snowflake
     account: Optional[str] = None
     warehouse: Optional[str] = None

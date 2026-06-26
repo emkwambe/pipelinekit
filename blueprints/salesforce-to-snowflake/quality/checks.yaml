@@ -1,0 +1,12 @@
+# Soda checks for Salesforce → Snowflake Blueprint #002.
+# Executed by the Soda quality adapter against the opportunities table.
+
+checks for opportunities:
+  - freshness(last_modified_date) < 4h:
+      name: opportunities_freshness
+  - row_count > 0:
+      name: opportunities_not_empty
+  - missing_count(id) = 0:
+      name: opportunities_id_not_null
+  - missing_count(amount) = 0:
+      name: opportunities_amount_not_null

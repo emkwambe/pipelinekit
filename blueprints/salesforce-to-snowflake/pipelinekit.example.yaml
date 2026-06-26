@@ -1,0 +1,51 @@
+# pipelinekit.example.yaml — Blueprint #002 (Salesforce → Snowflake)
+# Copy to your project root as pipelinekit.yaml. Credentials are read from
+# environment variables via ${VAR} interpolation (ADR-017). Set the referenced
+# vars before running. See docs/runbook.md Prerequisites.
+
+pipeline:
+  name: salesforce-to-snowflake-blueprint-002
+  version: "1.0.0"
+  description: "Blueprint #002 — Salesforce to Snowflake trusted analytics"
+
+runtime:
+  environment: production
+
+ingestion:
+  source:
+    type: salesforce
+    username: "${SALESFORCE_USERNAME}"
+    password: "${SALESFORCE_PASSWORD}"
+    security_token: "${SALESFORCE_SECURITY_TOKEN}"
+    tables:
+      - accounts
+      - opportunities
+      - contacts
+  destination:
+    type: snowflake
+    account: "${SNOWFLAKE_ACCOUNT}"
+    user: "${SNOWFLAKE_USER}"
+    password: "${SNOWFLAKE_PASSWORD}"
+    database: "${SNOWFLAKE_DATABASE}"
+    warehouse: "${SNOWFLAKE_WAREHOUSE}"
+    schema: "raw"
+
+transformation:
+  enabled: true
+  project_dir: ./blueprints/salesforce-to-snowflake/transform
+
+contracts:
+  enabled: true
+  directory: ./blueprints/salesforce-to-snowflake/contracts
+
+quality:
+  enabled: true
+  checks_dir: ./blueprints/salesforce-to-snowflake/quality
+
+diagnostics:
+  enabled: true
+  provider: anthropic
+
+notifications:
+  enabled: false
+  channels: []

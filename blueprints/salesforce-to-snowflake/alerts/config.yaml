@@ -1,0 +1,12 @@
+# Notification configuration for Blueprint #002.
+# Mirrors the `notifications` section of pipelinekit.yaml.
+# The Resend API key is read from the RESEND_API_KEY environment variable
+# (BYOK, ADR-005) — never stored in this file.
+
+alerts:
+  on_failure:
+    - channel: email
+      subject: "Blueprint #002 pipeline failed"
+  on_contract_violation:
+    - channel: email
+      subject: "Blueprint #002 contract violated"

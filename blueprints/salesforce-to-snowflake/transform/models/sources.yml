@@ -1,0 +1,37 @@
+version: 2
+
+sources:
+  - name: salesforce_raw
+    description: >
+      Raw Salesforce CRM objects ingested via the dlt salesforce source.
+      Objects land in the raw schema before staging models transform them.
+    # Env-driven so the same source works for DuckDB (local) and Snowflake
+    # (production). Defaults preserve production behavior when the DBT_SOURCE_*
+    # overrides are unset.
+    database: "{{ env_var('DBT_SOURCE_DATABASE', env_var('SNOWFLAKE_DATABASE', '')) }}"
+    schema: "{{ env_var('DBT_SOURCE_SCHEMA', 'pipelinekit_pipeline_raw') }}"
+    tables:
+      - name: accounts
+        description: Raw Salesforce Account records.
+      - name: opportunities
+        description: Raw Salesforce Opportunity records.
+        columns:
+          - name: id
+            description: Salesforce Opportunity Id (primary key).
+            tests:
+              - unique
+              - not_null
+          - name: amount
+            description: Opportunity amount.
+            tests:
+              - not_null
+          - name: stage_name
+            description: Sales stage.
+            tests:
+              - not_null
+          - name: close_date
+            description: Expected or actual close date.
+            tests:
+              - not_null
+      - name: contacts
+        description: Raw Salesforce Contact records.

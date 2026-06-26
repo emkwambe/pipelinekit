@@ -1,0 +1,21 @@
+{
+  "name": "salesforce-to-snowflake",
+  "version": "1.0.0",
+  "description": "Salesforce CRM to Snowflake trusted analytics pipeline",
+  "source": {
+    "type": "salesforce",
+    "dlt_source": "salesforce"
+  },
+  "destination": {
+    "type": "snowflake",
+    "dlt_destination": "snowflake"
+  },
+  "contracts": ["contracts/opportunities.yaml"],
+  "tables": ["accounts", "opportunities", "contacts"],
+  "tags": ["salesforce", "snowflake", "crm-analytics"],
+  "kpis": ["Pipeline Value", "Win Rate", "Avg Deal Size", "Opportunities by Stage", "Revenue by Industry"],
+  "deploy_time_minutes": 60,
+  "time_to_trusted_data_hours": 4,
+  "requires": ["dlt[salesforce]", "dbt-snowflake", "soda-core-snowflake"],
+  "status": "stable"
+}

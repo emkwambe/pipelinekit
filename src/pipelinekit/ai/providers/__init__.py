@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import json
 import re
-import sys
 from typing import TYPE_CHECKING
 
 from pipelinekit.ai.arch_models import ArchitectureResult
@@ -293,12 +292,7 @@ def parse_proposal_response(
     Raises:
         ProposalError: ``PK-GEN-001`` if the response is not valid JSON.
     """
-    # TEMP DEBUG (remove after diagnosing PK-GEN-001): inspect raw + extracted.
-    print(f"DEBUG raw first 500: {raw[:500]!r}", file=sys.stderr)
-    print(f"DEBUG raw last 200: {raw[-200:]!r}", file=sys.stderr)
-    print(f"DEBUG raw length: {len(raw)}", file=sys.stderr)
     text = _extract_json_object(raw)
-    print(f"DEBUG extracted first 100: {text[:100]!r}", file=sys.stderr)
     try:
         data = json.loads(text)
     except ValueError as exc:

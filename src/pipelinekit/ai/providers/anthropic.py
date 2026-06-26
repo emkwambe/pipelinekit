@@ -31,9 +31,10 @@ if TYPE_CHECKING:
     from pipelinekit.ai.proposal_models import BlueprintProposal, ProposalContext
 
 _ENV_KEY = "ANTHROPIC_API_KEY"
-# Blueprint proposals return many full files, so the ceiling is generous; short
-# diagnostic/architecture responses are unaffected.
-_MAX_TOKENS = 8192
+# Blueprint proposals return ~13 full files; 8192 truncated them mid-JSON, so the
+# ceiling is raised. It is only a ceiling — short diagnostic/architecture
+# responses are unaffected.
+_MAX_TOKENS = 16000
 
 
 class AnthropicProvider:

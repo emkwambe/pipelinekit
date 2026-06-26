@@ -202,8 +202,9 @@ def analyze_command(
     provider: str = typer.Option(None, "--provider", "-p"),
     apply: bool = typer.Option(False, "--apply",
         help="Write draft pipelinekit.yaml after analysis"),
-    force: bool = typer.Option(False, "--force",
-        help="Apply even if blocking gaps exist"),
+    write_draft: bool = typer.Option(False, "--write-draft",
+        help="Write draft YAML even when blocking gaps exist. "
+             "Review all FIXMEs before running pipelinekit validate"),
 ):
     """Analyze an existing pipeline config and propose a PipelineKit migration."""
 ```

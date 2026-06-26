@@ -4,7 +4,7 @@
 **Date:** June 26, 2026  
 **Phase:** 6 — Sprint 6-7  
 **ADR Number:** 020  
-**Governs:** `src/pipelinekit/ai/migration.py`, `pipelinekit migrate analyze`
+**Governs:** `src/pipelinekit/ai/migration_analyzer.py`, `pipelinekit migrate analyze`
 
 ---
 

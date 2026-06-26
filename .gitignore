@@ -30,3 +30,8 @@ blueprints/postgres-to-snowflake/transform/.user.yml
 
 # dlt pipeline working directory
 .dlt/
+
+# dbt artifacts — all blueprints
+blueprints/*/transform/target/
+blueprints/*/transform/logs/
+blueprints/*/transform/.user.yml

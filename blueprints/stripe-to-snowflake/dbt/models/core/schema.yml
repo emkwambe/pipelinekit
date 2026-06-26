@@ -1,0 +1,58 @@
+version: 2
+
+models:
+  - name: fct_charges
+    description: "Fact table for Stripe charges — one row per charge — grain: charge_id"
+    columns:
+      - name: charge_id
+        description: "Stripe charge identifier"
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: "Associated Stripe customer identifier (nullable for guest charges)"
+      - name: amount
+        description: "Charge amount in major currency unit"
+        tests:
+          - not_null
+      - name: currency
+        description: "ISO currency code"
+        tests:
+          - not_null
+      - name: status
+        description: "Charge status"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['succeeded', 'pending', 'failed']
+      - name: is_successful
+        description: "1 if charge succeeded, 0 otherwise"
+        tests:
+          - not_null
+      - name: charge_created_at
+        description: "Timestamp of charge creation"
+        tests:
+          - not_null
+      - name: charge_date
+        description: "Date of charge (truncated to day)"
+        tests:
+          - not_null
+
+  - name: dim_customers
+    description: "Dimension table for Stripe customers — one row per customer — grain: customer_id"
+    columns:
+      - name: customer_id
+        description: "Stripe customer identifier"
+        tests:
+          - unique
+          - not_null
+      - name: email
+        description: "Customer email address"
+      - name: lifetime_value
+        description: "Sum of all successful charge amounts for this customer"
+        tests:
+          - not_null
+      - name: customer_created_at
+        description: "Timestamp of customer creation"
+        tests:
+          - not_null

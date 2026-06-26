@@ -1,0 +1,66 @@
+version: 2
+
+sources:
+  - name: stripe_raw
+    description: "Raw Stripe data loaded by dlt ingestion pipeline"
+    database: "{{ env_var('DBT_SOURCE_DATABASE') }}"
+    schema: "{{ env_var('DBT_SOURCE_SCHEMA') }}"
+    loaded_at_field: _dlt_load_id
+    freshness:
+      warn_after: {count: 3, period: hour}
+      error_after: {count: 6, period: hour}
+    tables:
+      - name: charges
+        description: "Raw Stripe charge records"
+        columns:
+          - name: id
+            description: "Stripe charge identifier"
+            tests:
+              - unique
+              - not_null
+          - name: customer
+            description: "Stripe customer ID associated with this charge"
+          - name: amount
+            description: "Charge amount in smallest currency unit (e.g. cents)"
+            tests:
+              - not_null
+          - name: currency
+            description: "Three-letter ISO currency code"
+            tests:
+              - not_null
+          - name: status
+            description: "Charge status: succeeded, pending, or failed"
+            tests:
+              - not_null
+              - accepted_values:
+                  values: ['succeeded', 'pending', 'failed']
+          - name: created
+            description: "Unix timestamp of charge creation"
+            tests:
+              - not_null
+          - name: refunded
+            description: "Boolean indicating if charge has been refunded"
+          - name: description
+            description: "Arbitrary description of the charge"
+      - name: customers
+        description: "Raw Stripe customer records"
+        columns:
+          - name: id
+            description: "Stripe customer identifier"
+            tests:
+              - unique
+              - not_null
+          - name: email
+            description: "Customer email address"
+          - name: name
+            description: "Customer full name"
+          - name: created
+            description: "Unix timestamp of customer creation"
+            tests:
+              - not_null
+          - name: currency
+            description: "Customer's preferred currency"
+          - name: description
+            description: "Arbitrary description of the customer"
+          - name: default_source
+            description: "ID of the default payment source"

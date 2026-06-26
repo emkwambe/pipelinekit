@@ -1,0 +1,32 @@
+# stripe-to-snowflake pipeline example configuration
+# Copy this file and fill in your environment-specific values.
+# All secrets must be provided via environment variables — never hardcode credentials.
+
+pipeline:
+  name: stripe-to-snowflake
+  version: "1.0.0"
+
+source:
+  type: stripe
+  api_key: ${STRIPE_API_KEY}          # Required: your Stripe secret key (sk_live_... or sk_test_...)
+
+destination:
+  type: snowflake
+  account: ${SNOWFLAKE_ACCOUNT}        # e.g. xy12345.us-east-1
+  username: ${SNOWFLAKE_USERNAME}
+  password: ${SNOWFLAKE_PASSWORD}
+  role: ${SNOWFLAKE_ROLE}              # e.g. TRANSFORMER
+  warehouse: ${SNOWFLAKE_WAREHOUSE}    # e.g. LOADING_WH
+  database: ${SNOWFLAKE_DATABASE}      # e.g. ANALYTICS
+  schema: ${SNOWFLAKE_SCHEMA}          # e.g. STRIPE_RAW
+
+tables:
+  - charges
+  - customers
+
+schedule:
+  cron: ${CRON_SCHEDULE}               # e.g. "0 * * * *" for hourly
+
+alerts:
+  slack_webhook_url: ${SLACK_WEBHOOK_URL}
+  pagerduty_key: ${PAGERDUTY_INTEGRATION_KEY}

@@ -1,0 +1,21 @@
+version: 1
+table: customers
+description: "Stripe customer records"
+
+freshness:
+  max_age_hours: 6
+  column: created_at
+
+required_columns:
+  - customer_id
+  - created_at
+
+uniqueness:
+  - customer_id
+
+not_null:
+  - customer_id
+  - created_at
+
+row_count:
+  min: 1

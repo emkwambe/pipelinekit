@@ -1,0 +1,54 @@
+version: 2
+
+models:
+  - name: stg_stripe__charges
+    description: "Staged Stripe charge records with normalized types and amounts"
+    columns:
+      - name: charge_id
+        description: "Stripe charge identifier"
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: "Stripe customer ID associated with this charge"
+      - name: amount_cents
+        description: "Charge amount in smallest currency unit (e.g. cents)"
+        tests:
+          - not_null
+      - name: amount
+        description: "Charge amount in major currency unit (e.g. dollars)"
+        tests:
+          - not_null
+      - name: currency
+        description: "ISO currency code (uppercased)"
+        tests:
+          - not_null
+      - name: status
+        description: "Charge status"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['succeeded', 'pending', 'failed']
+      - name: is_refunded
+        description: "True if the charge has been fully refunded"
+        tests:
+          - not_null
+      - name: created_at
+        description: "Timestamp of charge creation (converted from Unix epoch)"
+        tests:
+          - not_null
+
+  - name: stg_stripe__customers
+    description: "Staged Stripe customer records with normalized types"
+    columns:
+      - name: customer_id
+        description: "Stripe customer identifier"
+        tests:
+          - unique
+          - not_null
+      - name: email
+        description: "Customer email (lowercased and trimmed)"
+      - name: created_at
+        description: "Timestamp of customer creation (converted from Unix epoch)"
+        tests:
+          - not_null

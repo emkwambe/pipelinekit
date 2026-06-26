@@ -1,0 +1,69 @@
+# alerts.yaml
+# Alert configuration for the stripe-to-snowflake pipeline.
+# Notification channel credentials are provided via environment variables.
+
+version: 1
+pipeline: stripe-to-snowflake
+
+channels:
+  slack:
+    webhook_url: ${SLACK_WEBHOOK_URL}
+  pagerduty:
+    integration_key: ${PAGERDUTY_INTEGRATION_KEY}
+
+alerts:
+  - name: ingestion_failure
+    description: "Stripe dlt ingestion pipeline failed or produced failed jobs"
+    severity: critical
+    channels: [slack, pagerduty]
+    trigger:
+      type: pipeline_error
+
+  - name: freshness_breach_charges
+    description: "Stripe charges table has not been updated within the freshness SLA"
+    severity: critical
+    channels: [slack, pagerduty]
+    trigger:
+      type: freshness_check
+      table: charges
+      max_age_hours: 6
+
+  - name: freshness_breach_customers
+    description: "Stripe customers table has not been updated within the freshness SLA"
+    severity: warning
+    channels: [slack]
+    trigger:
+      type: freshness_check
+      table: customers
+      max_age_hours: 6
+
+  - name: quality_check_failure
+    description: "One or more dbt data quality tests failed"
+    severity: critical
+    channels: [slack, pagerduty]
+    trigger:
+      type: dbt_test_failure
+      tests:
+        - assert_no_duplicate_charges
+        - assert_no_negative_charge_amounts
+        - assert_successful_charges_have_positive_amount
+        - assert_no_duplicate_customers
+
+  - name: zero_charges_loaded
+    description: "No charges were loaded in the last pipeline run — possible API connectivity issue"
+    severity: warning
+    channels: [slack]
+    trigger:
+      type: row_count_check
+      table: charges
+      min_rows_per_run: 0
+      comparison: equal
+
+  - name: low_row_count_charges
+    description: "Unusually low number of charges loaded — possible partial load"
+    severity: warning
+    channels: [slack]
+    trigger:
+      type: row_count_anomaly
+      table: charges
+      std_dev_threshold: 3

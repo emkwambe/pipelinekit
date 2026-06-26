@@ -1,0 +1,33 @@
+version: 1
+table: charges
+description: "Stripe charge transaction records"
+
+freshness:
+  max_age_hours: 6
+  column: created_at
+
+required_columns:
+  - charge_id
+  - amount
+  - currency
+  - status
+  - created_at
+
+uniqueness:
+  - charge_id
+
+not_null:
+  - charge_id
+  - amount
+  - currency
+  - status
+  - created_at
+
+row_count:
+  min: 1
+
+accepted_values:
+  status:
+    - succeeded
+    - pending
+    - failed

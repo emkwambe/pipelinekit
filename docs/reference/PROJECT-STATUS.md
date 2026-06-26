@@ -8,66 +8,75 @@
 
 ## Current State
 
-**Active Phase:** Phase 6 — Blueprint Catalog + Ecosystem  
-**Last Completed:** Sprint 6-5 — AI Blueprint Proposal + Blueprint #003  
+**Active Phase:** Phase 6 — Complete (Catalog + Ecosystem)  
+**Last Completed:** Sprint 6-6 — Remote Blueprint Registry  
 **Last Updated:** June 26, 2026  
-**Main Branch:** `62516f7`
+**Main Branch:** `8d40dbd`
 
 ---
 
-## Phase Completion Record
-
-### ✅ Phases 1–5 + Provider Diversity — See prior entries
+## Phase 6 Completion Record
 
 ### ✅ Sprint 6-1 — pipelinekit health | `c613640` | 209 tests
 ### ✅ Sprint 6-2a — dlt Adapter + Credential Wiring | `fe6341f` | 225 tests
 ### ✅ Blueprint #001 Local Verification | `d01ca36` | 1,000 rows | 0.7 min
 ### ✅ Sprint 6-3 — Blueprint #002 Salesforce → Snowflake | `04ffd50` | 229 tests
+### ✅ Sprint 6-5 — AI Blueprint Proposal | `9fc034a`+ | 256 tests
+### ✅ Blueprint #003 — stripe-to-snowflake (AI-proposed) | `617e5ec`
 
 ---
 
-### ✅ Sprint 6-5 — AI Blueprint Proposal + Blueprint #003
+### ✅ Sprint 6-6 — Remote Blueprint Registry
 **Completed:** June 26, 2026  
-**Key commits:**
-- `9fc034a` — Sprint 6-5 core (AI Blueprint Proposal)
-- `d3c6240` — max_tokens 16000 fix
-- `e4e534f` — shared parser robust fix (all 5 providers)
-- `822f23a` — apply() path-doubling fix
-- `617e5ec` — Blueprint #003 stripe-to-snowflake committed
-- `62516f7` — ruff fix on AI-generated pipeline.py
-
-**Tests:** 256 | **Coverage:** 80.68% | **All gates green**
+**Commit:** `8d40dbd` | 268 tests | 81.10% | 10 files +793/−14
 
 **What was built:**
-- `src/pipelinekit/ai/proposal_models.py` — BlueprintProposal, ProposedAsset, AssetState (6 states)
-- `src/pipelinekit/ai/blueprint_proposer.py` — BlueprintProposer (propose + apply)
-- `src/pipelinekit/ai/adapter_registry.py` — AdapterCapabilityRegistry
-- `src/pipelinekit/cli/generate.py` — `pipelinekit generate blueprint --plan/--interactive`, `pipelinekit apply plan`
-- `schemas/blueprint_proposal.schema.json`
-- All 5 providers — `propose_blueprint()` implemented
-- Blueprint #003 — stripe-to-snowflake (AI-proposed, human-approved)
+- `src/pipelinekit/blueprints/remote.py` — RemoteRegistry, BlueprintCatalog, CatalogEntry
+- `pipelinekit blueprint search <query>` — search remote catalog
+- `pipelinekit blueprint install <name>` — download, validate, write
+- Validation before write: schema + lenient 8-asset check (admits all 3 current blueprints)
+- 24h catalog cache with offline graceful degradation
+- `installed_blueprints` table in state.db
+- RegistryError + PK-REGISTRY-001 to 005
 
-**Sprint 6-5 bugs fixed during verification:**
-- Anthropic max_tokens 8192 truncated 13-asset proposals → raised to 16000
-- Shared parser did not handle markdown fences or preamble → `_extract_json_object()` added
-- `apply()` wrote to `blueprints/<name>/<name>/` → `_relative_path()` strips prefix
+**Trust model hardening (Sprint 6-5 authorized adjustments landed here):**
+- `pipelinekit apply plan` — `--yes` removed; `--interactive` added; no generate→auto-apply shortcut
+- AdapterCapabilityRegistry `verified` flag: postgres=true, salesforce/stripe=false
+- `⚠ Unverified adapter source` warning in interactive review
 
-**ADR satisfied:** ADR-018 (Blueprint Proposal Governance)  
-**Governance model enforced:**
-- `proposed → approved → written → validated` state machine
-- `PK-GEN-006` fires before AI call for unsupported sources
-- Provenance (9 fields) on every asset, stripped on write
-- `can_auto_apply` always False
+**Quality gates:**
+| Gate | Result |
+|---|---|
+| pytest | 268 passed (256 prior + 12 new) |
+| coverage | 81.10% |
+| ruff / black / mypy | Clean |
+
+---
+
+## The Phase 6 Arc — Complete
+
+```
+6-1  health      → programmed sustainability policy
+6-2a dlt adapter → real credential wiring, Blueprint #001 verified
+6-3  Blueprint #002 → Salesforce → Snowflake (hand-crafted, verified)
+6-5  AI Proposal → Blueprint #003 Stripe (AI-proposed, human-approved)
+6-6  Registry    → install/search/distribute blueprints
+```
+
+**The flywheel:**
+```
+Install blueprint → better AI proposals → better blueprints → install more
+```
 
 ---
 
 ## Blueprint Catalog
 
-| Blueprint | Built | Local Verified | How Built |
-|---|---|---|---|
-| postgres-to-snowflake | ✅ | ✅ 1,000 rows, 0.7 min | Hand-crafted |
-| salesforce-to-snowflake | ✅ | ✅ 800 rows, 0.2 min | Hand-crafted |
-| stripe-to-snowflake | ✅ | ⏳ dbt parse pending | **AI-proposed** ← first |
+| Blueprint | Built | Local Verified | Registry | Adapter Verified |
+|---|---|---|---|---|
+| postgres-to-snowflake | ✅ | ✅ 1,000 rows | ⏳ pending deploy | ✅ |
+| salesforce-to-snowflake | ✅ | ✅ 800 rows | ⏳ pending deploy | ⚠ community-sourced |
+| stripe-to-snowflake | ✅ AI-proposed | ⏳ dbt parse pending | ⏳ pending deploy | ⚠ community-sourced |
 
 ---
 
@@ -75,53 +84,35 @@
 
 ```
 pipelinekit init / validate / run / status
-pipelinekit blueprint list / validate / info
+pipelinekit blueprint list / validate / info / search / install
 pipelinekit diagnose / architect / health
 pipelinekit generate blueprint --plan/--interactive
 pipelinekit generate show <plan_id>
-pipelinekit apply plan <plan_id>
+pipelinekit apply plan <plan_id> [--interactive]
 ```
 
 ---
 
-## Phase 6 Sprint Queue
+## Open Items Before Design Partner Outreach
 
 ```
-✅ Sprint 6-1:   pipelinekit health
-✅ Sprint 6-2a:  dlt adapter + credential wiring
-✅ Sprint 6-3:   Blueprint #002 Salesforce → Snowflake
-✅ Sprint 6-5:   AI Blueprint Proposal + Blueprint #003
-⏳ Blueprint #003 dbt parse + local verification
-⏳ Sprint 6-2b:  PK-CONFIG-006 wiring
-⏳ Sprint 6-6:   Remote Blueprint Registry
-⏳ Sprint 6-7:   Migration Intelligence
-📋 Cleanup:      Archive superseded "Generation" ADR/SPEC files
-📋 Enhancement:  apply() auto-format AI-generated .py assets
-```
-
----
-
-## Hardening Checklist
-
-```
-✅ AI Blueprint Proposal system (ADR-018, SPEC-015)
-✅ Blueprint #003 AI-proposed and on main
-✅ State machine enforced (proposed→approved→written)
-✅ Ruff clean repo-wide (including AI-generated code)
-□  Blueprint #003 dbt parse + local verification
+□  Deploy registry — pipelinekit-registry Cloudflare Pages repo
+   → catalog.json + 3 blueprint zips at registry.pipelinekit.dev
+□  Blueprint #003 local verification (dbt parse + synthetic run)
+□  Archive superseded ADR-018-Generation + SPEC-015-Generation files
+□  Sprint 6-7: Migration Intelligence (ADR + SPEC first)
+□  Sprint 6-2b: PK-CONFIG-006 wiring
 □  Blueprint #001 production Snowflake verification
-□  PK-CONFIG-006 wired
-□  Archive superseded Generation files
 □  ICP-001, ICP-002, ICP-003 stubs
-□  CI green confirmed
+□  CI green confirmed on GitHub
 ```
 
 ---
 
 ## Repository Numbers
 
-**Tests:** 256 | **Coverage:** 80.68% | **Blueprints:** 3 (1 AI-proposed)  
-**AI providers:** 5 | **ADRs:** 018 | **SPECs:** 015 | **State tables:** 7
+**Tests:** 268 | **Coverage:** 81.10% | **Blueprints:** 3  
+**AI providers:** 5 | **ADRs:** 019 | **SPECs:** 016 | **State tables:** 8
 
 ---
 

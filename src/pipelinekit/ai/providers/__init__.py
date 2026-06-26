@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from typing import TYPE_CHECKING
 
 from pipelinekit.ai.arch_models import ArchitectureResult
@@ -266,6 +267,8 @@ def _extract_json_object(raw: str) -> str:
     ``}`` so that preamble or trailing prose around the object is dropped. The
     caller validates; an unparseable result still raises at the call site.
     """
+    # TEMP DEBUG (remove after diagnosing PK-GEN-001): show the raw response.
+    print(f"DEBUG raw response (first 500): {raw[:500]!r}", file=sys.stderr)
     content = re.sub(r"```json\s*|\s*```", "", raw).strip()
     try:
         json.loads(content)

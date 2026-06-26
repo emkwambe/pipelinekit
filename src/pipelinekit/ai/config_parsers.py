@@ -36,14 +36,32 @@ def _first_word_lower(value: str) -> str:
 
 
 class AirbyteParser:
-    """Parse an Airbyte ``connection.json`` export."""
+    """Parse an Airbyte connection export across its common shapes.
+
+    Airbyte emits several shapes for the same connection:
+
+    - **config-API** — ``syncCatalog`` with nested ``source``/``destination``
+      objects carrying ``sourceType``/``connectionConfiguration``;
+    - **flat** — ``syncCatalog`` plus top-level ``sourceType``/
+      ``destinationType``;
+    - **public-API** — ``configurations`` (not ``syncCatalog``) with only
+      ``sourceId``/``destinationId`` references and no nested objects.
+
+    Detection and extraction must tolerate all three; the public-API shape in
+    particular has no ``syncCatalog`` and no nested ``source``/``destination``,
+    which previously fell through to ``PK-MIGRATE-002``.
+    """
 
     @staticmethod
     def can_parse(data: dict) -> bool:
         """Return True if ``data`` looks like an Airbyte connection export."""
         if not isinstance(data, dict):
             return False
-        return "syncCatalog" in data or ("source" in data and "destination" in data)
+        if "syncCatalog" in data or "configurations" in data:
+            return True
+        if "source" in data and "destination" in data:
+            return True
+        return "sourceId" in data and "destinationId" in data
 
     def parse(self, path: Path) -> dict:
         """Extract source_type, destination_type, streams, sync_mode, namespace."""
@@ -51,45 +69,72 @@ class AirbyteParser:
         return self.parse_data(data)
 
     def parse_data(self, data: dict) -> dict:
-        """Parse an already-loaded Airbyte export dict."""
+        """Parse an already-loaded Airbyte export dict (any of the shapes)."""
         source = data.get("source") or {}
         destination = data.get("destination") or {}
-        catalog = data.get("syncCatalog") or {}
-
-        streams: list[dict] = []
-        for entry in catalog.get("streams", []) or []:
-            stream = entry.get("stream", {}) if isinstance(entry, dict) else {}
-            config = entry.get("config", {}) if isinstance(entry, dict) else {}
-            streams.append(
-                {
-                    "name": stream.get("name", ""),
-                    "namespace": stream.get("namespace", ""),
-                    "sync_mode": config.get("syncMode", ""),
-                }
-            )
-
+        streams = self._streams(data)
         sync_mode = streams[0]["sync_mode"] if streams else ""
         namespace = streams[0]["namespace"] if streams else ""
         return {
-            "source_type": self._type_of(source, "sourceType", "sourceName"),
-            "destination_type": self._type_of(
-                destination, "destinationType", "destinationName"
+            "source_type": self._first_type(
+                source.get("sourceType"),
+                source.get("sourceName"),
+                data.get("sourceType"),
+                data.get("sourceName"),
+            ),
+            "destination_type": self._first_type(
+                destination.get("destinationType"),
+                destination.get("destinationName"),
+                data.get("destinationType"),
+                data.get("destinationName"),
             ),
             "streams": streams,
             "sync_mode": sync_mode,
             "namespace": namespace,
             "source_config": source.get("connectionConfiguration", {}),
             "destination_config": destination.get("connectionConfiguration", {}),
-            "schedule": data.get("scheduleData") or data.get("scheduleType"),
+            "schedule": (
+                data.get("scheduleData")
+                or data.get("scheduleType")
+                or data.get("schedule")
+            ),
         }
 
     @staticmethod
-    def _type_of(node: dict, type_key: str, name_key: str) -> str:
-        """Resolve a connector type from an explicit type or its display name."""
-        explicit = node.get(type_key)
-        if explicit:
-            return _first_word_lower(str(explicit))
-        return _first_word_lower(str(node.get(name_key, "")))
+    def _streams(data: dict) -> list[dict]:
+        """Normalise streams from either ``syncCatalog`` or ``configurations``.
+
+        ``syncCatalog`` entries nest ``{"stream": {...}, "config": {...}}``;
+        ``configurations`` entries are flat (``{"name", "namespace",
+        "syncMode"}``). Both collapse to ``{name, namespace, sync_mode}``.
+        """
+        catalog = data.get("syncCatalog") or data.get("configurations") or {}
+        if not isinstance(catalog, dict):
+            return []
+        out: list[dict] = []
+        for entry in catalog.get("streams", []) or []:
+            if not isinstance(entry, dict):
+                continue
+            nested = entry.get("stream")
+            stream = nested if isinstance(nested, dict) else entry
+            cfg = entry.get("config")
+            config = cfg if isinstance(cfg, dict) else entry
+            out.append(
+                {
+                    "name": stream.get("name", ""),
+                    "namespace": stream.get("namespace", ""),
+                    "sync_mode": config.get("syncMode", ""),
+                }
+            )
+        return out
+
+    @staticmethod
+    def _first_type(*candidates: object) -> str:
+        """Return the first non-empty candidate, normalised to a type token."""
+        for value in candidates:
+            if value:
+                return _first_word_lower(str(value))
+        return ""
 
 
 class FivetranParser:

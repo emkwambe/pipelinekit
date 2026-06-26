@@ -89,6 +89,52 @@ def test_airbyte_parser_extracts_source_destination_streams(tmp_path):
     assert result["namespace"] == "public"
 
 
+def test_airbyte_parser_flat_shape_reads_top_level_types(tmp_path):
+    """A flat export (syncCatalog + top-level destinationType, no nested objects)
+    is detected and its top-level types are read (regression: empty types)."""
+    flat = {
+        "sourceId": "abc-123",
+        "destinationId": "def-456",
+        "syncCatalog": {
+            "streams": [
+                {"stream": {"name": "customers"}, "config": {"syncMode": "append"}}
+            ]
+        },
+        "destinationType": "snowflake",
+    }
+    path = tmp_path / "connection.json"
+    path.write_text(json.dumps(flat), encoding="utf-8")
+    assert AirbyteParser.can_parse(flat) is True
+    result = AirbyteParser().parse(path)
+    assert result["destination_type"] == "snowflake"
+    assert [s["name"] for s in result["streams"]] == ["customers"]
+
+
+def test_airbyte_parser_public_api_configurations_shape(tmp_path):
+    """The public-API export (configurations, sourceId/destinationId, no
+    syncCatalog/source/destination) is detected and its streams are read
+    (regression: previously fell through to PK-MIGRATE-002)."""
+    public = {
+        "connectionId": "abc-123",
+        "name": "pg to sf",
+        "sourceId": "abc-123",
+        "destinationId": "def-456",
+        "configurations": {
+            "streams": [
+                {"name": "customers", "namespace": "public", "syncMode": "incremental"}
+            ]
+        },
+        "schedule": {"scheduleType": "manual"},
+    }
+    path = tmp_path / "connection.json"
+    path.write_text(json.dumps(public), encoding="utf-8")
+    assert AirbyteParser.can_parse(public) is True
+    assert MigrationConfigParser().parse(path)[0] == "airbyte"
+    result = AirbyteParser().parse(path)
+    assert result["streams"][0]["name"] == "customers"
+    assert result["streams"][0]["sync_mode"] == "incremental"
+
+
 def test_fivetran_parser_extracts_connector_schema_tables(tmp_path):
     """FivetranParser.parse() extracts connector/schema/tables (enabled only)."""
     path = tmp_path / "connector.json"

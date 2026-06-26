@@ -72,3 +72,9 @@ class ProposalError(PipelineKitError):
 class RegistryError(PipelineKitError):
     """Raised when a remote blueprint registry operation fails — network,
     validation, or install (ADR-019, SPEC-016). Carries ``PK-REGISTRY-*``."""
+
+
+class MigrationError(PipelineKitError):
+    """Raised when migration analysis fails — config not found, format not
+    recognised, blocking gaps on apply, AI analysis failure, or an unparseable
+    Python file (ADR-020, SPEC-017). Carries ``PK-MIGRATE-*`` codes."""

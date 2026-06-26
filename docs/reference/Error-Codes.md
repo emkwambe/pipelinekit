@@ -172,6 +172,24 @@ catalog is used when present.
 
 ---
 
+### MIGRATE — Migration Intelligence (Sprint 6-7)
+
+| Code | Meaning |
+|---|---|
+| PK-MIGRATE-001 | Config file not found |
+| PK-MIGRATE-002 | Config format not recognized |
+| PK-MIGRATE-003 | Blocking gaps exist — use --force to apply anyway |
+| PK-MIGRATE-004 | AI analysis failed (invalid response) |
+| PK-MIGRATE-005 | Python file parsing failed (syntax error) |
+
+`MigrationError` carries the `PK-MIGRATE-*` codes. AI reads existing configs and
+proposes — a human approves — `apply()` writes `pipelinekit.proposed.yaml` (never
+`pipelinekit.yaml`). Parsing is deterministic and never executes the source file;
+the Python parser uses `ast.parse()` only. `can_auto_apply` is always False
+(ADR-020).
+
+---
+
 ## Error Class Hierarchy
 
 ```python
@@ -186,7 +204,8 @@ PipelineKitError(code, message, context)
 ├── ArchitectureError    PK-ARCH-*        (Phase 5)
 ├── HealthError          PK-HEALTH-*      (Phase 6)
 ├── ProposalError        PK-GEN-*         (Phase 6 — Sprint 6-5)
-└── RegistryError        PK-REGISTRY-*    (Phase 6 — Sprint 6-6)
+├── RegistryError        PK-REGISTRY-*    (Phase 6 — Sprint 6-6)
+└── MigrationError       PK-MIGRATE-*     (Phase 6 — Sprint 6-7)
 ```
 
 All errors carry structured code, message, and context dict.

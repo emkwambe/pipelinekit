@@ -15,6 +15,7 @@ from pipelinekit.ai.models import DiagnosticResult, RecommendedAction
 if TYPE_CHECKING:
     from pipelinekit.ai.arch_evidence import ArchitectureContext
     from pipelinekit.ai.arch_models import ArchitectureResult
+    from pipelinekit.ai.migration_models import MigrationProposal
     from pipelinekit.ai.proposal_models import BlueprintProposal, ProposalContext
 
 
@@ -67,5 +68,22 @@ class LLMProvider(Protocol):
 
         Raises ``LLMError(PK-AI-001)`` if the provider is unavailable and
         ``ProposalError(PK-GEN-001)`` if the response is not valid JSON.
+        """
+        ...
+
+    def analyze_migration(
+        self,
+        context: dict,
+    ) -> "MigrationProposal":
+        """Analyse an existing pipeline config and propose a migration
+        (SPEC-017, ADR-020).
+
+        ``context`` carries the parsed source config, available blueprints, and
+        adapter capabilities. Returns a ``MigrationProposal`` — never writes
+        files. ``can_auto_apply`` is always False; AI proposes, a human
+        approves, ``apply()`` writes ``pipelinekit.proposed.yaml``.
+
+        Raises ``LLMError(PK-AI-001)`` if the provider is unavailable and
+        ``MigrationError(PK-MIGRATE-004)`` if the response is not valid JSON.
         """
         ...

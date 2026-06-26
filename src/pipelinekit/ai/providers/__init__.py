@@ -23,11 +23,17 @@ from typing import TYPE_CHECKING
 
 from pipelinekit.ai.arch_models import ArchitectureResult
 from pipelinekit.ai.evidence import EvidencePackage
+from pipelinekit.ai.migration_models import (
+    MappingResult,
+    MappingStatus,
+    MigrationGap,
+    MigrationProposal,
+)
 from pipelinekit.ai.models import DiagnosticResult
 from pipelinekit.ai.proposal_models import BlueprintProposal, ProposedAsset
 from pipelinekit.ai.provider import LLMProvider
 from pipelinekit.config.schema import PipelineConfig
-from pipelinekit.core.errors import LLMError, ProposalError
+from pipelinekit.core.errors import LLMError, MigrationError, ProposalError
 
 if TYPE_CHECKING:
     from pipelinekit.ai.arch_evidence import ArchitectureContext
@@ -331,6 +337,126 @@ def parse_proposal_response(
         generated_at="",
         can_auto_apply=False,
     )
+
+
+MIGRATION_SYSTEM_PROMPT = """You are a PipelineKit migration analyst.
+Read the parsed configuration of an existing pipeline (Airbyte, Fivetran, custom
+Python, or an existing pipelinekit.yaml) and propose a PipelineKit equivalent.
+
+You are PROPOSING, not migrating. Your output is reviewed by a human before any
+file is written. Be explicit about assumptions and gaps. Never claim 100%
+compatibility without evidence.
+
+Return a JSON object:
+{
+  "confidence": 0.0-1.0,
+  "blueprint_recommendation": "matching-blueprint-name or null",
+  "draft_yaml": "full proposed pipelinekit.yaml content",
+  "mappings": [
+    {
+      "field": "source.type",
+      "source_value": "postgres",
+      "pipelinekit_equivalent": "ingestion.source.type: postgres",
+      "status": "clean|partial|manual|unsupported",
+      "note": "optional note"
+    }
+  ],
+  "gaps": [
+    {
+      "gap_type": "credential|table|transform|schedule|feature",
+      "description": "what is missing",
+      "required_action": "what the human must do",
+      "blocking": true
+    }
+  ],
+  "assumptions": ["what you assumed about the source"]
+}
+
+Critical rules:
+- All credentials in draft_yaml use ${VAR} interpolation — NEVER hardcoded
+- Only recommend a blueprint from the available_blueprints list provided
+- Only map sources/destinations in the supported lists provided; others are
+  unsupported gaps
+- can_auto_apply must be false
+- Return ONLY the JSON object. No markdown. No preamble."""
+
+
+def build_migration_user_prompt(context: dict) -> str:
+    """Render the migration context as the user prompt (structured, never raw)."""
+    return (
+        "Analyse this existing pipeline config and propose a PipelineKit "
+        "migration using ONLY the capabilities and blueprints below.\n\n"
+        + json.dumps(context, indent=2, default=str)
+    )
+
+
+def parse_migration_response(raw: str, context: dict) -> MigrationProposal:
+    """Parse a provider's raw text into a ``MigrationProposal``.
+
+    ``source_tool`` and ``source_file`` are left to the analyzer to stamp.
+    ``can_auto_apply`` is forced False here and again by the analyzer (ADR-020).
+
+    Raises:
+        MigrationError: ``PK-MIGRATE-004`` if the response is not valid JSON.
+    """
+    text = _extract_json_object(raw)
+    try:
+        data = json.loads(text)
+    except ValueError as exc:
+        raise MigrationError(
+            "PK-MIGRATE-004",
+            "AI migration analysis was not valid JSON",
+            {"detail": str(exc)},
+        ) from exc
+
+    mappings: list[MappingResult] = []
+    for item in data.get("mappings", []):
+        if not isinstance(item, dict):
+            continue
+        mappings.append(
+            MappingResult(
+                field=str(item.get("field", "")),
+                source_value=str(item.get("source_value", "")),
+                pipelinekit_equivalent=item.get("pipelinekit_equivalent"),
+                status=_coerce_mapping_status(item.get("status")),
+                note=str(item.get("note", "")),
+            )
+        )
+
+    gaps: list[MigrationGap] = []
+    for item in data.get("gaps", []):
+        if not isinstance(item, dict):
+            continue
+        gaps.append(
+            MigrationGap(
+                gap_type=str(item.get("gap_type", "feature")),
+                description=str(item.get("description", "")),
+                required_action=str(item.get("required_action", "")),
+                blocking=bool(item.get("blocking", True)),
+            )
+        )
+
+    confidence = max(0.0, min(1.0, float(data.get("confidence", 0.0))))
+    recommendation = data.get("blueprint_recommendation")
+    return MigrationProposal(
+        source_tool=str(context.get("source_tool", "")),
+        source_file="",
+        draft_yaml=str(data.get("draft_yaml", "")),
+        blueprint_recommendation=recommendation if recommendation else None,
+        mappings=mappings,
+        gaps=gaps,
+        confidence=confidence,
+        can_auto_apply=False,
+        assumptions=list(data.get("assumptions", [])),
+    )
+
+
+def _coerce_mapping_status(value: object) -> MappingStatus:
+    """Coerce a provider status string into a ``MappingStatus`` (default MANUAL)."""
+    try:
+        return MappingStatus(str(value))
+    except ValueError:
+        return MappingStatus.MANUAL
 
 
 def create_provider(config: PipelineConfig, override: str | None = None) -> LLMProvider:

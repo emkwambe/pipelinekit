@@ -14,13 +14,16 @@ from pipelinekit.ai.evidence import EvidencePackage
 from pipelinekit.ai.models import DiagnosticResult, RecommendedAction
 from pipelinekit.ai.providers import (
     ARCH_SYSTEM_PROMPT,
+    MIGRATION_SYSTEM_PROMPT,
     PROPOSAL_SYSTEM_PROMPT,
     SYSTEM_PROMPT,
     build_arch_user_prompt,
+    build_migration_user_prompt,
     build_proposal_user_prompt,
     build_user_prompt,
     parse_architecture_response,
     parse_diagnostic_response,
+    parse_migration_response,
     parse_proposal_response,
 )
 from pipelinekit.core.errors import LLMError
@@ -28,6 +31,7 @@ from pipelinekit.core.errors import LLMError
 if TYPE_CHECKING:
     from pipelinekit.ai.arch_evidence import ArchitectureContext
     from pipelinekit.ai.arch_models import ArchitectureResult
+    from pipelinekit.ai.migration_models import MigrationProposal
     from pipelinekit.ai.proposal_models import BlueprintProposal, ProposalContext
 
 _ENV_KEY = "ANTHROPIC_API_KEY"
@@ -113,3 +117,10 @@ class AnthropicProvider:
             PROPOSAL_SYSTEM_PROMPT, build_proposal_user_prompt(context)
         )
         return parse_proposal_response(raw, context, self.name, self.model)
+
+    def analyze_migration(self, context: dict) -> "MigrationProposal":
+        """Analyse an existing config and propose a migration (SPEC-017)."""
+        raw = self._complete(
+            MIGRATION_SYSTEM_PROMPT, build_migration_user_prompt(context)
+        )
+        return parse_migration_response(raw, context)

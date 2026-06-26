@@ -130,3 +130,5 @@ Three gaps identified for Sprint 6-2:
 3. SourceConfig missing user/password/warehouse as first-class fields
 
 Verification run not counted until all three gaps resolved and dry-run + full run pass.
+
+| 2026-06-26 | Eddy Mkwambe | PostgreSQL 15 (Docker) | DuckDB (local) | 1,000 | 0.7 min | 13.3s | orders contract valid | SUCCESS — LOCAL |

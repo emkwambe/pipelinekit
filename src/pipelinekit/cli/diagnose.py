@@ -87,7 +87,7 @@ def diagnose_command(
         None,
         "--provider",
         "-p",
-        help="AI provider override: openai | anthropic | ollama",
+        help="AI provider override: anthropic | openai | ollama | deepseek | mistral",
     ),
     approve: bool = typer.Option(
         False, "--approve", help="Interactively review recommended actions."

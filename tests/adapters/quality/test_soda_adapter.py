@@ -13,11 +13,20 @@ def _config(checks_dir: str) -> QualitySection:
 
 
 def _scan(pass_count: int, fail_count: int, warn_count: int = 0) -> MagicMock:
+    """Mock a Soda Scan using the real get_scan_results() API.
+
+    soda-core exposes results as a dict whose ``checks`` entries each carry an
+    ``outcome`` of ``pass`` | ``fail`` | ``warn`` (CheckOutcome). The adapter
+    counts these outcomes — the removed get_checks_*_count() methods are gone.
+    """
+    checks = (
+        [{"outcome": "pass"}] * pass_count
+        + [{"outcome": "fail"}] * fail_count
+        + [{"outcome": "warn"}] * warn_count
+    )
     scan = MagicMock()
     scan.execute.return_value = 0
-    scan.get_checks_pass_count.return_value = pass_count
-    scan.get_checks_fail_count.return_value = fail_count
-    scan.get_checks_warn_count.return_value = warn_count
+    scan.get_scan_results.return_value = {"checks": checks}
     return scan
 
 

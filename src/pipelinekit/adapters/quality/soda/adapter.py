@@ -56,9 +56,7 @@ class SodaQualityAdapter(BaseAdapter):
             scan = Scan()
             scan.add_sodacl_yaml_files(self.config.checks_dir)
             scan.execute()
-            passed = int(scan.get_checks_pass_count())
-            failed = int(scan.get_checks_fail_count())
-            warned = int(scan.get_checks_warn_count())
+            passed, failed, warned = self._count_outcomes(scan)
         except Exception as exc:
             return StepResult(
                 _STEP,
@@ -93,3 +91,35 @@ class SodaQualityAdapter(BaseAdapter):
             "checks_dir": self.config.checks_dir,
             **self._last_summary,
         }
+
+    # -- Soda result parsing -------------------------------------------------
+
+    @staticmethod
+    def _count_outcomes(scan: object) -> tuple[int, int, int]:
+        """Count (passed, failed, warned) from a Soda scan's results.
+
+        soda-core removed ``get_checks_pass_count``/``fail_count``/``warn_count``;
+        the public ``get_scan_results()`` carries each check's ``outcome``
+        (``CheckOutcome``: ``pass`` | ``warn`` | ``fail``). Outcomes are
+        normalized to lower-case strings so the count is tolerant of either the
+        serialized string form or an enum. Missing/empty results count as zero —
+        no checks ran.
+        """
+        get_results = getattr(scan, "get_scan_results", None)
+        results = get_results() if callable(get_results) else {}
+        checks = results.get("checks") or [] if isinstance(results, dict) else []
+
+        passed = failed = warned = 0
+        for check in checks:
+            if not isinstance(check, dict):
+                continue
+            outcome = check.get("outcome")
+            outcome = getattr(outcome, "value", outcome)
+            outcome = str(outcome).lower() if outcome is not None else ""
+            if outcome == "pass":
+                passed += 1
+            elif outcome == "fail":
+                failed += 1
+            elif outcome == "warn":
+                warned += 1
+        return passed, failed, warned

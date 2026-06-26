@@ -8,16 +8,29 @@
 # This script times each step of the full Blueprint #001 deployment so the
 # 60-minute deploy_time claim can be replaced with verified evidence. Record the
 # result in blueprints/postgres-to-snowflake/docs/runbook.md (Verified Deployments).
+#
+# Pass -Local to run the standard local verification path: Docker Postgres source
+# -> DuckDB destination (no Snowflake credentials needed). Without -Local the
+# script runs the production path: Postgres -> Snowflake.
+
+param([switch]$Local)
 
 $start = Get-Date
 
 Write-Host "=== Blueprint #001 Verification ===" -ForegroundColor Cyan
 Write-Host "Started: $start"
 
-# Step 0: Preflight — required environment variables must be set
-$required = @("POSTGRES_CONN_STR", "PG_HOST", "PG_DATABASE",
-              "SNOWFLAKE_ACCOUNT", "SNOWFLAKE_USER", "SNOWFLAKE_PASSWORD",
-              "SNOWFLAKE_DATABASE", "SNOWFLAKE_WAREHOUSE")
+# Step 0: Preflight — required environment variables must be set.
+# Local mode (Postgres -> DuckDB) needs only the Postgres source variables.
+if ($Local) {
+    $required = @("PG_HOST", "PG_DATABASE", "PG_USER", "PG_PASSWORD")
+    Write-Host "Mode: LOCAL (Docker Postgres -> DuckDB)" -ForegroundColor Cyan
+} else {
+    $required = @("POSTGRES_CONN_STR", "PG_HOST", "PG_DATABASE",
+                  "SNOWFLAKE_ACCOUNT", "SNOWFLAKE_USER", "SNOWFLAKE_PASSWORD",
+                  "SNOWFLAKE_DATABASE", "SNOWFLAKE_WAREHOUSE")
+    Write-Host "Mode: PRODUCTION (Postgres -> Snowflake)" -ForegroundColor Cyan
+}
 $missing = $required | Where-Object { -not [Environment]::GetEnvironmentVariable($_) }
 if ($missing) {
     Write-Host "✗ Missing env vars: $($missing -join ', ')" -ForegroundColor Red
@@ -31,6 +44,15 @@ Copy-Item "blueprints\postgres-to-snowflake\pipelinekit.example.yaml" "pipelinek
 # Point contracts at the blueprint's data contract, not the repo architecture contracts.
 $config = Get-Content "pipelinekit.yaml" -Raw
 $config = $config -replace "directory: ./contracts", "directory: ./blueprints/postgres-to-snowflake/contracts"
+# Local mode: replace the Snowflake destination block with a local DuckDB file.
+if ($Local) {
+    $duckDestination = @"
+  destination:
+    type: duckdb
+    path: "./blueprint_001_local.duckdb"
+"@
+    $config = [regex]::Replace($config, '(?m)^  destination:\r?\n(?:    .*\r?\n?)+', $duckDestination)
+}
 Set-Content "pipelinekit.yaml" $config
 poetry run pipelinekit validate
 $step1_end = Get-Date

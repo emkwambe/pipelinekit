@@ -111,6 +111,16 @@ CREATE TABLE IF NOT EXISTS blueprint_proposals (
     proposed_at      TEXT NOT NULL,
     applied_at       TEXT
 );
+
+CREATE TABLE IF NOT EXISTS installed_blueprints (
+    name            TEXT PRIMARY KEY,
+    version         TEXT NOT NULL,
+    source          TEXT,
+    destination     TEXT,
+    verified        INTEGER DEFAULT 0,
+    installed_at    TEXT NOT NULL,
+    registry_url    TEXT
+);
 """
 
 
@@ -540,6 +550,46 @@ def mark_proposal_applied(
         raise StateError(
             "PK-STATE-002",
             f"Cannot update blueprint proposal {plan_id}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def insert_installed_blueprint(
+    name: str,
+    version: str,
+    source: str,
+    destination: str,
+    verified: bool,
+    registry_url: str | None,
+    cwd: Path | None = None,
+) -> None:
+    """Record a blueprint installed from the remote registry (SPEC-016)."""
+    initialize(cwd)
+    db_path = get_db_path(cwd)
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO installed_blueprints (
+                    name, version, source, destination, verified,
+                    installed_at, registry_url
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    name,
+                    version,
+                    source,
+                    destination,
+                    1 if verified else 0,
+                    _utc_now(),
+                    registry_url,
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot record installed blueprint {name}",
             {"path": str(db_path), "detail": str(exc)},
         ) from exc
 

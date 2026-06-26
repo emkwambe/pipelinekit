@@ -67,3 +67,8 @@ class HealthError(PipelineKitError):
 class ProposalError(PipelineKitError):
     """Raised when an AI blueprint proposal fails or an invalid asset state
     transition is attempted (ADR-018, SPEC-015). Carries ``PK-GEN-*`` codes."""
+
+
+class RegistryError(PipelineKitError):
+    """Raised when a remote blueprint registry operation fails — network,
+    validation, or install (ADR-019, SPEC-016). Carries ``PK-REGISTRY-*``."""

@@ -14,8 +14,10 @@ from rich.console import Console
 from rich.table import Table
 
 from pipelinekit.blueprints.registry import BlueprintRegistry
+from pipelinekit.blueprints.remote import RemoteRegistry
 from pipelinekit.blueprints.validator import BlueprintValidator
-from pipelinekit.core.errors import BlueprintError
+from pipelinekit.core.errors import BlueprintError, RegistryError
+from pipelinekit.state import db
 
 console = Console()
 
@@ -107,6 +109,103 @@ def info_command(name: str = typer.Argument(..., help="Blueprint name.")) -> Non
     console.print(
         f"Time-to-Trusted-Data: < {blueprint.time_to_trusted_data_hours} hours"
     )
+    raise typer.Exit(0)
+
+
+@blueprint_app.command("search")
+def search_command(
+    query: str = typer.Argument(
+        ..., help="Search term: source, destination, name, or tag."
+    ),
+    verified_only: bool = typer.Option(
+        False, "--verified", help="Show only verified blueprints."
+    ),
+) -> None:
+    """Search the remote blueprint registry."""
+    try:
+        results = RemoteRegistry().search(query)
+    except RegistryError as exc:
+        console.print(f"✗ [{exc.code}] {exc.message}", style="bold red")
+        raise typer.Exit(1) from exc
+
+    if verified_only:
+        results = [r for r in results if r.verified]
+
+    console.print(f'Blueprint Registry Search: "{query}"')
+    console.print("─" * 36)
+    if not results:
+        console.print("\nNo blueprints found.", style="dim")
+        raise typer.Exit(0)
+
+    table = Table()
+    table.add_column("Name", style="cyan", no_wrap=True)
+    table.add_column("Version")
+    table.add_column("Source")
+    table.add_column("Destination")
+    table.add_column("Verified")
+    for entry in results:
+        table.add_row(
+            entry.name,
+            entry.version,
+            entry.source,
+            entry.destination,
+            "✓" if entry.verified else "—",
+        )
+    console.print(table)
+    console.print(
+        f"\n{len(results)} blueprint(s) found. "
+        "Install with: pipelinekit blueprint install <name>",
+        style="dim",
+    )
+    raise typer.Exit(0)
+
+
+@blueprint_app.command("install")
+def install_command(
+    name: str = typer.Argument(..., help="Blueprint name to install."),
+    version: str = typer.Option(None, "--version", "-v"),
+    force: bool = typer.Option(
+        False, "--force", help="Overwrite if already installed."
+    ),
+) -> None:
+    """Install a blueprint from the registry (validated before write)."""
+    registry = RemoteRegistry()
+    console.print(f"Installing {name}{f' v{version}' if version else ''}...")
+    try:
+        installed_version = registry.install(name, version, force=force)
+    except RegistryError as exc:
+        console.print(f"✗ [{exc.code}] {exc.message}", style="bold red")
+        raise typer.Exit(1) from exc
+
+    # Record the install and surface verification status (best-effort, cached).
+    entry = registry.fetch_catalog().get(name, installed_version)
+    if entry is not None:
+        db.insert_installed_blueprint(
+            entry.name,
+            installed_version,
+            entry.source,
+            entry.destination,
+            entry.verified,
+            entry.url,
+        )
+
+    console.print("  ✓ Validated blueprint schema", style="green")
+    console.print("  ✓ Verified required assets", style="green")
+    console.print(f"  ✓ Written to blueprints/{name}/", style="green")
+    verified = entry.verified if entry else False
+    if verified:
+        console.print(
+            f"\n{name} v{installed_version} installed. ✓ Verified blueprint.",
+            style="green",
+        )
+    else:
+        console.print(f"\n{name} v{installed_version} installed.", style="green")
+        console.print(
+            "⚠ This blueprint has not been verified by the Mpingo Systems team.\n"
+            "  Review all assets carefully before deploying to production.",
+            style="yellow",
+        )
+    console.print(f"Run 'pipelinekit blueprint info {name}' for details.", style="dim")
     raise typer.Exit(0)
 
 

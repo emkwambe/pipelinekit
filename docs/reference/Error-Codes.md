@@ -156,6 +156,22 @@ a missing tool resolves to an `info` result rather than raising.
 
 ---
 
+### REGISTRY — Remote Blueprint Registry (Sprint 6-6)
+
+| Code | Meaning |
+|---|---|
+| PK-REGISTRY-001 | Registry unreachable — network error (and no cache) |
+| PK-REGISTRY-002 | Blueprint validation failed — schema or missing assets |
+| PK-REGISTRY-003 | Blueprint already installed — use --force to overwrite |
+| PK-REGISTRY-004 | Blueprint not found in catalog |
+| PK-REGISTRY-005 | Version not found in catalog |
+
+`RegistryError` carries the `PK-REGISTRY-*` codes. Every installed blueprint is
+schema-validated and asset-checked before any write (ADR-019); offline, a cached
+catalog is used when present.
+
+---
+
 ## Error Class Hierarchy
 
 ```python
@@ -169,7 +185,8 @@ PipelineKitError(code, message, context)
 ├── AIError              PK-AI-*          (Phase 4)
 ├── ArchitectureError    PK-ARCH-*        (Phase 5)
 ├── HealthError          PK-HEALTH-*      (Phase 6)
-└── ProposalError        PK-GEN-*         (Phase 6 — Sprint 6-5)
+├── ProposalError        PK-GEN-*         (Phase 6 — Sprint 6-5)
+└── RegistryError        PK-REGISTRY-*    (Phase 6 — Sprint 6-6)
 ```
 
 All errors carry structured code, message, and context dict.

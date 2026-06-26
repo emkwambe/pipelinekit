@@ -81,7 +81,8 @@ def test_apply_plan_no_approved_reports_pk_gen_003(tmp_path, monkeypatch):
     plan_id = _seed_proposal(tmp_path, approved=False)
     (tmp_path / "pipelinekit.yaml").write_text(_CONFIG, encoding="utf-8")
     monkeypatch.chdir(tmp_path)
-    result = runner.invoke(app, ["apply", "plan", plan_id, "--yes"])
+    # No --interactive and no prior approval → must not write (no auto-apply).
+    result = runner.invoke(app, ["apply", "plan", plan_id])
     assert result.exit_code == 1
     assert "PK-GEN-003" in result.stdout
 

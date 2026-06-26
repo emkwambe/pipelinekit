@@ -17,11 +17,15 @@ SUPPORTED_SOURCES: dict[str, dict] = {
         "dlt_source": "sql_database",
         "credential_fields": ["host", "port", "database", "user", "password"],
         "tables": "configurable",
+        # PipelineKit end-to-end verified (Blueprint #001 locally verified).
+        "verified": True,
     },
     "salesforce": {
         "dlt_source": "salesforce",
         "credential_fields": ["username", "password", "security_token"],
         "tables": ["accounts", "opportunities", "contacts", "leads", "cases"],
+        # Community-sourced dlt verified source — not PipelineKit end-to-end verified.
+        "verified": False,
     },
     "stripe": {
         "dlt_source": "stripe_analytics",
@@ -34,6 +38,8 @@ SUPPORTED_SOURCES: dict[str, dict] = {
             "events",
             "refunds",
         ],
+        # Community-sourced dlt verified source — not PipelineKit end-to-end verified.
+        "verified": False,
     },
 }
 
@@ -63,6 +69,15 @@ class AdapterCapabilityRegistry:
     def is_destination_supported(self, destination_type: str) -> bool:
         """Return True if the destination type has a registered dlt adapter."""
         return destination_type in SUPPORTED_DESTINATIONS
+
+    def is_source_verified(self, source_type: str) -> bool:
+        """Return True if the source is PipelineKit end-to-end verified.
+
+        Community-sourced adapters (e.g. ``stripe_analytics``) are unverified;
+        proposals using them carry a warning in interactive review (SPEC-016).
+        Unknown sources are treated as unverified.
+        """
+        return bool(SUPPORTED_SOURCES.get(source_type, {}).get("verified", False))
 
     def get_source_info(self, source_type: str) -> dict:
         """Return the capability record for a source, or ``{}`` if unsupported."""

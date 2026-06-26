@@ -14,6 +14,7 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 
+from pipelinekit.ai.adapter_registry import AdapterCapabilityRegistry
 from pipelinekit.ai.blueprint_proposer import BlueprintProposer
 from pipelinekit.ai.proposal_models import BlueprintProposal
 from pipelinekit.ai.providers import create_provider
@@ -108,12 +109,20 @@ def _explain(asset) -> None:
 
 def _review_loop(proposal: BlueprintProposal) -> None:
     """Interactive per-asset review. Mutates asset states in place."""
+    source_verified = AdapterCapabilityRegistry().is_source_verified(
+        proposal.source_type
+    )
     accept_all = False
     total = len(proposal.assets)
     for i, asset in enumerate(proposal.assets, start=1):
         console.print(f"\nAsset {i} of {total}: {asset.filename}")
         console.print("━" * 56)
         console.print(Panel(asset.content, title=asset.asset_type, expand=False))
+        if not source_verified:
+            console.print(
+                "⚠ Unverified adapter source — verify import path before " "deploying.",
+                style="yellow",
+            )
         if asset.confidence_note:
             console.print(f"Confidence: {asset.confidence_note}", style="dim")
         if asset.validation_error:
@@ -222,9 +231,18 @@ def show_command(plan_id: str = typer.Argument(...)) -> None:
 @apply_app.command("plan")
 def apply_plan_command(
     plan_id: str = typer.Argument(...),
-    yes: bool = typer.Option(False, "--yes", "-y"),
+    interactive: bool = typer.Option(
+        False, "--interactive", help="Review each asset before writing."
+    ),
 ) -> None:
-    """Write approved assets from a proposal to blueprints/<name>/."""
+    """Write approved assets from a proposal to blueprints/<name>/.
+
+    Review is required (ADR-018, Smell 13). With ``--interactive`` you review
+    each asset, then approved ones are written. Without it, only assets already
+    APPROVED from a prior ``generate blueprint --interactive`` session are
+    written — otherwise this fails with ``PK-GEN-003``. There is no
+    generate → auto-apply shortcut.
+    """
     data = db.get_blueprint_proposal(plan_id)
     if data is None:
         console.print(f"✗ Plan not found: {plan_id}", style="bold red")
@@ -238,21 +256,18 @@ def apply_plan_command(
         raise typer.Exit(1) from exc
     proposer = BlueprintProposer(config, provider=None)  # type: ignore[arg-type]
 
+    if interactive:
+        _review_loop(proposal)
+        db.insert_blueprint_proposal(proposal.to_dict())  # persist approvals
+
     approved = proposal.approved_assets()
     if not approved:
         console.print(
-            "✗ [PK-GEN-003] No approved assets. Review with "
-            "'generate blueprint --interactive' first.",
+            "✗ [PK-GEN-003] No approved assets. Use "
+            "'generate blueprint --interactive' to review first.",
             style="bold red",
         )
         raise typer.Exit(1)
-    if not yes and not typer.confirm(
-        f"Write {len(approved)} approved asset(s) to "
-        f"blueprints/{proposal.blueprint_name}/?",
-        default=False,
-    ):
-        console.print("Aborted.", style="dim")
-        raise typer.Exit(0)
 
     try:
         written = proposer.apply(proposal)

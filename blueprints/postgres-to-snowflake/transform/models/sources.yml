@@ -15,7 +15,7 @@ sources:
       - name: orders
         description: Raw orders table ingested from Postgres source.
         columns:
-          - name: id
+          - name: order_id
             description: Primary key. Unique order identifier.
             tests:
               - unique

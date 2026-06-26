@@ -8,75 +8,48 @@
 
 ## Current State
 
-**Active Phase:** Phase 6 — Complete (Catalog + Ecosystem)  
-**Last Completed:** Sprint 6-6 — Remote Blueprint Registry  
+**Active Phase:** Phase 6 — Complete  
+**Last Completed:** Sprint 6-7 — Migration Intelligence  
 **Last Updated:** June 26, 2026  
-**Main Branch:** `8d40dbd`
+**Main Branch:** `91f39c3`
 
 ---
 
-## Phase 6 Completion Record
+## Phase 6 — Complete Sprint Record
 
-### ✅ Sprint 6-1 — pipelinekit health | `c613640` | 209 tests
-### ✅ Sprint 6-2a — dlt Adapter + Credential Wiring | `fe6341f` | 225 tests
-### ✅ Blueprint #001 Local Verification | `d01ca36` | 1,000 rows | 0.7 min
-### ✅ Sprint 6-3 — Blueprint #002 Salesforce → Snowflake | `04ffd50` | 229 tests
-### ✅ Sprint 6-5 — AI Blueprint Proposal | `9fc034a`+ | 256 tests
-### ✅ Blueprint #003 — stripe-to-snowflake (AI-proposed) | `617e5ec`
+| Sprint | Commit | Tests | What shipped |
+|---|---|---|---|
+| 6-1 pipelinekit health | `c613640` | 209 | Health commands, pip-audit |
+| 6-2a dlt adapter | `fe6341f` | 225 | Real dlt, credential wiring, ADR-017 |
+| Blueprint #001 verified | `d01ca36` | — | 1,000 rows, 0.7 min |
+| 6-3 Blueprint #002 | `04ffd50` | 229 | Salesforce → Snowflake |
+| 6-5 AI Blueprint Proposal | `9fc034a`+ | 256 | ADR-018, state machine, provenance |
+| Blueprint #003 AI-proposed | `617e5ec` | — | stripe-to-snowflake |
+| 6-6 Remote Registry | `8d40dbd` | 268 | search, install, catalog, ADR-019 |
+| **6-7 Migration Intelligence** | **`91f39c3`** | **286** | **Airbyte/Fivetran/Python parsers, ADR-020** |
 
 ---
 
-### ✅ Sprint 6-6 — Remote Blueprint Registry
+### ✅ Sprint 6-7 — Migration Intelligence
 **Completed:** June 26, 2026  
-**Commit:** `8d40dbd` | 268 tests | 81.10% | 10 files +793/−14
+**Commit:** `91f39c3` | 286 tests | 81.40% | 18 new tests
 
 **What was built:**
-- `src/pipelinekit/blueprints/remote.py` — RemoteRegistry, BlueprintCatalog, CatalogEntry
-- `pipelinekit blueprint search <query>` — search remote catalog
-- `pipelinekit blueprint install <name>` — download, validate, write
-- Validation before write: schema + lenient 8-asset check (admits all 3 current blueprints)
-- 24h catalog cache with offline graceful degradation
-- `installed_blueprints` table in state.db
-- RegistryError + PK-REGISTRY-001 to 005
+- `src/pipelinekit/ai/migration_models.py` — MigrationProposal, MappingResult, MigrationGap, MappingStatus
+- `src/pipelinekit/ai/config_parsers.py` — AirbyteParser, FivetranParser, PythonParser (ast.parse only — never exec), MigrationConfigParser router
+- `src/pipelinekit/ai/migration_analyzer.py` — MigrationAnalyzer (analyze + apply)
+- `src/pipelinekit/cli/migrate.py` — `pipelinekit migrate analyze`
+- All 5 providers — `analyze_migration()` implemented
+- MigrationError + PK-MIGRATE-001 to 005
 
-**Trust model hardening (Sprint 6-5 authorized adjustments landed here):**
-- `pipelinekit apply plan` — `--yes` removed; `--interactive` added; no generate→auto-apply shortcut
-- AdapterCapabilityRegistry `verified` flag: postgres=true, salesforce/stripe=false
-- `⚠ Unverified adapter source` warning in interactive review
+**Trust model:**
+- AI reads existing config → proposes migration → human approves → apply() writes
+- `apply()` writes `pipelinekit.proposed.yaml` — never `pipelinekit.yaml`
+- Blocking gaps prevent apply without `--force`
+- `can_auto_apply` always False
+- `PythonParser` uses `ast.parse()` only — never exec/eval/subprocess
 
-**Quality gates:**
-| Gate | Result |
-|---|---|
-| pytest | 268 passed (256 prior + 12 new) |
-| coverage | 81.10% |
-| ruff / black / mypy | Clean |
-
----
-
-## The Phase 6 Arc — Complete
-
-```
-6-1  health      → programmed sustainability policy
-6-2a dlt adapter → real credential wiring, Blueprint #001 verified
-6-3  Blueprint #002 → Salesforce → Snowflake (hand-crafted, verified)
-6-5  AI Proposal → Blueprint #003 Stripe (AI-proposed, human-approved)
-6-6  Registry    → install/search/distribute blueprints
-```
-
-**The flywheel:**
-```
-Install blueprint → better AI proposals → better blueprints → install more
-```
-
----
-
-## Blueprint Catalog
-
-| Blueprint | Built | Local Verified | Registry | Adapter Verified |
-|---|---|---|---|---|
-| postgres-to-snowflake | ✅ | ✅ 1,000 rows | ⏳ pending deploy | ✅ |
-| salesforce-to-snowflake | ✅ | ✅ 800 rows | ⏳ pending deploy | ⚠ community-sourced |
-| stripe-to-snowflake | ✅ AI-proposed | ⏳ dbt parse pending | ⏳ pending deploy | ⚠ community-sourced |
+**ADR satisfied:** ADR-020 (Migration Intelligence Governance)
 
 ---
 
@@ -89,30 +62,88 @@ pipelinekit diagnose / architect / health
 pipelinekit generate blueprint --plan/--interactive
 pipelinekit generate show <plan_id>
 pipelinekit apply plan <plan_id> [--interactive]
+pipelinekit migrate analyze <config> [--apply] [--force]
 ```
 
 ---
 
-## Open Items Before Design Partner Outreach
+## Blueprint Catalog
+
+| Blueprint | Built | Local Verified | Registry | Source |
+|---|---|---|---|---|
+| postgres-to-snowflake | ✅ | ✅ 1,000 rows | ⏳ deploy pending | Hand-crafted |
+| salesforce-to-snowflake | ✅ | ✅ 800 rows | ⏳ deploy pending | Hand-crafted |
+| stripe-to-snowflake | ✅ | ⏳ pending | ⏳ deploy pending | **AI-proposed** |
+
+---
+
+## Real Infrastructure Testing Plan (6-6 + 6-7)
+
+These must be completed before design partner outreach:
+
+### Sprint 6-6 Registry Testing
+```
+□ Create pipelinekit-registry GitHub repo
+□ Add v1/catalog.json with 3 blueprint entries
+□ Zip each blueprint: postgres-to-snowflake-1.0.0.zip etc.
+□ Deploy to Cloudflare Pages at registry.pipelinekit.dev
+□ Run: pipelinekit blueprint search stripe
+□ Run: pipelinekit blueprint install postgres-to-snowflake
+□ Verify install writes to blueprints/ and validates
+□ Record verified test in PROJECT-STATUS
+```
+
+### Sprint 6-7 Migration Testing
+```
+□ Create sample Airbyte connection.json (postgres → snowflake)
+□ Run: pipelinekit migrate analyze airbyte-connection.json
+□ Verify: MigrationProposal shows mappings, gaps, confidence
+□ Run: pipelinekit migrate analyze airbyte-connection.json --apply
+□ Verify: pipelinekit.proposed.yaml written correctly
+□ Run: pipelinekit validate (against proposed yaml)
+□ Record verified test in PROJECT-STATUS
+```
+
+---
+
+## Open Housekeeping
 
 ```
-□  Deploy registry — pipelinekit-registry Cloudflare Pages repo
-   → catalog.json + 3 blueprint zips at registry.pipelinekit.dev
-□  Blueprint #003 local verification (dbt parse + synthetic run)
-□  Archive superseded ADR-018-Generation + SPEC-015-Generation files
-□  Sprint 6-7: Migration Intelligence (ADR + SPEC first)
-□  Sprint 6-2b: PK-CONFIG-006 wiring
-□  Blueprint #001 production Snowflake verification
-□  ICP-001, ICP-002, ICP-003 stubs
-□  CI green confirmed on GitHub
+□ ADR-020 filename reconciliation (migration.py → migration_analyzer.py)
+□ Archive ADR-018-Blueprint-Generation-Governance.md (superseded)
+□ Archive SPEC-015-AI-Blueprint-Generation.md (superseded)
+□ Blueprint #003 dbt parse + local verification
+□ SPEC-013 drift reconciliation
+□ ICP-001, ICP-002, ICP-003 stubs
+□ PK-CONFIG-006 wired into validate/run
+□ CI green confirmed on GitHub
 ```
 
 ---
 
 ## Repository Numbers
 
-**Tests:** 268 | **Coverage:** 81.10% | **Blueprints:** 3  
-**AI providers:** 5 | **ADRs:** 019 | **SPECs:** 016 | **State tables:** 8
+**Tests:** 286 | **Coverage:** 81.40% | **Blueprints:** 3  
+**AI providers:** 5 | **ADRs:** 020 | **SPECs:** 017 | **State tables:** 8  
+**CLI commands:** 13+ across 6 command groups
+
+---
+
+## What PipelineKit Can Do Now
+
+```
+Initialize and validate pipeline projects
+Run pipelines (dlt ingestion, dbt transformation, Soda quality)
+Enforce data contracts
+Deploy production blueprints (3 available)
+Alert on failures (Resend email)
+Diagnose failures with AI root cause analysis (5 providers)
+Reason about architecture decisions
+Monitor health (deps, security, blueprints, specs, tests)
+Propose new blueprints from source/destination specification
+Search and install blueprints from registry
+Analyze existing Airbyte/Fivetran/Python pipelines and propose migration
+```
 
 ---
 

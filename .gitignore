@@ -24,9 +24,9 @@ pipelinekit_pipeline.duckdb
 *.duckdb
 
 # dbt run artifacts (Blueprint #001)
-blueprints/postgres-to-snowflake/transform/logs/
-blueprints/postgres-to-snowflake/transform/target/
-blueprints/postgres-to-snowflake/transform/.user.yml
+blueprints/*/transform/logs/
+blueprints/*/transform/target/
+blueprints/*/transform/.user.yml
 
 # dlt pipeline working directory
 .dlt/

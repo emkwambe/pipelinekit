@@ -7,7 +7,10 @@ failure → ``LLMError(PK-AI-001)``; malformed output → ``LLMError(PK-AI-002)`
 
 from __future__ import annotations
 
+import json
 import os
+import re
+import sys
 from typing import TYPE_CHECKING
 
 from pipelinekit.ai.evidence import EvidencePackage
@@ -103,8 +106,46 @@ class AnthropicProvider:
         return parse_architecture_response(raw, context, reasoning_type)
 
     def propose_blueprint(self, context: "ProposalContext") -> "BlueprintProposal":
-        """Propose a blueprint from context (SPEC-015). Never writes files."""
+        """Propose a blueprint from context (SPEC-015). Never writes files.
+
+        Anthropic sometimes wraps the JSON object in markdown fences or adds a
+        short preamble. Strip fences and extract the outermost ``{...}`` object
+        before parsing. A response that is still not valid JSON is logged to
+        stderr and raised as ``LLMError(PK-AI-002)``.
+        """
         raw = self._complete(
             PROPOSAL_SYSTEM_PROMPT, build_proposal_user_prompt(context)
         )
-        return parse_proposal_response(raw, context, self.name, self.model)
+        content = _extract_json_object(raw)
+        try:
+            json.loads(content)
+        except ValueError as exc:
+            print(
+                f"[anthropic] proposal response was not valid JSON:\n{raw}",
+                file=sys.stderr,
+            )
+            raise LLMError(
+                "PK-AI-002",
+                "Anthropic proposal response was not valid JSON",
+                {"provider": self.name},
+            ) from exc
+        return parse_proposal_response(content, context, self.name, self.model)
+
+
+def _extract_json_object(raw: str) -> str:
+    """Return the JSON object from a model response.
+
+    Strips `````json`` / ``````` fences, then — if the result is not
+    already valid JSON — extracts the substring from the first ``{`` to the last
+    ``}`` (handling preamble or trailing prose). Returns the cleaned string; the
+    caller validates.
+    """
+    content = re.sub(r"```json\s*|\s*```", "", raw).strip()
+    try:
+        json.loads(content)
+        return content
+    except ValueError:
+        start, end = content.find("{"), content.rfind("}")
+        if start != -1 and end > start:
+            return content[start : end + 1]
+        return content

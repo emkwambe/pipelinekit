@@ -1,0 +1,26 @@
+# PipelineKit Diagrams
+
+All diagrams are Mermaid format (`.mmd`). They render automatically in GitHub, Obsidian, and most docs platforms. Open any file to view the rendered diagram, or embed it in a Markdown code fence tagged `mermaid`.
+
+| File | Title | Audience | Use case |
+|---|---|---|---|
+| `01-system-overview.mmd` | System Overview | Investors, Executives | First conversation |
+| `02-five-layer-architecture.mmd` | Five-Layer Architecture | Engineers | Technical evaluation |
+| `03-cli-command-map.mmd` | CLI Command Map | Maintainers | Day-to-day operations |
+| `04-pipeline-execution-flow.mmd` | Pipeline Execution Flow | Engineers | Debugging runs |
+| `05-blueprint-proposal-flow.mmd` | Blueprint Proposal Flow | Engineers, Product | AI feature explanation |
+| `06-migration-intelligence-flow.mmd` | Migration Intelligence | Engineers, Sales | ICP-004 conversations |
+| `07-state-store-schema.mmd` | State Store Schema | Maintainers | Database debugging |
+| `08-error-taxonomy.mmd` | Error Code Taxonomy | On-call Engineers | Incident response |
+| `09-blueprint-catalog-registry.mmd` | Blueprint Catalog | Product, Partners | Catalog overview |
+| `10-ai-provider-architecture.mmd` | AI Provider Architecture | Engineers, Investors | AI strategy |
+| `11-product-ecosystem.mmd` | Product Ecosystem | Investors | Portfolio overview |
+| `12-future-mcp-architecture.mmd` | Future MCP Architecture | Future Engineers | Roadmap planning |
+
+## Accuracy notes
+
+- Diagrams are verified against the codebase: CLI commands against `src/pipelinekit/cli/`, state tables and columns against `src/pipelinekit/state/db.py`, error classes against `src/pipelinekit/core/errors.py`, and error code ranges against `docs/reference/Error-Codes.md`.
+- **Diagram 08** uses the actual error-code ranges (`PK-RUNTIME-001..003`, `PK-BLUEPRINT-001..004`, `PK-AI-001..003`, `PK-ARCH-001..004`, `PK-HEALTH-001..004`). `PK-ADAPTER-*` and `PK-NOTIFY-*` have no dedicated exception subclass yet and are shown separately.
+- **Diagram 07** shows the real columns (e.g. `pipeline_runs` uses `finished_at` and `duration_s`; there is no `rows_loaded` column — per-step rows live in the in-memory `PipelineResult`).
+- **Diagram 11** is strategic portfolio context. Only the PipelineKit subtree is verifiable in this repository; the RealityDB and Education products are supplied by the Command Center.
+- **Diagram 12** is explicitly labeled **CURRENT** vs **FUTURE**. The future MCP roles are proposed and not yet built; they would be governed by **ADR-021, which does not yet exist** (the current set ends at ADR-020).

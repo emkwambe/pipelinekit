@@ -1,0 +1,44 @@
+%% PipelineKit — Blueprint Catalog and Registry (Product / Engineering)
+%% Audience: product, engineers, design partners.
+%% Catalog and verification states verified against PROJECT-STATUS.md, blueprints/, remote.py.
+flowchart TB
+    subgraph SRC["Blueprint Sources"]
+        direction TB
+        subgraph HAND["Hand-crafted (local)"]
+            pg["postgres-to-snowflake v1.0.0<br/>locally verified — 1,000 rows"]
+            sf["salesforce-to-snowflake v1.0.0<br/>locally verified — 800 rows"]
+        end
+        subgraph AIP["AI-Proposed (BlueprintProposer)"]
+            st["stripe-to-snowflake v1.0.0<br/>AI-proposed, human-approved<br/>local verification pending"]
+        end
+        subgraph REG["Registry (registry.pipelinekit.dev — deploy pending)"]
+            rsearch["pipelinekit blueprint search &lt;query&gt;"]
+            rinstall["pipelinekit blueprint install &lt;name&gt;"]
+            note["currently returns PK-REGISTRY-001<br/>(not yet deployed)"]
+        end
+    end
+
+    subgraph ASSETS["Blueprint structure — 8 required assets (lenient layout)"]
+        direction TB
+        a1["blueprint.json"]
+        a2["ingestion/ (dlt)"]
+        a3["transform/ or dbt/ (dbt project)"]
+        a4["contracts/*.yaml"]
+        a5["quality/ or dbt/tests (Soda)"]
+        a6["alerts/config.yaml"]
+        a7["docs/README.md"]
+        a8["docs/runbook.md or RUNBOOK.md"]
+    end
+
+    subgraph VERIFY["Verification lifecycle"]
+        direction LR
+        v0["proposed"] --> v1["approved"] --> v2["written"] --> v3["validated"] --> v4["locally verified"] --> v5["production verified"]
+    end
+
+    HAND --> ASSETS
+    AIP --> ASSETS
+    REG --> ASSETS
+    ASSETS --> VERIFY
+
+    classDef pending fill:#3a341a,color:#fe9,stroke:#cb6;
+    class note,st pending;

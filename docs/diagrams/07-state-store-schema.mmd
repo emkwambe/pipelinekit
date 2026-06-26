@@ -1,0 +1,97 @@
+%% PipelineKit — State Store Schema (Maintenance / Engineering)
+%% Audience: maintainers, engineers debugging state.
+%% Columns verified EXACTLY against src/pipelinekit/state/db.py (_SCHEMA).
+%% State lives at .pipelinekit/state.db (SQLite). Run-id links are logical
+%% (no enforced FK constraints in the schema). Command->table edges: see Diagram 03.
+erDiagram
+    pipeline_runs {
+        TEXT id PK
+        TEXT pipeline
+        TEXT status
+        TEXT started_at
+        TEXT finished_at
+        REAL duration_s
+        TEXT error_code
+        TEXT error_msg
+    }
+    validation_runs {
+        TEXT id PK
+        TEXT status
+        TEXT ran_at
+        INTEGER error_count
+        TEXT errors
+    }
+    contract_results {
+        TEXT id PK
+        TEXT run_id FK
+        TEXT table_name
+        TEXT status
+        INTEGER violation_count
+        TEXT violations
+        TEXT checked_at
+    }
+    diagnostic_results {
+        TEXT id PK
+        TEXT run_id FK
+        TEXT status
+        TEXT finding_type
+        REAL confidence
+        TEXT explanation
+        TEXT evidence
+        TEXT actions
+        INTEGER can_auto_fix
+        TEXT diagnosed_at
+        TEXT provider
+    }
+    architecture_results {
+        TEXT id PK
+        TEXT reasoning_type
+        TEXT question
+        REAL confidence
+        TEXT recommendation
+        TEXT tradeoffs
+        TEXT adr_compliance
+        INTEGER can_auto_apply
+        TEXT analyzed_at
+        TEXT provider
+    }
+    health_runs {
+        TEXT id PK
+        TEXT ran_at
+        TEXT deps_status
+        TEXT security_status
+        TEXT blueprints_status
+        TEXT specs_status
+        TEXT tests_status
+        TEXT overall_status
+        TEXT summary
+    }
+    blueprint_proposals {
+        TEXT plan_id PK
+        TEXT blueprint_name
+        TEXT source_type
+        TEXT destination_type
+        TEXT tables
+        TEXT assets
+        REAL confidence
+        TEXT assumptions
+        TEXT unsupported
+        TEXT decisions
+        TEXT provider
+        INTEGER can_auto_apply
+        INTEGER applied
+        TEXT proposed_at
+        TEXT applied_at
+    }
+    installed_blueprints {
+        TEXT name PK
+        TEXT version
+        TEXT source
+        TEXT destination
+        INTEGER verified
+        TEXT installed_at
+        TEXT registry_url
+    }
+
+    pipeline_runs ||--o{ contract_results : "run_id"
+    pipeline_runs ||--o{ diagnostic_results : "run_id"

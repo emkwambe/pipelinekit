@@ -1,0 +1,57 @@
+%% PipelineKit — Five-Layer Architecture (Engineering)
+%% Audience: engineers evaluating PipelineKit, contributors.
+%% Components verified against src/pipelinekit/.
+flowchart TB
+    subgraph L5["Layer 5 — Architecture Intelligence"]
+        direction LR
+        ae["ArchitectureEngine"]
+        adrr["ADR reader / arch evidence"]
+    end
+
+    subgraph L4["Layer 4 — Intelligence Layer"]
+        direction LR
+        de["DiagnosticsEngine"]
+        ec["EvidenceCollector"]
+        bpprop["BlueprintProposer"]
+        manalyzer["MigrationAnalyzer"]
+        llm["LLMProvider (protocol)"]
+    end
+
+    subgraph L3["Layer 3 — Trust Layer"]
+        direction LR
+        breg["BlueprintRegistry"]
+        rreg["RemoteRegistry"]
+        cval["ContractValidator"]
+        ndisp["NotificationDispatcher"]
+    end
+
+    subgraph L2["Layer 2 — Data Layer"]
+        direction LR
+        runner["PipelineRunner"]
+        dlt["dlt adapter (ingestion)"]
+        dbt["dbt adapter (transformation)"]
+        soda["Soda adapter (quality)"]
+    end
+
+    subgraph L1["Layer 1 — Foundation"]
+        direction LR
+        cli["CLI (Typer)"]
+        cfg["PipelineConfig"]
+        errs["Error hierarchy (PK-*)"]
+    end
+
+    L5 --> L4 --> L3 --> L2 --> L1
+
+    state["State store<br/>SQLite — .pipelinekit/state.db"]
+    L1 -.-> state
+    L2 -.-> state
+    L3 -.-> state
+    L4 -.-> state
+    L5 -.-> state
+
+    chain["Document chain<br/>Constitution to ADR to SPEC to Code"]
+    chain -.->|governs| L1
+    chain -.->|governs| L5
+
+    classDef cross fill:#234,color:#fff,stroke:#9bf;
+    class state,chain cross;

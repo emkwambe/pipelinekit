@@ -1,0 +1,48 @@
+%% PipelineKit — System Overview (Investor / Executive)
+%% Audience: investors, executives, first-time evaluators.
+%% High-level value picture. Note: "Health" is a deterministic operations
+%% capability (not AI); the other four are AI-assisted.
+flowchart TB
+    subgraph stack["The Analytics Stack"]
+        direction LR
+        data["RealityDB<br/>data"] --> pk["PipelineKit<br/>pipeline OS"] --> out["Analytics<br/>trusted output"]
+    end
+
+    subgraph caps["Five Capabilities"]
+        direction LR
+        diag["Diagnose"]
+        arch["Architect"]
+        prop["Propose"]
+        mig["Migrate"]
+        hlth["Health"]
+    end
+
+    subgraph bp["Blueprint Sources"]
+        direction LR
+        hand["Hand-crafted"]
+        aip["AI-proposed"]
+        reg["Registry-installed"]
+    end
+
+    subgraph prov["AI Providers (BYOK)"]
+        direction LR
+        anth["Anthropic<br/>US"]
+        oai["OpenAI<br/>US"]
+        oll["Ollama<br/>local"]
+        ds["DeepSeek<br/>China"]
+        mis["Mistral<br/>EU"]
+    end
+
+    pk --> caps
+    pk --> bp
+    diag --> prov
+    arch --> prov
+    prop --> prov
+    mig --> prov
+
+    trust["AI Proposes  —  Human Approves  —  Apply Writes"]
+    prov --> trust
+    bp --> trust
+
+    classDef phrase fill:#0a7d55,color:#ffffff,font-weight:bold,stroke:#064;
+    class trust phrase;

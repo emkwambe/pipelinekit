@@ -1,0 +1,48 @@
+%% PipelineKit — Migration Intelligence Flow (Engineering / Sales)
+%% Audience: engineers evaluating migration; sales with Airbyte/Fivetran users.
+%% Verified against ai/config_parsers.py, ai/migration_analyzer.py, cli/migrate.py.
+%% Parsing is deterministic; the Python parser uses ast.parse() only — never exec.
+flowchart TB
+    cfg["Existing config<br/>airbyte-connection.json / fivetran-connector.json / pipeline.py"]
+    cfg --> route{"MigrationConfigParser.parse()<br/>detect format"}
+    route -->|".json (Airbyte)"| ap["AirbyteParser"]
+    route -->|".json (Fivetran)"| fp["FivetranParser"]
+    route -->|".py"| pp["PythonParser (ast.parse only)"]
+    route -->|"not found"| m1["PK-MIGRATE-001"]
+    route -->|unrecognised| m2["PK-MIGRATE-002"]
+    pp -->|"syntax error"| m5["PK-MIGRATE-005"]
+
+    ap --> analyze["MigrationAnalyzer.analyze()<br/>build context + available blueprints"]
+    fp --> analyze
+    pp --> analyze
+    analyze --> call["LLMProvider.analyze_migration()"]
+    call -->|"invalid JSON"| m4["PK-MIGRATE-004"]
+    call --> prop["MigrationProposal<br/>mappings + gaps + confidence + draft_yaml<br/>can_auto_apply = False"]
+
+    prop --> render["CLI renders mappings and gaps"]
+    subgraph MAP["Mapping status"]
+        direction LR
+        clean["clean — maps directly"]
+        partial["partial — maps with adjustment"]
+        manual["manual — significant human work"]
+        unsupported["unsupported — no equivalent"]
+    end
+    render --> MAP
+
+    render --> applycmd["pipelinekit migrate analyze --apply"]
+    applycmd --> gate{"blocking_gaps > 0 and not --write-draft?"}
+    gate -->|yes| m3["PK-MIGRATE-003<br/>use --write-draft"]
+    gate -->|"no / --write-draft"| draft["write pipelinekit.proposed.yaml<br/>(NEVER pipelinekit.yaml)"]
+    draft --> fill["human fills FIXME markers"]
+    fill --> val["pipelinekit validate"]
+    val --> runp["pipelinekit run"]
+
+    subgraph REPL["What each tool's ingestion becomes"]
+        direction LR
+        air["Airbyte to dlt"]
+        fiv["Fivetran to dlt"]
+        cpy["custom Python to dlt"]
+    end
+
+    classDef err fill:#7d1a1a,color:#fff,stroke:#c66;
+    class m1,m2,m3,m4,m5 err;

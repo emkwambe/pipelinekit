@@ -1,0 +1,47 @@
+%% PipelineKit — Pipeline Execution Flow (Engineering / Debugging)
+%% Audience: engineers debugging pipelinekit run.
+%% Sequence verified against src/pipelinekit/runtime/runner.py (run()).
+%% The run record is updated in a try/finally — it is NEVER skipped, even on failure.
+sequenceDiagram
+    actor User
+    participant CLI as CLI (run.py)
+    participant Loader as config.loader
+    participant Runner as PipelineRunner
+    participant State as state.db
+    participant Adapters as Adapters (dlt / dbt / Soda)
+    participant Notifier as NotificationDispatcher
+
+    User->>CLI: pipelinekit run
+    CLI->>Loader: load_config()
+    alt config invalid
+        Loader-->>CLI: ConfigurationError (PK-CONFIG-001..004)
+        CLI-->>User: print error, exit 1
+    end
+    Loader-->>CLI: PipelineConfig
+    CLI->>Runner: run()
+    Runner->>State: insert_run(run_id, status=pending)
+
+    Note over Runner,Adapters: Enabled steps only, in order: ingestion, transformation, quality
+
+    loop each enabled adapter
+        Runner->>Adapters: execute_step(name, adapter)
+        alt step succeeds
+            Adapters-->>Runner: StepResult(SUCCESS, rows, duration)
+        else step fails
+            Adapters-->>Runner: StepResult(FAILED, error_code e.g. PK-ADAPTER-001/002)
+        end
+    end
+
+    Note over Runner: aggregate status (SUCCESS / PARTIAL / FAILED).<br/>Unexpected exception, error_code = PK-RUNTIME-001
+
+    Runner->>State: update_run(final status, duration, error_code) [try/finally]
+
+    opt notifications.enabled
+        Runner->>Notifier: notify_pipeline_result(result)
+        Note over Notifier: failure swallowed — never corrupts state (SPEC-008)
+    end
+
+    Runner-->>CLI: PipelineResult (per-step status, duration, rows)
+    CLI-->>User: render run table, exit 0 if succeeded else 1
+
+    Note over CLI,State: Data contract DEFINITIONS are checked by<br/>pipelinekit validate --contracts (PK-CONTRACT-*);<br/>data-quality checks run in the Soda step above.

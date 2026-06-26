@@ -1,0 +1,44 @@
+%% PipelineKit — AI Blueprint Proposal Flow (Engineering / Product)
+%% Audience: engineers, PMs, design partners.
+%% Verified against ai/blueprint_proposer.py, ai/proposal_models.py, cli/generate.py.
+%% Trust boundary: AI proposes, human approves, apply() writes. can_auto_apply always False.
+flowchart TB
+    start["pipelinekit generate blueprint<br/>-s stripe -d snowflake -t charges --plan"]
+    start --> capcheck{"AdapterCapabilityRegistry<br/>is_source/destination_supported?"}
+    capcheck -->|no| gen6["PK-GEN-006<br/>unsupported connector (before any AI call)"]
+    capcheck -->|yes| ctx["BlueprintProposer._build_context()<br/>existing blueprints + blueprint.schema.json + source fields"]
+
+    ctx --> call["LLMProvider.propose_blueprint(context)<br/>PROPOSAL_SYSTEM_PROMPT to provider API"]
+    call --> parse["parse_proposal_response()<br/>strip fences, extract JSON object"]
+    parse -->|"not valid JSON"| gen1["PK-GEN-001"]
+    parse --> valassets["validate blueprint.json asset vs schema<br/>(recorded, not fatal — PK-GEN-005 surfaced in review)"]
+    valassets --> prov["attach AssetProvenance (9 fields) to each asset"]
+    prov --> force["force can_auto_apply = False"]
+    force --> valplan["validate assembled plan vs schema"]
+    valplan -->|invalid| gen2["PK-GEN-002"]
+    valplan --> store["store in state.db: blueprint_proposals"]
+    store --> render["CLI renders: Plan ID, confidence, assumptions, required decisions<br/>(no files written)"]
+
+    render --> review["pipelinekit generate blueprint --interactive<br/>OR generate show + apply plan"]
+    review --> loop["per-asset review:<br/>[a]ccept [r]eject [e]dit [x]explain [y-all]"]
+    loop --> applycmd["pipelinekit apply plan &lt;id&gt;"]
+    applycmd --> noappr{"any APPROVED assets?"}
+    noappr -->|no| gen3["PK-GEN-003"]
+    noappr -->|"dir exists"| gen4["PK-GEN-004"]
+    noappr -->|yes| write["write APPROVED assets only<br/>_strip_provenance() before write"]
+    write --> validatecmd["pipelinekit blueprint validate"]
+
+    %% State machine
+    subgraph SM["AssetState machine (invalid transition = PK-GEN-007)"]
+        direction LR
+        s0["proposed"] --> s1["approved"] --> s2["written"] --> s3["validated"]
+        s0 --> sr["rejected"]
+        s0 --> se["edited"] --> s0
+    end
+
+    loop -.-> s1
+    write -.-> s2
+    validatecmd -.-> s3
+
+    classDef err fill:#7d1a1a,color:#fff,stroke:#c66;
+    class gen1,gen2,gen3,gen4,gen6 err;

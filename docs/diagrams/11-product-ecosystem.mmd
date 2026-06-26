@@ -1,0 +1,47 @@
+%% PipelineKit — The Product Ecosystem (Investor / Strategic)
+%% Audience: investors, strategic partners, Mpingo Systems overview.
+%% NOTE: Only the PipelineKit subtree is verifiable in THIS repository.
+%% RealityDB, Education products, and portfolio facts are strategic context
+%% supplied by the Command Center — the Command Center owns their accuracy.
+flowchart TB
+    mpingo["Mpingo Systems — Product Ecosystem"]
+
+    subgraph RDB["RealityDB Platform"]
+        direction TB
+        rcore["RealityDB Core (CLI v2.38.0)"]
+        simlab["SimLab — interactive simulation"]
+        sandbox["Sandbox — 9 templates, 32K-50K rows each"]
+        safesql["SafeSQL Pro — SQL validation (safesqlpro.dev)"]
+    end
+
+    subgraph PK["PipelineKit (this product)"]
+        direction TB
+        pkcat["Blueprint Catalog — 3 blueprints"]
+        pkai["AI Layer — 5 providers; diagnose / architect / propose / migrate"]
+        pkreg["Registry — registry.pipelinekit.dev (deploy pending)"]
+        pkmig["Migration Intelligence — Airbyte / Fivetran / Python"]
+    end
+
+    subgraph EDU["Education Products"]
+        direction TB
+        matha["MathAthlone — competitive math"]
+        mathp["MathPivot — AI math tutoring"]
+        sqll["SQL Learn — SQL education"]
+        atelier["Atelier — Decision Intelligence Measurement System"]
+    end
+
+    mpingo --> RDB
+    mpingo --> PK
+    mpingo --> EDU
+
+    subgraph FLOW["The integration"]
+        direction LR
+        i1["RealityDB<br/>generates synthetic enterprise data"] --> i2["PipelineKit<br/>runs trusted pipelines on that data"] --> i3["PipelineKit Academy<br/>trains engineers using both"]
+    end
+
+    RDB -.-> i1
+    PK -.-> i2
+    EDU -.-> i3
+
+    classDef self fill:#0a3d62,color:#fff,stroke:#9cf;
+    class PK,pkcat,pkai,pkreg,pkmig self;

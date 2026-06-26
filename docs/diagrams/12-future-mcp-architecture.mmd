@@ -1,0 +1,42 @@
+%% PipelineKit — Future Architecture: MCP Integration (Future Engineering)
+%% Audience: future engineers, strategic planning.
+%% CURRENT STATE is verified against the codebase.
+%% FUTURE STATE is PROPOSED and NOT YET BUILT — it would be governed by ADR-021,
+%% which does NOT yet exist (the current set ends at ADR-020).
+flowchart TB
+    subgraph CURRENT["CURRENT STATE (built, verified)"]
+        direction LR
+        u1["User"] --> c1["CLI"] --> c2["PipelineKit internals"]
+        note_cur["Authorized MCP today: Resend (ADR-013),<br/>AI provider layer (ADR-014)"]
+    end
+
+    subgraph FUTURE["FUTURE STATE — proposed, NOT YET BUILT (ADR-021 not yet written)"]
+        direction TB
+
+        subgraph R1["Role 1: PipelineKit AS an MCP server"]
+            direction LR
+            f1a["Claude Desktop / Cursor / any MCP client"] -->|"MCP protocol"| f1b["PipelineKit MCP Server<br/>tools: validate, diagnose, health,<br/>blueprint_info, migrate_analyze, propose"]
+            f1b --> f1c["Same PipelineKit internals"]
+        end
+
+        subgraph R2["Role 2: MCP for schema discovery"]
+            direction LR
+            f2a["BlueprintProposer"] -->|"MCP call"| f2b["Source MCP server<br/>(Salesforce MCP, Stripe MCP, ...)"]
+            f2b --> f2c["real schema & column names<br/>confidence 0.82 to 0.95+"]
+        end
+
+        subgraph R3["Role 3: MCP for alerts"]
+            direction LR
+            f3a["NotificationDispatcher"] -->|"MCP call"| f3b["Slack MCP / PagerDuty MCP / Teams MCP"]
+        end
+    end
+
+    CURRENT --> FUTURE
+
+    trust["Trust model UNCHANGED across interfaces:<br/>MCP tools are read/propose only;<br/>write/execute requires human confirmation;<br/>the ADR-007 boundary holds regardless of interface"]
+    FUTURE --> trust
+
+    classDef future fill:#3a341a,color:#fe9,stroke:#cb6;
+    classDef phrase fill:#0a7d55,color:#ffffff,font-weight:bold,stroke:#064;
+    class FUTURE,R1,R2,R3,f1a,f1b,f1c,f2a,f2b,f2c,f3a,f3b future;
+    class trust phrase;

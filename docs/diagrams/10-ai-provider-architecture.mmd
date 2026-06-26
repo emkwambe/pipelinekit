@@ -1,0 +1,38 @@
+%% PipelineKit — AI Provider Architecture (Engineering / Investor)
+%% Audience: engineers, investors evaluating AI strategy.
+%% Verified against ai/provider.py (LLMProvider protocol) and ai/providers/*.
+flowchart TB
+    ailayer["PipelineKit AI Layer<br/>DiagnosticsEngine · ArchitectureEngine · BlueprintProposer · MigrationAnalyzer"]
+    ailayer --> proto["LLMProvider protocol (interface)<br/>engines never know which provider is active"]
+
+    subgraph PROV["Provider implementations (BYOK — key from env)"]
+        direction LR
+        anth["Anthropic — US cloud<br/>ANTHROPIC_API_KEY"]
+        oai["OpenAI — US cloud<br/>OPENAI_API_KEY"]
+        oll["Ollama — local / air-gapped<br/>OLLAMA_HOST (no key)"]
+        ds["DeepSeek — China / cost-sensitive<br/>DEEPSEEK_API_KEY"]
+        mis["Mistral — EU / GDPR<br/>MISTRAL_API_KEY"]
+    end
+    proto --> PROV
+
+    subgraph METHODS["Protocol methods and results"]
+        direction TB
+        m_diag["diagnose() to DiagnosticResult<br/>can_auto_fix = always False"]
+        m_arch["architect() to ArchitectureResult<br/>can_auto_apply = always False"]
+        m_prop["propose_blueprint() to BlueprintProposal<br/>can_auto_apply = always False"]
+        m_mig["analyze_migration() to MigrationProposal<br/>can_auto_apply = always False"]
+        m_help["summarize() · recommend() — read-only helpers"]
+    end
+    PROV --> METHODS
+
+    subgraph EVID["Evidence flow (diagnostics)"]
+        direction LR
+        sdb["state.db"] --> ecol["EvidenceCollector"] --> epkg["EvidencePackage"] --> prov2["LLMProvider"] --> valid["validate vs schema<br/>(PK-AI-002 on failure)"] --> cli["CLI renders"]
+    end
+    METHODS --> EVID
+
+    trust["Trust boundary (immutable):<br/>AI proposes — human approves — apply() writes<br/>can_auto_fix / can_auto_apply = always False<br/>missing key / unreachable = PK-AI-001"]
+    EVID --> trust
+
+    classDef phrase fill:#0a7d55,color:#ffffff,font-weight:bold,stroke:#064;
+    class trust phrase;

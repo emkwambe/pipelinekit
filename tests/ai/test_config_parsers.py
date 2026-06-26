@@ -189,6 +189,16 @@ def test_router_detects_format_by_file_type(tmp_path):
     assert router.parse(yaml_path)[0] == "pipelinekit"
 
 
+def test_router_strips_utf8_bom_before_parsing(tmp_path):
+    """A UTF-8 BOM-prefixed JSON file parses (Windows editors / PowerShell add a
+    BOM that json.loads otherwise rejects with 'Expecting value')."""
+    path = tmp_path / "connection.json"
+    path.write_text(chr(0xFEFF) + json.dumps(_AIRBYTE), encoding="utf-8")
+    tool, parsed = MigrationConfigParser().parse(path)
+    assert tool == "airbyte"
+    assert parsed["source_type"] == "postgres"
+
+
 def test_router_missing_file_raises_pk_migrate_001(tmp_path):
     """A missing config file raises PK-MIGRATE-001."""
     with pytest.raises(MigrationError) as exc_info:

@@ -314,7 +314,11 @@ class MigrationConfigParser:
     def _parse_json(self, path: Path) -> tuple[str, dict]:
         """Route a JSON file to Airbyte, then Fivetran."""
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
+            content = path.read_text(encoding="utf-8")
+            # Strip a UTF-8 BOM (Windows editors / PowerShell often add one);
+            # json.loads rejects a leading BOM with "Expecting value".
+            content = content.lstrip(chr(0xFEFF))
+            data = json.loads(content)
         except ValueError as exc:
             raise MigrationError(
                 "PK-MIGRATE-002",

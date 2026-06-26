@@ -112,6 +112,20 @@ def test_apply_writes_only_approved(tmp_path):
     assert not (bp / "docs" / "README.md").exists()
 
 
+def test_apply_strips_blueprint_name_prefix(tmp_path):
+    """apply() strips a leading <blueprint_name>/ prefix (no doubled directory)."""
+    proposal = _canned()
+    proposal.plan_id = "plan-prefix-1"
+    # AI rooted the filename at the blueprint dir — would double without stripping.
+    proposal.assets[0].filename = "stripe-to-snowflake/blueprint.json"
+    proposal.assets[0].approve()
+    proposer = BlueprintProposer(_config(), MagicMock())
+    proposer.apply(proposal, cwd=tmp_path)
+    bp = tmp_path / "blueprints" / "stripe-to-snowflake"
+    assert (bp / "blueprint.json").exists()
+    assert not (bp / "stripe-to-snowflake").exists()  # not doubled
+
+
 def test_apply_raises_on_no_approved(tmp_path):
     """apply() raises ProposalError(PK-GEN-003) when no assets are approved."""
     proposal = _canned()

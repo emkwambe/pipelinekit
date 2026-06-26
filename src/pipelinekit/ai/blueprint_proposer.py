@@ -149,7 +149,8 @@ class BlueprintProposer:
 
         written: list[str] = []
         for asset in approved:
-            target = blueprint_dir / asset.filename
+            rel = self._relative_path(asset.filename, proposal.blueprint_name)
+            target = blueprint_dir / rel
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(self._strip_provenance(asset.content), encoding="utf-8")
             asset.mark_written()  # approved → written
@@ -244,6 +245,21 @@ class BlueprintProposer:
                 f"Proposed plan failed schema validation: {exc.message}",
                 {"detail": exc.message},
             ) from exc
+
+    @staticmethod
+    def _relative_path(filename: str, blueprint_name: str) -> str:
+        """Return the asset path relative to ``blueprints/<name>/``.
+
+        AI proposals often root each asset filename at the blueprint directory
+        (e.g. ``stripe-to-snowflake/blueprint.json``). ``apply()`` already
+        targets ``blueprints/<name>/``, so a leading ``<name>/`` (or
+        ``blueprints/<name>/``) prefix would double the directory; strip it.
+        """
+        rel = filename.replace("\\", "/").lstrip("/")
+        for prefix in (f"blueprints/{blueprint_name}/", f"{blueprint_name}/"):
+            if rel.startswith(prefix):
+                return rel[len(prefix) :]
+        return rel
 
     @staticmethod
     def _load_json(path: Path) -> dict:

@@ -46,18 +46,21 @@ $config = Get-Content "pipelinekit.yaml" -Raw
 $config = $config -replace "directory: ./contracts", "directory: ./blueprints/postgres-to-snowflake/contracts"
 # Local mode: replace the Snowflake destination block with a local DuckDB file.
 if ($Local) {
+    # dlt writes to this exact file (the adapter honors destination.path); dbt
+    # reads the same file. Use dlt's conventional <pipeline_name>.duckdb name so
+    # both sides — and the catalog (file stem) — align on one database.
     $duckDestination = @"
   destination:
     type: duckdb
-    path: "./blueprint_001_local.duckdb"
+    path: "pipelinekit_pipeline.duckdb"
 "@
     $config = [regex]::Replace($config, '(?m)^  destination:\r?\n(?:    .*\r?\n?)+', $duckDestination)
 
-    # dbt builds into the same local DuckDB file; the dbt source resolves to the
-    # DuckDB catalog (file stem) and the dlt-loaded dataset schema.
+    # dbt builds against the same DuckDB file: catalog = file stem, schema = the
+    # dlt-loaded dataset name.
     $env:DBT_TARGET = "local"
-    $env:DUCKDB_PATH = "blueprint_001_local.duckdb"
-    $env:DBT_SOURCE_DATABASE = "blueprint_001_local"
+    $env:DUCKDB_PATH = "pipelinekit_pipeline.duckdb"
+    $env:DBT_SOURCE_DATABASE = "pipelinekit_pipeline"
     $env:DBT_SOURCE_SCHEMA = "pipelinekit_pipeline_raw"
 }
 Set-Content "pipelinekit.yaml" $config

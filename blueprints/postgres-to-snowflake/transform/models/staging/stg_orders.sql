@@ -6,4 +6,4 @@ select
     status,
     cast(created_at as timestamp) as created_at,
     cast(updated_at as timestamp) as updated_at
-from {{ source('pipelinekit_raw', 'orders') }}
+from {{ source('postgres_raw', 'orders') }}

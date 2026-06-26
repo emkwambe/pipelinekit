@@ -111,8 +111,8 @@ class DltIngestionAdapter(BaseAdapter):
                 )
             # First local verification loads all rows, not just incremental
             # updates — replace ensures a clean, deterministic full load.
-            load_info = pipeline.run(self._build_source(), write_disposition="replace")
-            rows = self._rows_loaded(load_info)
+            pipeline.run(self._build_source(), write_disposition="replace")
+            rows = self._rows_loaded(pipeline)
         except PipelineKitError:
             raise
         except Exception as exc:
@@ -202,14 +202,21 @@ class DltIngestionAdapter(BaseAdapter):
             return sql_database(conn_str).with_resources(*tables)
         return []
 
-    def _rows_loaded(self, load_info: object) -> int:
-        """Best-effort row count from a dlt ``load_info`` object."""
-        packages = getattr(load_info, "load_packages", None)
-        if not packages:
+    @staticmethod
+    def _rows_loaded(pipeline: Any) -> int:
+        """Sum real data-table row counts from dlt's last normalize step.
+
+        dlt ``load_info`` reports completed *jobs*, not rows; the actual
+        per-table row counts live on the pipeline trace
+        (``last_trace.last_normalize_info.row_counts``). dlt bookkeeping tables
+        (``_dlt_*``) are excluded. Missing/partial trace data counts as zero —
+        never raises.
+        """
+        try:
+            normalize_info = pipeline.last_trace.last_normalize_info
+            counts = dict(normalize_info.row_counts) if normalize_info else {}
+        except Exception:
             return 0
-        total = 0
-        for package in packages:
-            jobs = getattr(package, "jobs", None) or {}
-            completed = jobs.get("completed_jobs", []) if isinstance(jobs, dict) else []
-            total += len(completed)
-        return total
+        return sum(
+            int(n) for table, n in counts.items() if not table.startswith("_dlt")
+        )

@@ -67,11 +67,20 @@ def test_status_returns_structured_dict():
     assert status["source"] == "postgres"
 
 
-def test_execute_counts_rows_from_load_packages():
-    """execute() sums completed jobs from dlt load packages."""
-    load_info = MagicMock(load_packages=[MagicMock(jobs={"completed_jobs": [1, 2, 3]})])
+def test_execute_reports_real_row_counts():
+    """execute() reports real data-table row counts from the dlt trace.
+
+    dlt load_info reports completed jobs, not rows; the adapter reads the actual
+    per-table counts from last_trace.last_normalize_info.row_counts and excludes
+    dlt bookkeeping tables (_dlt_*).
+    """
     with patch("dlt.pipeline") as mock_pipeline:
-        mock_pipeline.return_value.run.return_value = load_info
+        pipe = mock_pipeline.return_value
+        pipe.run.return_value = MagicMock(load_packages=[])
+        pipe.last_trace.last_normalize_info.row_counts = {
+            "orders": 3,
+            "_dlt_pipeline_state": 1,
+        }
         adapter = DltIngestionAdapter(_ingestion_config())
         result = adapter.execute()
 

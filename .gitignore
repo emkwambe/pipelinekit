@@ -19,3 +19,6 @@ build/
 .pipelinekit/
 
 pipelinekit.yaml
+
+pipelinekit_pipeline.duckdb
+*.duckdb

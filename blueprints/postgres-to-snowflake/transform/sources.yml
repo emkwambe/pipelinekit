@@ -10,7 +10,7 @@ sources:
     # (production). Defaults preserve production behavior when the DBT_SOURCE_*
     # overrides are unset.
     database: "{{ env_var('DBT_SOURCE_DATABASE', env_var('SNOWFLAKE_DATABASE', '')) }}"
-    schema: "{{ env_var('DBT_SOURCE_SCHEMA', 'raw') }}"
+    schema: "{{ env_var('DBT_SOURCE_SCHEMA', 'pipelinekit_pipeline_raw') }}"
     tables:
       - name: orders
         description: Raw orders table ingested from Postgres source.

@@ -175,6 +175,12 @@ class DltIngestionAdapter(BaseAdapter):
             return dlt.destinations.snowflake(
                 credentials=self._build_snowflake_credentials(dest)
             )
+        if dest.type == "duckdb" and dest.path:
+            import dlt  # type: ignore  # provider lib: treated as Any
+
+            # Honor the configured DuckDB file so dlt and dbt share one database
+            # (ADR-017). Without a path, dlt uses its default <pipeline>.duckdb.
+            return dlt.destinations.duckdb(dest.path)
         return dest.type
 
     def _build_source(self) -> object:

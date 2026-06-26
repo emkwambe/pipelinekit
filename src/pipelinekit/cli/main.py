@@ -24,6 +24,7 @@ import typer  # noqa: E402 — must follow stdout reconfiguration above
 from pipelinekit.cli.architect import architect_app  # noqa: E402
 from pipelinekit.cli.blueprint import blueprint_app  # noqa: E402
 from pipelinekit.cli.diagnose import diagnose_command  # noqa: E402
+from pipelinekit.cli.generate import apply_app, generate_app  # noqa: E402
 from pipelinekit.cli.health import health_app  # noqa: E402
 from pipelinekit.cli.init import init_command  # noqa: E402
 from pipelinekit.cli.run import run_command  # noqa: E402
@@ -67,3 +68,5 @@ app.add_typer(blueprint_app, name="blueprint")
 app.command("diagnose")(diagnose_command)
 app.add_typer(architect_app, name="architect")
 app.add_typer(health_app, name="health")
+app.add_typer(generate_app, name="generate")
+app.add_typer(apply_app, name="apply")

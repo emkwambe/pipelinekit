@@ -15,17 +15,21 @@ from pipelinekit.ai.evidence import EvidencePackage
 from pipelinekit.ai.models import DiagnosticResult, RecommendedAction
 from pipelinekit.ai.providers import (
     ARCH_SYSTEM_PROMPT,
+    PROPOSAL_SYSTEM_PROMPT,
     SYSTEM_PROMPT,
     build_arch_user_prompt,
+    build_proposal_user_prompt,
     build_user_prompt,
     parse_architecture_response,
     parse_diagnostic_response,
+    parse_proposal_response,
 )
 from pipelinekit.core.errors import LLMError
 
 if TYPE_CHECKING:
     from pipelinekit.ai.arch_evidence import ArchitectureContext
     from pipelinekit.ai.arch_models import ArchitectureResult
+    from pipelinekit.ai.proposal_models import BlueprintProposal, ProposalContext
 
 _ENV_HOST = "OLLAMA_HOST"
 _DEFAULT_HOST = "http://localhost:11434"
@@ -89,3 +93,10 @@ class OllamaProvider:
             build_arch_user_prompt(context, reasoning_type, question),
         )
         return parse_architecture_response(raw, context, reasoning_type)
+
+    def propose_blueprint(self, context: "ProposalContext") -> "BlueprintProposal":
+        """Propose a blueprint from context (SPEC-015). Never writes files."""
+        raw = self._complete(
+            PROPOSAL_SYSTEM_PROMPT, build_proposal_user_prompt(context)
+        )
+        return parse_proposal_response(raw, context, self.name, self.model)

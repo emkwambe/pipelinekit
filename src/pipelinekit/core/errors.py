@@ -62,3 +62,8 @@ class ArchitectureError(PipelineKitError):
 
 class HealthError(PipelineKitError):
     """Raised when a health check cannot run (tooling unavailable or failed)."""
+
+
+class ProposalError(PipelineKitError):
+    """Raised when an AI blueprint proposal fails or an invalid asset state
+    transition is attempted (ADR-018, SPEC-015). Carries ``PK-GEN-*`` codes."""

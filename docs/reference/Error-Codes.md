@@ -139,6 +139,23 @@ a missing tool resolves to an `info` result rather than raising.
 
 ---
 
+### GEN — AI Blueprint Proposal (Sprint 6-5)
+
+| Code | Meaning |
+|---|---|
+| PK-GEN-001 | Proposal failed — AI provider error / invalid JSON |
+| PK-GEN-002 | Proposed plan failed schema validation |
+| PK-GEN-003 | Apply failed — no assets in approved state |
+| PK-GEN-004 | Blueprint directory already exists |
+| PK-GEN-005 | Proposed blueprint.json failed schema validation |
+| PK-GEN-006 | Source or destination type not supported by adapter registry |
+| PK-GEN-007 | Asset state transition violation |
+
+`ProposalError` carries the `PK-GEN-*` codes. AI proposes; a human approves;
+`apply()` writes (ADR-018). `can_auto_apply` is always False.
+
+---
+
 ## Error Class Hierarchy
 
 ```python
@@ -151,7 +168,8 @@ PipelineKitError(code, message, context)
 ├── NotificationError    PK-NOTIFY-*      (use PipelineKitError directly for now)
 ├── AIError              PK-AI-*          (Phase 4)
 ├── ArchitectureError    PK-ARCH-*        (Phase 5)
-└── HealthError          PK-HEALTH-*      (Phase 6)
+├── HealthError          PK-HEALTH-*      (Phase 6)
+└── ProposalError        PK-GEN-*         (Phase 6 — Sprint 6-5)
 ```
 
 All errors carry structured code, message, and context dict.

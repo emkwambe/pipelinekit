@@ -93,6 +93,24 @@ CREATE TABLE IF NOT EXISTS health_runs (
     overall_status    TEXT,
     summary           TEXT
 );
+
+CREATE TABLE IF NOT EXISTS blueprint_proposals (
+    plan_id          TEXT PRIMARY KEY,
+    blueprint_name   TEXT NOT NULL,
+    source_type      TEXT NOT NULL,
+    destination_type TEXT NOT NULL,
+    tables           TEXT,
+    assets           TEXT,
+    confidence       REAL,
+    assumptions      TEXT,
+    unsupported      TEXT,
+    decisions        TEXT,
+    provider         TEXT,
+    can_auto_apply   INTEGER DEFAULT 0,
+    applied          INTEGER DEFAULT 0,
+    proposed_at      TEXT NOT NULL,
+    applied_at       TEXT
+);
 """
 
 
@@ -410,6 +428,118 @@ def insert_health_run(results: dict, cwd: Path | None = None) -> None:
         raise StateError(
             "PK-STATE-002",
             "Cannot write health run to state database",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def insert_blueprint_proposal(proposal: dict, cwd: Path | None = None) -> None:
+    """Store a blueprint proposal (SPEC-015). Called by BlueprintProposer only.
+
+    ``proposal`` is a serialized ``BlueprintProposal`` (its ``to_dict``). The
+    full asset list — with per-asset state — is stored as JSON so ``show`` and
+    ``apply plan`` can reload the exact proposal. No files are written here; this
+    is the audit record of what AI proposed (ADR-018).
+    """
+    initialize(cwd)
+    db_path = get_db_path(cwd)
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO blueprint_proposals (
+                    plan_id, blueprint_name, source_type, destination_type,
+                    tables, assets, confidence, assumptions, unsupported,
+                    decisions, provider, can_auto_apply, applied,
+                    proposed_at, applied_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    proposal["plan_id"],
+                    proposal["blueprint_name"],
+                    proposal["source_type"],
+                    proposal["destination_type"],
+                    json.dumps(proposal.get("tables", [])),
+                    json.dumps(proposal.get("assets", [])),
+                    float(proposal.get("confidence", 0.0)),
+                    json.dumps(proposal.get("assumptions", [])),
+                    json.dumps(proposal.get("unsupported_areas", [])),
+                    json.dumps(proposal.get("requires_human_decisions", [])),
+                    proposal.get("provider", ""),
+                    1 if proposal.get("can_auto_apply") else 0,
+                    1 if proposal.get("applied") else 0,
+                    proposal.get("generated_at") or _utc_now(),
+                    None,
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot write blueprint proposal {proposal.get('plan_id')}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def get_blueprint_proposal(plan_id: str, cwd: Path | None = None) -> dict | None:
+    """Return the stored proposal for ``plan_id``, or None if not found.
+
+    The returned dict is shaped like ``BlueprintProposal.to_dict`` so the caller
+    can rebuild it via ``BlueprintProposal.from_dict``.
+    """
+    initialize(cwd)
+    db_path = get_db_path(cwd)
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT * FROM blueprint_proposals WHERE plan_id = ?", (plan_id,)
+            ).fetchone()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            f"Cannot read blueprint proposal {plan_id}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    if row is None:
+        return None
+    return {
+        "plan_id": row["plan_id"],
+        "blueprint_name": row["blueprint_name"],
+        "source_type": row["source_type"],
+        "destination_type": row["destination_type"],
+        "tables": json.loads(row["tables"] or "[]"),
+        "assets": json.loads(row["assets"] or "[]"),
+        "confidence": row["confidence"],
+        "assumptions": json.loads(row["assumptions"] or "[]"),
+        "unsupported_areas": json.loads(row["unsupported"] or "[]"),
+        "requires_human_decisions": json.loads(row["decisions"] or "[]"),
+        "provider": row["provider"],
+        "generated_at": row["proposed_at"],
+        "can_auto_apply": bool(row["can_auto_apply"]),
+        "applied": bool(row["applied"]),
+    }
+
+
+def mark_proposal_applied(
+    plan_id: str, assets: list[dict], cwd: Path | None = None
+) -> None:
+    """Mark a proposal applied and persist the post-write asset states."""
+    initialize(cwd)
+    db_path = get_db_path(cwd)
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                """
+                UPDATE blueprint_proposals
+                SET applied = 1, applied_at = ?, assets = ?
+                WHERE plan_id = ?
+                """,
+                (_utc_now(), json.dumps(assets), plan_id),
+            )
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot update blueprint proposal {plan_id}",
             {"path": str(db_path), "detail": str(exc)},
         ) from exc
 

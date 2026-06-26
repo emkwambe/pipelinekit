@@ -23,12 +23,14 @@ from typing import TYPE_CHECKING
 from pipelinekit.ai.arch_models import ArchitectureResult
 from pipelinekit.ai.evidence import EvidencePackage
 from pipelinekit.ai.models import DiagnosticResult
+from pipelinekit.ai.proposal_models import BlueprintProposal, ProposedAsset
 from pipelinekit.ai.provider import LLMProvider
 from pipelinekit.config.schema import PipelineConfig
-from pipelinekit.core.errors import LLMError
+from pipelinekit.core.errors import LLMError, ProposalError
 
 if TYPE_CHECKING:
     from pipelinekit.ai.arch_evidence import ArchitectureContext
+    from pipelinekit.ai.proposal_models import ProposalContext
 
 SYSTEM_PROMPT = """You are a data pipeline diagnostics assistant.
 Analyze the provided pipeline evidence and return a JSON diagnostic result.
@@ -209,6 +211,106 @@ def _strip_code_fences(text: str) -> str:
             lines = lines[:-1]
         stripped = "\n".join(lines)
     return stripped.strip()
+
+
+PROPOSAL_SYSTEM_PROMPT = """You are a PipelineKit blueprint engineer.
+Propose a complete analytics pipeline blueprint from the provided specification.
+
+You are PROPOSING, not generating. Your output will be reviewed by a human before
+any file is written. Be explicit about your assumptions and limitations.
+
+Return a JSON object:
+{
+  "confidence": 0.0-1.0,
+  "assumptions": ["what you assumed about the source schema"],
+  "unsupported_areas": ["what you could not propose"],
+  "requires_human_decisions": ["decisions the human must make"],
+  "assets": [
+    {
+      "asset_type": "blueprint_json|example_yaml|ingestion_pipeline|dbt_project|\
+dbt_profiles|dbt_sources|dbt_staging_models|dbt_core_models|contracts|\
+quality_checks|alerts_config|readme|runbook",
+      "filename": "relative/path",
+      "content": "full file content",
+      "confidence_note": "confidence note for this specific asset"
+    }
+  ]
+}
+
+Critical rules:
+- All credentials use ${VAR} interpolation — NEVER hardcoded
+- dbt sources use {{ env_var('DBT_SOURCE_DATABASE') }} and \
+{{ env_var('DBT_SOURCE_SCHEMA') }}
+- Staging models use {{ source('source_name', 'table') }}
+- Core models use {{ ref('staging_model') }}
+- Only use tables from the adapter capability registry provided
+- can_auto_apply must be false
+- Follow existing blueprint patterns exactly
+- Return ONLY the JSON object. No markdown. No preamble."""
+
+
+def build_proposal_user_prompt(context: "ProposalContext") -> str:
+    """Render the proposal context as the user prompt (structured, never raw)."""
+    return (
+        "Propose a complete blueprint using ONLY the capabilities, schema, and "
+        "patterns below.\n\n" + json.dumps(context.to_dict(), indent=2, default=str)
+    )
+
+
+def parse_proposal_response(
+    raw: str,
+    context: "ProposalContext",
+    provider_name: str,
+    model: str = "",
+) -> BlueprintProposal:
+    """Parse a provider's raw text into a ``BlueprintProposal``.
+
+    ``plan_id`` and ``generated_at`` are left blank — the ``BlueprintProposer``
+    stamps them. ``can_auto_apply`` is forced False here and again by the
+    proposer (ADR-018).
+
+    Raises:
+        ProposalError: ``PK-GEN-001`` if the response is not valid JSON.
+    """
+    text = _strip_code_fences(raw)
+    try:
+        data = json.loads(text)
+    except ValueError as exc:
+        raise ProposalError(
+            "PK-GEN-001",
+            "AI proposal response was not valid JSON",
+            {"detail": str(exc)},
+        ) from exc
+
+    assets: list[ProposedAsset] = []
+    for item in data.get("assets", []):
+        if not isinstance(item, dict):
+            continue
+        assets.append(
+            ProposedAsset(
+                asset_type=str(item.get("asset_type", "")),
+                filename=str(item.get("filename", "")),
+                content=str(item.get("content", "")),
+                confidence_note=str(item.get("confidence_note", "")),
+            )
+        )
+
+    confidence = max(0.0, min(1.0, float(data.get("confidence", 0.0))))
+    return BlueprintProposal(
+        plan_id="",
+        blueprint_name=f"{context.source_type}-to-{context.destination_type}",
+        source_type=context.source_type,
+        destination_type=context.destination_type,
+        tables=list(context.tables),
+        assets=assets,
+        confidence=confidence,
+        assumptions=list(data.get("assumptions", [])),
+        unsupported_areas=list(data.get("unsupported_areas", [])),
+        requires_human_decisions=list(data.get("requires_human_decisions", [])),
+        provider=provider_name,
+        generated_at="",
+        can_auto_apply=False,
+    )
 
 
 def create_provider(config: PipelineConfig, override: str | None = None) -> LLMProvider:

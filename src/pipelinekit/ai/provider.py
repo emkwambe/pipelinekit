@@ -15,6 +15,7 @@ from pipelinekit.ai.models import DiagnosticResult, RecommendedAction
 if TYPE_CHECKING:
     from pipelinekit.ai.arch_evidence import ArchitectureContext
     from pipelinekit.ai.arch_models import ArchitectureResult
+    from pipelinekit.ai.proposal_models import BlueprintProposal, ProposalContext
 
 
 @runtime_checkable
@@ -51,5 +52,20 @@ class LLMProvider(Protocol):
         Raises ``LLMError(PK-AI-001)`` if the provider is unavailable and
         ``LLMError(PK-AI-002)`` if the response fails schema validation. The
         result never auto-applies — ``can_auto_apply`` is always False.
+        """
+        ...
+
+    def propose_blueprint(
+        self,
+        context: "ProposalContext",
+    ) -> "BlueprintProposal":
+        """Propose a complete blueprint from context (SPEC-015, ADR-018).
+
+        Returns a ``BlueprintProposal`` — never writes files. Every asset starts
+        in the ``proposed`` state; ``can_auto_apply`` is always False. AI
+        proposes; a human approves; ``apply()`` writes.
+
+        Raises ``LLMError(PK-AI-001)`` if the provider is unavailable and
+        ``ProposalError(PK-GEN-001)`` if the response is not valid JSON.
         """
         ...

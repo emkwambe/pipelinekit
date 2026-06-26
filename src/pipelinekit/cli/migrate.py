@@ -138,8 +138,13 @@ def analyze_command(
     apply: bool = typer.Option(
         False, "--apply", help="Write draft pipelinekit.proposed.yaml after analysis"
     ),
-    force: bool = typer.Option(
-        False, "--force", help="Apply even if blocking gaps exist"
+    write_draft: bool = typer.Option(
+        False,
+        "--write-draft",
+        help=(
+            "Write draft YAML even when blocking gaps exist. Review all FIXMEs "
+            "before running pipelinekit validate."
+        ),
     ),
 ) -> None:
     """Analyse an existing pipeline config and propose a PipelineKit migration."""
@@ -168,7 +173,7 @@ def analyze_command(
         raise typer.Exit(0)
 
     try:
-        path = analyzer.apply(proposal, force=force)
+        path = analyzer.apply(proposal, force=write_draft)
     except MigrationError as exc:
         console.print(f"✗ [{exc.code}] {exc.message}", style="bold red")
         raise typer.Exit(1) from exc

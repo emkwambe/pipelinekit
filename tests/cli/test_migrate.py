@@ -73,7 +73,7 @@ def test_migrate_analyze_writes_no_files_by_default(tmp_path, monkeypatch):
 def test_migrate_analyze_apply_blocking_gap_reports_pk_migrate_003(
     tmp_path, monkeypatch
 ):
-    """--apply with a blocking gap and no --force reports PK-MIGRATE-003."""
+    """--apply with a blocking gap and no --write-draft reports PK-MIGRATE-003."""
     provider = MagicMock()
     provider.analyze_migration.return_value = _proposal(blocking=True)
     monkeypatch.chdir(tmp_path)
@@ -87,8 +87,9 @@ def test_migrate_analyze_apply_blocking_gap_reports_pk_migrate_003(
     assert not (tmp_path / "pipelinekit.proposed.yaml").exists()
 
 
-def test_migrate_analyze_apply_force_writes_proposed_yaml(tmp_path, monkeypatch):
-    """--apply --force writes pipelinekit.proposed.yaml (never pipelinekit.yaml)."""
+def test_migrate_analyze_apply_non_blocking_writes_proposed_yaml(tmp_path, monkeypatch):
+    """--apply with no blocking gap writes pipelinekit.proposed.yaml
+    (never pipelinekit.yaml) — no override flag needed."""
     provider = MagicMock()
     provider.analyze_migration.return_value = _proposal(blocking=False)
     monkeypatch.chdir(tmp_path)

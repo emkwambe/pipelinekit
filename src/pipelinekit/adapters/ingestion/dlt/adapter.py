@@ -109,7 +109,9 @@ class DltIngestionAdapter(BaseAdapter):
                     destination=self._destination(),
                     dataset_name=self._dataset_name(),
                 )
-            load_info = pipeline.run(self._build_source())
+            # First local verification loads all rows, not just incremental
+            # updates — replace ensures a clean, deterministic full load.
+            load_info = pipeline.run(self._build_source(), write_disposition="replace")
             rows = self._rows_loaded(load_info)
         except PipelineKitError:
             raise

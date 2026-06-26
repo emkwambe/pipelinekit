@@ -1,9 +1,14 @@
 # dbt profile for Blueprint #001 (Postgres -> Snowflake).
 # Credentials are supplied via environment variables (BYOK, ADR-005).
 # Never commit real account details, passwords, or keys.
+#
+# Target selection is env-driven and defaults to the Snowflake `prod` target,
+# so production behavior is unchanged when DBT_TARGET is unset. Local
+# verification (scripts/verify-blueprint-001.ps1 -Local) sets DBT_TARGET=local
+# to build into a local DuckDB file instead — no cloud credentials required.
 
 postgres_to_snowflake:
-  target: prod
+  target: "{{ env_var('DBT_TARGET', 'prod') }}"
   outputs:
     prod:
       type: snowflake
@@ -14,4 +19,9 @@ postgres_to_snowflake:
       database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
       warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
       schema: analytics
+      threads: 4
+    local:
+      type: duckdb
+      path: "{{ env_var('DUCKDB_PATH', 'blueprint_001_local.duckdb') }}"
+      schema: main
       threads: 4

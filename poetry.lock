@@ -1170,6 +1170,28 @@ files = [
 ]
 
 [[package]]
+name = "dbt-duckdb"
+version = "1.10.1"
+description = "The duckdb adapter plugin for dbt (data build tool)"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "dbt_duckdb-1.10.1-py3-none-any.whl", hash = "sha256:90658ecb367082786c5ea2ffbf9e35bb4116fa5ad1bc2f287c4dc1f3984bafa1"},
+    {file = "dbt_duckdb-1.10.1.tar.gz", hash = "sha256:5d6df1589d4ba21fe20ac08454a32763d3263798c9f5914280eabd1dc285cbc0"},
+]
+
+[package.dependencies]
+dbt-adapters = ">=1,<2"
+dbt-common = ">=1,<2"
+dbt-core = ">=1.8.0"
+duckdb = ">=1.0.0"
+
+[package.extras]
+glue = ["boto3", "mypy-boto3-glue"]
+md = ["duckdb (==1.4.4)"]
+
+[[package]]
 name = "dbt-extractor"
 version = "0.6.0"
 description = "A tool to analyze and extract information from Jinja used in dbt projects."
@@ -7310,4 +7332,4 @@ type = ["pytest-mypy (>=1.0.1) ; platform_python_implementation != \"PyPy\""]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "f45caaa75b9a470c42a75c9f70aadad30019fd24b3dca886fbbe473407a6664f"
+content-hash = "8b609fd6c803e8915924665ce0796a112cc7cd22873d9dece1fb88475a1d643b"

@@ -52,6 +52,13 @@ if ($Local) {
     path: "./blueprint_001_local.duckdb"
 "@
     $config = [regex]::Replace($config, '(?m)^  destination:\r?\n(?:    .*\r?\n?)+', $duckDestination)
+
+    # dbt builds into the same local DuckDB file; the dbt source resolves to the
+    # DuckDB catalog (file stem) and the dlt-loaded dataset schema.
+    $env:DBT_TARGET = "local"
+    $env:DUCKDB_PATH = "blueprint_001_local.duckdb"
+    $env:DBT_SOURCE_DATABASE = "blueprint_001_local"
+    $env:DBT_SOURCE_SCHEMA = "pipelinekit_pipeline_raw"
 }
 Set-Content "pipelinekit.yaml" $config
 poetry run pipelinekit validate

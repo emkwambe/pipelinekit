@@ -6,8 +6,11 @@ sources:
       Raw operational data ingested from the source Postgres database
       via the dlt pipeline. Tables land in the raw schema before
       staging models transform them.
-    database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
-    schema: raw
+    # Env-driven so the same source works for DuckDB (local) and Snowflake
+    # (production). Defaults preserve production behavior when the DBT_SOURCE_*
+    # overrides are unset.
+    database: "{{ env_var('DBT_SOURCE_DATABASE', env_var('SNOWFLAKE_DATABASE', '')) }}"
+    schema: "{{ env_var('DBT_SOURCE_SCHEMA', 'raw') }}"
     tables:
       - name: orders
         description: Raw orders table ingested from Postgres source.

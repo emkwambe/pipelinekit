@@ -132,3 +132,5 @@ After running `scripts/verify-blueprint-002.ps1` successfully:
 |---|---|---|
 | `deploy_time_minutes: 60` | Unverified until first row above | — |
 | `time_to_trusted_data_hours: 4` | Unverified until first row above | — |
+
+| 2026-06-26 | Eddy Mkwambe | Synthetic DuckDB | DuckDB (local) | 100 accts / 500 opps / 200 contacts | 0.2 min | 0.82s dbt | 9/9 dbt tests passed | SUCCESS — LOCAL |

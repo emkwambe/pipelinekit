@@ -44,6 +44,10 @@ Copy-Item "blueprints\postgres-to-snowflake\pipelinekit.example.yaml" "pipelinek
 # Point contracts at the blueprint's data contract, not the repo architecture contracts.
 $config = Get-Content "pipelinekit.yaml" -Raw
 $config = $config -replace "directory: ./contracts", "directory: ./blueprints/postgres-to-snowflake/contracts"
+# Point transformation (dbt project) and quality (Soda checks) at the blueprint's
+# own directories — applies to both local and production verification.
+$config = $config -replace 'project_dir: \./transform', 'project_dir: ./blueprints/postgres-to-snowflake/transform'
+$config = $config -replace 'checks_dir: \./quality', 'checks_dir: ./blueprints/postgres-to-snowflake/quality'
 # Local mode: replace the Snowflake destination block with a local DuckDB file.
 if ($Local) {
     # dlt writes to this exact file (the adapter honors destination.path); dbt

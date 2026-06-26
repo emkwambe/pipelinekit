@@ -18,6 +18,7 @@ AI package respects the boundary. (Flagged deviation from the brief's
 from __future__ import annotations
 
 import json
+import re
 from typing import TYPE_CHECKING
 
 from pipelinekit.ai.arch_models import ArchitectureResult
@@ -257,6 +258,25 @@ def build_proposal_user_prompt(context: "ProposalContext") -> str:
     )
 
 
+def _extract_json_object(raw: str) -> str:
+    """Return the JSON object from a model response (shared by all providers).
+
+    Strips `````json`` / ``````` fences, then — if the result is not
+    already valid JSON — extracts the substring from the first ``{`` to the last
+    ``}`` so that preamble or trailing prose around the object is dropped. The
+    caller validates; an unparseable result still raises at the call site.
+    """
+    content = re.sub(r"```json\s*|\s*```", "", raw).strip()
+    try:
+        json.loads(content)
+        return content
+    except ValueError:
+        start, end = content.find("{"), content.rfind("}")
+        if start != -1 and end > start:
+            return content[start : end + 1]
+        return content
+
+
 def parse_proposal_response(
     raw: str,
     context: "ProposalContext",
@@ -272,7 +292,7 @@ def parse_proposal_response(
     Raises:
         ProposalError: ``PK-GEN-001`` if the response is not valid JSON.
     """
-    text = _strip_code_fences(raw)
+    text = _extract_json_object(raw)
     try:
         data = json.loads(text)
     except ValueError as exc:

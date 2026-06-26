@@ -9,9 +9,9 @@
 ## Current State
 
 **Active Phase:** Phase 6 — Blueprint Catalog + Ecosystem  
-**Last Completed:** Sprint 6-2a — dlt Adapter Completion + Credential Wiring  
-**Last Updated:** June 25, 2026  
-**Main Branch:** `fe6341f` (Sprint 6-2a)
+**Last Completed:** Blueprint #001 Local Verification  
+**Last Updated:** June 26, 2026  
+**Main Branch:** `523d4a6` (gitignore artifacts + runbook scope clarification)
 
 ---
 
@@ -24,59 +24,45 @@
 ### ✅ Phase 5 — Architecture Layer | `ede343a` | 174 tests | 81.27%
 ### ✅ Provider Diversity (ADR-016) | `d6e4a4b` | 184 tests | 5 providers
 ### ✅ Sprint 6-1 — pipelinekit health | `c613640` | 209 tests | 82.42%
+### ✅ Sprint 6-2a — dlt Adapter + Credential Wiring | `fe6341f` | 225 tests | 82.67%
 
 ---
 
-### ✅ Sprint 6-2a — dlt Adapter Completion + Credential Wiring
-**Completed:** June 25, 2026  
-**Commit:** `fe6341f` | 225 tests | 82.67% | 11 files +627/−27
+### ✅ Blueprint #001 — Local Verification Complete
+**Verified:** June 26, 2026  
+**Final commit:** `523d4a6`  
+**Verification commit:** `d01ca36`
 
-**What was built:**
-- `src/pipelinekit/config/schema.py` — SourceConfig extended with first-class credential fields (user, password, host, port, database, tables, account, warehouse, schema_name, project, path)
-- `src/pipelinekit/config/loader.py` — `${VAR}` environment variable interpolation before Pydantic validation
-- `src/pipelinekit/adapters/ingestion/dlt/adapter.py` — real `sql_database` dlt source, Postgres connection string, Snowflake credentials from PipelineConfig
-- `scripts/verify-blueprint-001.ps1` — fixed harness (copies example config, env preflight guard, blueprint contracts path)
-- `blueprints/postgres-to-snowflake/pipelinekit.example.yaml` — credential fields restored as first-class config
-- `pyproject.toml` — `dlt[sql_database]` extra added (SQLAlchemy 2.0.51)
-- `docs/reference/Error-Codes.md` — PK-CONFIG-006 registered
-- 3 new test files (test_dlt_adapter_integration, test_loader_interpolation, test_schema_credentials)
+**Verified run result:**
 
-**Quality gates:**
-| Gate | Result |
-|---|---|
-| pytest | 225 passed (209 prior + 16 new) |
-| coverage | 82.67% (adapter 90%, loader 93%, schema 100%) |
-| ruff / black / mypy | Clean, 69 source files |
-| sql_database import | Resolves (SQLAlchemy installed) |
-| db.py / PROJECT-STATUS | Untouched |
+| Date | Tester | Source | Destination | Rows | Deploy | Latency | Contracts | Status |
+|---|---|---|---|---|---|---|---|---|
+| 2026-06-26 | Eddy Mkwambe | Docker Postgres 15 (localhost) | DuckDB (local) | 1,000 | 0.7 min | <1 min | 7/7 passed | ✅ VERIFIED — local |
 
-**ADR satisfied:** ADR-017 (dlt Credential Integration Policy)
+**Claim validation:**
 
-**Key decisions:**
-- Position A chosen — PipelineKit owns credentials, not dlt
-- New sibling test files created (not modifying READ ONLY existing tests)
-- `dlt[sql_database]` extra authorized mid-sprint — direct requirement of completed adapter
-- Credential fields restored to example.yaml — now first-class SourceConfig fields
+| Claim | Status | Evidence |
+|---|---|---|
+| deploy_time_minutes: 60 | ✅ VERIFIED (local) | Local: 0.7 min. Production Snowflake pending. |
+| time_to_trusted_data_hours: 24 | ✅ VERIFIED (local) | Local: <1 min. Production Snowflake pending. |
 
-**Carry-forward (not blockers):**
-- PK-CONFIG-006 registered but not enforced — CLI/runtime wiring in next sprint
-- Blueprint #001 is now genuinely runnable end-to-end
+**What the verification arc fixed (in order):**
+- dlt adapter was a Phase 2 scaffold — completed with real sql_database source (ADR-017)
+- SourceConfig extended with first-class credential fields
+- `${VAR}` env interpolation added to config loader
+- Soda API updated from removed `get_checks_*_count()` to `get_scan_results()`
+- Verification harness fixed — copies example config, not `pipelinekit init`
+- dbt DuckDB profile added with env-driven target
+- `sources.yml` moved to `models/` directory (dbt requirement)
+- DuckDB shared file path aligned between dlt and dbt
+- `sources.yml` schema fixed (`pipelinekit_pipeline_raw` not `pipelinekit_raw`)
+- `_rows_loaded()` fixed to report actual rows not job count
+- `stg_orders.sql` source reference fixed (`postgres_raw` not `pipelinekit_raw`)
+- `accepted_values` updated for dbt 1.12 + `confirmed` status added
+- Blueprint path rewrites added to verification script
+- dbt artifacts added to `.gitignore`
 
----
-
-## Blueprint #001 Status
-
-**Blueprint #001 (Postgres → Snowflake) is now runnable.**
-
-The dlt adapter builds a real `sql_database` source from config. Credentials flow from `pipelinekit.yaml` → `SourceConfig` → dlt. The path exists.
-
-**Next manual step (Eddy):**
-1. Set real environment variables (not `"..."` placeholders)
-2. Run `.\scripts\verify-blueprint-001.ps1`
-3. Fill in `blueprints/postgres-to-snowflake/docs/runbook.md` §6 with real numbers
-4. Commit: `"Blueprint #001 verified — [date] by Eddy Mkwambe"`
-
-That commit closes the 60-minute claim and clears the last gate before design partner outreach.
+**Production Snowflake verification:** Pending. Harness ready at `scripts/verify-blueprint-001.ps1` (run without `-Local`). Requires real Snowflake credentials.
 
 ---
 
@@ -85,7 +71,8 @@ That commit closes the 60-minute claim and clears the last gate before design pa
 ```
 ✅ Sprint 6-1:   pipelinekit health              c613640
 ✅ Sprint 6-2a:  dlt adapter + credential wiring  fe6341f
-⏳ Blueprint #001 real verification               Eddy manual run
+✅ Blueprint #001 local verification              d01ca36
+⏳ Blueprint #001 production verification         Eddy — Snowflake credentials needed
 ⏳ Sprint 6-2b:  PK-CONFIG-006 wiring             CLI/runtime sprint
 ⏳ Sprint 6-3:   Blueprint #002 Salesforce → Snowflake
 📋 Sprint 6-4:   AI Blueprint Generation
@@ -104,8 +91,12 @@ That commit closes the 60-minute claim and clears the last gate before design pa
 ✅ SourceConfig credential fields first-class
 ✅ ${VAR} interpolation in config loader
 ✅ dlt[sql_database] extra installed
-□  Blueprint #001 verified deployment on real Postgres + Snowflake
-□  PK-CONFIG-006 wired into validate/run (Sprint 6-2b)
+✅ Soda API updated to get_scan_results()
+✅ Blueprint #001 local verification (1,000 rows, 0.7 min)
+✅ dbt DuckDB local profile
+✅ gitignore dbt/dlt/DuckDB artifacts
+□  Blueprint #001 production Snowflake verification
+□  PK-CONFIG-006 wired into validate/run
 □  SPEC-005 confidence_threshold drift fix
 □  ICP-001, ICP-002, ICP-003 stubs
 □  PRD in-file update with v2 executive summary
@@ -118,7 +109,7 @@ That commit closes the 60-minute claim and clears the last gate before design pa
 
 **Tests:** 225 | **Coverage:** 82.67% | **Source files:** 69  
 **State tables:** 6 | **AI providers:** 5 | **CLI commands:** 11+  
-**ADRs:** 017 | **SPECs:** 12 | **Smells:** 16
+**Blueprints:** 1 (locally verified) | **ADRs:** 017 | **SPECs:** 12
 
 ---
 
@@ -131,6 +122,19 @@ poetry run ruff check .
 poetry run black --check .
 poetry run mypy src/pipelinekit
 poetry run pipelinekit health
+```
+
+## Blueprint #001 Local Verification
+
+```powershell
+cd C:\Users\HP\Documents\pipelinekit
+Remove-Item -Recurse -Force .dlt -ErrorAction SilentlyContinue
+Remove-Item -Force *.duckdb -ErrorAction SilentlyContinue
+Remove-Item -Force pipelinekit.yaml -ErrorAction SilentlyContinue
+$env:PG_HOST="localhost"; $env:PG_PORT="5432"
+$env:PG_DATABASE="testdb"; $env:PG_USER="test"; $env:PG_PASSWORD="test"
+$env:POSTGRES_CONN_STR="postgresql://test:test@localhost:5432/testdb"
+.\scripts\verify-blueprint-001.ps1 -Local
 ```
 
 ---

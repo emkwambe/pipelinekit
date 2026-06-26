@@ -1,5 +1,5 @@
-# PipelineKit — Sprint 6-5 Session Opener
-## AI Blueprint Generation
+# PipelineKit — Sprint 6-5 Session Opener v2
+## AI Blueprint Proposal
 
 You are Claude Code working inside the PipelineKit repository.
 
@@ -14,30 +14,35 @@ C:\Users\HP\Documents\pipelinekit
 ```
 1.  .claude/CLAUDE.md
 2.  docs/reference/PROJECT-STATUS.md
-3.  docs/decisions/ADR-018-Blueprint-Generation-Governance.md  ← New — read completely
+3.  docs/decisions/ADR-018-Blueprint-Proposal-Governance.md   ← Read completely
 4.  docs/decisions/ADR-007-* (AI is Operator not Owner)
-5.  docs/specifications/SPEC-015-AI-Blueprint-Generation.md    ← Primary SPEC
-6.  docs/specifications/SPEC-005-AI-Diagnostics.md             ← LLMProvider pattern
-7.  docs/specifications/SPEC-006-Blueprint-Engine.md           ← Blueprint pattern
-8.  src/pipelinekit/ai/provider.py                             ← You extend this
-9.  src/pipelinekit/ai/diagnostics.py                          ← Pattern to follow
-10. blueprints/postgres-to-snowflake/                          ← Generation pattern source
-11. blueprints/salesforce-to-snowflake/                        ← Generation pattern source
-12. schemas/blueprint.schema.json                              ← Output must satisfy this
-13. docs/reference/Architectural-Smells.md                     ← Especially Smell 13 + 15
+5.  docs/specifications/SPEC-015-AI-Blueprint-Proposal.md     ← Primary SPEC
+6.  docs/specifications/SPEC-005-AI-Diagnostics.md            ← LLMProvider pattern
+7.  src/pipelinekit/ai/provider.py                            ← You extend this
+8.  blueprints/postgres-to-snowflake/                         ← Pattern source
+9.  blueprints/salesforce-to-snowflake/                       ← Pattern source
+10. schemas/blueprint.schema.json                             ← Proposal must satisfy
+11. docs/reference/Architectural-Smells.md                    ← Smell 13 + 15
 ```
 
-## Context
+## Naming — Read This First
 
-Sprint 6-5 is the most architecturally significant sprint since Phase 4. This is the first time AI generates new artifacts in PipelineKit. ADR-018 governs the boundary precisely — AI proposes, human approves, only approved assets touch the filesystem.
+This sprint is called **AI Blueprint Proposal**, not AI Blueprint Generation.
+
+The architectural phrase is:
+> PipelineKit proposes blueprint artifacts. Humans approve what becomes part of the repository.
+
+Every class, method, and command uses "propose/proposal" not "generate/generation".
+Exception: the CLI command is `pipelinekit generate blueprint` (user-facing verb).
+Internally: `BlueprintProposer`, `BlueprintProposal`, `ProposedAsset`, `propose_blueprint()`.
 
 ## Confirm Your Understanding Of
 
-1. What the "Plan then Apply" pattern means — specifically, when does anything touch the filesystem?
-2. What `can_auto_apply = False` means in the context of generation (different from Phase 4/5)
-3. The `GenerationPlan` data structure — what it contains and what it is NOT
-4. Which existing blueprints the generator reads as patterns
-5. What Smell 13 means when extended to generation (Observer Becomes Actor → Generator Becomes Actor)
-6. What must never be touched
+1. **The state machine** — what are the 6 valid asset states and what transitions are allowed vs forbidden?
+2. **The command model** — what does `--plan` do vs `--interactive`? When does anything touch the filesystem?
+3. **The AdapterCapabilityRegistry** — what does it prevent and why must it be checked before any AI call?
+4. **Provenance metadata** — what 8 fields does every asset carry, and what happens to them on write?
+5. **Smell 13 extended** — how does "Observer Becomes Actor" apply to a proposal system?
+6. **What must never be touched**
 
 Confirm when ready. Do not write any code until confirmation is complete.

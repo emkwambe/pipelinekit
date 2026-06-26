@@ -35,3 +35,9 @@ blueprints/*/transform/.user.yml
 blueprints/*/transform/target/
 blueprints/*/transform/logs/
 blueprints/*/transform/.user.yml
+
+# Migration Intelligence draft output (Sprint 6-7)
+pipelinekit.proposed.yaml
+
+# Coverage data
+.coverage

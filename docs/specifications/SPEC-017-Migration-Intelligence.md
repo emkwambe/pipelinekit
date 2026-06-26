@@ -167,7 +167,7 @@ class MigrationAnalyzer:
         """
         Write draft pipelinekit.yaml to disk after human review.
         Returns path written.
-        Raises MigrationError(PK-MIGRATE-003) if blocking gaps exist and --force not set.
+        Raises MigrationError(PK-MIGRATE-003) if blocking gaps exist and --write-draft not set.
         """
 ```
 
@@ -252,7 +252,7 @@ Review it, fill in the gaps, then run: pipelinekit validate
 |---|---|
 | `PK-MIGRATE-001` | Config file not found |
 | `PK-MIGRATE-002` | Config format not recognized |
-| `PK-MIGRATE-003` | Blocking gaps exist — use --force to apply anyway |
+| `PK-MIGRATE-003` | Blocking gaps exist — use --write-draft to apply anyway |
 | `PK-MIGRATE-004` | AI analysis failed |
 | `PK-MIGRATE-005` | Python file parsing failed (syntax error) |
 
@@ -289,7 +289,7 @@ All 268 prior tests must pass.
 ✓ MigrationProposal shows confidence, mappings, gaps
 ✓ Blueprint recommendation shown when matching blueprint installed
 ✓ --apply writes pipelinekit.proposed.yaml (not pipelinekit.yaml)
-✓ Blocking gaps prevent apply without --force
+✓ Blocking gaps prevent apply without --write-draft
 ✓ can_auto_apply always False
 ✓ All 268 prior tests pass
 ✓ coverage >= 80%

@@ -119,3 +119,14 @@ After running `scripts/verify-blueprint-001.ps1` successfully:
 |---|---|---|
 | `deploy_time_minutes: 60` | Unverified until first row above | — |
 | `time_to_trusted_data_hours: 24` | Unverified until first row above | — |
+
+| 2026-06-25 | Eddy Mkwambe | Local placeholder | Not reached | 0 | 0.4 min | N/A | FAILED — 3 gaps | DIAGNOSTIC |
+
+### Diagnostic Run — 2026-06-25
+
+Three gaps identified for Sprint 6-2:
+1. dlt credential resolution — needs credential translation in adapter
+2. contracts.directory defaults to repo root — should point to blueprint contracts/
+3. SourceConfig missing user/password/warehouse as first-class fields
+
+Verification run not counted until all three gaps resolved and dry-run + full run pass.

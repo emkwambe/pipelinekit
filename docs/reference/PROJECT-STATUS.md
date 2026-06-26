@@ -9,9 +9,9 @@
 ## Current State
 
 **Active Phase:** Phase 6 — Blueprint Catalog + Ecosystem  
-**Last Completed:** Blueprint #001 Local Verification  
+**Last Completed:** Sprint 6-3 — Blueprint #002 Salesforce → Snowflake  
 **Last Updated:** June 26, 2026  
-**Main Branch:** `523d4a6` (gitignore artifacts + runbook scope clarification)
+**Main Branch:** `04ffd50` (Sprint 6-3)
 
 ---
 
@@ -25,44 +25,49 @@
 ### ✅ Provider Diversity (ADR-016) | `d6e4a4b` | 184 tests | 5 providers
 ### ✅ Sprint 6-1 — pipelinekit health | `c613640` | 209 tests | 82.42%
 ### ✅ Sprint 6-2a — dlt Adapter + Credential Wiring | `fe6341f` | 225 tests | 82.67%
+### ✅ Blueprint #001 Local Verification | `d01ca36` | 1,000 rows | 0.7 min
 
 ---
 
-### ✅ Blueprint #001 — Local Verification Complete
-**Verified:** June 26, 2026  
-**Final commit:** `523d4a6`  
-**Verification commit:** `d01ca36`
+### ✅ Sprint 6-3 — Blueprint #002 Salesforce → Snowflake
+**Completed:** June 26, 2026  
+**Commit:** `04ffd50` | 229 tests | 82.42% | 19 files +763/−4
 
-**Verified run result:**
+**What was built:**
+- `blueprints/salesforce-to-snowflake/` — all 8 required assets
+- `src/pipelinekit/config/schema.py` — username, security_token fields added
+- `src/pipelinekit/adapters/ingestion/dlt/adapter.py` — Salesforce source handling (lazy import)
+- `scripts/verify-blueprint-002.ps1` — verification harness with -Local synthetic DuckDB seed
+- `tests/blueprints/test_blueprint_002.py` — 4 blueprint tests
 
-| Date | Tester | Source | Destination | Rows | Deploy | Latency | Contracts | Status |
-|---|---|---|---|---|---|---|---|---|
-| 2026-06-26 | Eddy Mkwambe | Docker Postgres 15 (localhost) | DuckDB (local) | 1,000 | 0.7 min | <1 min | 7/7 passed | ✅ VERIFIED — local |
+**Quality gates:**
+| Gate | Result |
+|---|---|
+| pytest | 229 passed (225 prior + 4 new) |
+| coverage | 82.42% |
+| ruff / black / mypy | Clean |
+| blueprint validate | Both blueprints valid |
+| Blueprint #001 | Untouched ✅ |
 
-**Claim validation:**
+**Key decisions:**
+- blueprint.json extended with contracts + dlt_source/dlt_destination — schema requires them
+- contracts/opportunities.yaml uses real ContractDefinition shape — SPEC-013 snippet was wrong (Smell 12)
+- `dlt[salesforce]` not added to pyproject.toml — not on allowed-modify list; lazy import pattern used; add before real Salesforce run
+- Local verification uses synthetic DuckDB seed — no Salesforce API required
 
-| Claim | Status | Evidence |
-|---|---|---|
-| deploy_time_minutes: 60 | ✅ VERIFIED (local) | Local: 0.7 min. Production Snowflake pending. |
-| time_to_trusted_data_hours: 24 | ✅ VERIFIED (local) | Local: <1 min. Production Snowflake pending. |
+**SPEC-013 drift to fix:**
+- blueprint.json snippet needs contracts + dlt fields added
+- contracts/opportunities.yaml snippet needs real ContractDefinition shape
+- dlt[salesforce] dependency decision needs documenting
 
-**What the verification arc fixed (in order):**
-- dlt adapter was a Phase 2 scaffold — completed with real sql_database source (ADR-017)
-- SourceConfig extended with first-class credential fields
-- `${VAR}` env interpolation added to config loader
-- Soda API updated from removed `get_checks_*_count()` to `get_scan_results()`
-- Verification harness fixed — copies example config, not `pipelinekit init`
-- dbt DuckDB profile added with env-driven target
-- `sources.yml` moved to `models/` directory (dbt requirement)
-- DuckDB shared file path aligned between dlt and dbt
-- `sources.yml` schema fixed (`pipelinekit_pipeline_raw` not `pipelinekit_raw`)
-- `_rows_loaded()` fixed to report actual rows not job count
-- `stg_orders.sql` source reference fixed (`postgres_raw` not `pipelinekit_raw`)
-- `accepted_values` updated for dbt 1.12 + `confirmed` status added
-- Blueprint path rewrites added to verification script
-- dbt artifacts added to `.gitignore`
+---
 
-**Production Snowflake verification:** Pending. Harness ready at `scripts/verify-blueprint-001.ps1` (run without `-Local`). Requires real Snowflake credentials.
+## Blueprint Catalog
+
+| Blueprint | Status | Local Verified | Production Verified |
+|---|---|---|---|
+| postgres-to-snowflake | ✅ Built | ✅ 1,000 rows, 0.7 min | ⏳ Snowflake credentials needed |
+| salesforce-to-snowflake | ✅ Built | ⏳ Pending -Local run | ⏳ Salesforce credentials needed |
 
 ---
 
@@ -72,12 +77,13 @@
 ✅ Sprint 6-1:   pipelinekit health              c613640
 ✅ Sprint 6-2a:  dlt adapter + credential wiring  fe6341f
 ✅ Blueprint #001 local verification              d01ca36
-⏳ Blueprint #001 production verification         Eddy — Snowflake credentials needed
-⏳ Sprint 6-2b:  PK-CONFIG-006 wiring             CLI/runtime sprint
-⏳ Sprint 6-3:   Blueprint #002 Salesforce → Snowflake
-📋 Sprint 6-4:   AI Blueprint Generation
-📋 Sprint 6-5:   Remote Blueprint Registry
-📋 Sprint 6-6:   Migration Intelligence
+✅ Sprint 6-3:   Blueprint #002 Salesforce → SF   04ffd50
+⏳ Blueprint #002 local verification              -Local run pending
+⏳ Sprint 6-2b:  PK-CONFIG-006 wiring
+⏳ Sprint 6-4:   Blueprint #003 Stripe → Snowflake
+📋 Sprint 6-5:   AI Blueprint Generation
+📋 Sprint 6-6:   Remote Blueprint Registry
+📋 Sprint 6-7:   Migration Intelligence
 ```
 
 ---
@@ -86,20 +92,17 @@
 
 ```
 ✅ pipelinekit health (SPEC-012)
-✅ architecture.schema.json adr_compliance fixed
 ✅ dlt adapter real implementation (ADR-017)
-✅ SourceConfig credential fields first-class
-✅ ${VAR} interpolation in config loader
-✅ dlt[sql_database] extra installed
-✅ Soda API updated to get_scan_results()
-✅ Blueprint #001 local verification (1,000 rows, 0.7 min)
-✅ dbt DuckDB local profile
-✅ gitignore dbt/dlt/DuckDB artifacts
-□  Blueprint #001 production Snowflake verification
+✅ Blueprint #001 locally verified (1,000 rows, 0.7 min)
+✅ Blueprint #002 built (all 8 assets)
+□  Blueprint #002 local verification (-Local run)
+□  .gitignore generalized for all blueprint dbt artifacts
+□  SPEC-013 drift reconciliation
+□  dlt[salesforce] dependency decision
 □  PK-CONFIG-006 wired into validate/run
+□  Blueprint #001 production Snowflake verification
 □  SPEC-005 confidence_threshold drift fix
 □  ICP-001, ICP-002, ICP-003 stubs
-□  PRD in-file update with v2 executive summary
 □  CI green confirmed on GitHub
 ```
 
@@ -107,35 +110,8 @@
 
 ## Repository Numbers
 
-**Tests:** 225 | **Coverage:** 82.67% | **Source files:** 69  
-**State tables:** 6 | **AI providers:** 5 | **CLI commands:** 11+  
-**Blueprints:** 1 (locally verified) | **ADRs:** 017 | **SPECs:** 12
-
----
-
-## Verification Commands
-
-```powershell
-cd C:\Users\HP\Documents\pipelinekit
-poetry run pytest --cov=src/pipelinekit --cov-fail-under=80
-poetry run ruff check .
-poetry run black --check .
-poetry run mypy src/pipelinekit
-poetry run pipelinekit health
-```
-
-## Blueprint #001 Local Verification
-
-```powershell
-cd C:\Users\HP\Documents\pipelinekit
-Remove-Item -Recurse -Force .dlt -ErrorAction SilentlyContinue
-Remove-Item -Force *.duckdb -ErrorAction SilentlyContinue
-Remove-Item -Force pipelinekit.yaml -ErrorAction SilentlyContinue
-$env:PG_HOST="localhost"; $env:PG_PORT="5432"
-$env:PG_DATABASE="testdb"; $env:PG_USER="test"; $env:PG_PASSWORD="test"
-$env:POSTGRES_CONN_STR="postgresql://test:test@localhost:5432/testdb"
-.\scripts\verify-blueprint-001.ps1 -Local
-```
+**Tests:** 229 | **Coverage:** 82.42% | **Source files:** ~70  
+**Blueprints:** 2 | **AI providers:** 5 | **ADRs:** 017 | **SPECs:** 013
 
 ---
 

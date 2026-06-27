@@ -13,7 +13,7 @@
       "verified_by": "mpingo-systems",
       "downloads": 0,
       "tags": ["postgres", "snowflake", "sql", "verified"],
-      "url": "https://pipelinekit-registry.pages.dev/v1/blueprints/postgres-to-snowflake-1.0.0.zip"
+      "url": "https://registry.pipelinekit.dev/v1/blueprints/postgres-to-snowflake-1.0.0.zip"
     },
     {
       "name": "salesforce-to-snowflake",
@@ -26,7 +26,7 @@
       "verified_by": "mpingo-systems",
       "downloads": 0,
       "tags": ["salesforce", "snowflake", "crm", "verified"],
-      "url": "https://pipelinekit-registry.pages.dev/v1/blueprints/salesforce-to-snowflake-1.0.0.zip"
+      "url": "https://registry.pipelinekit.dev/v1/blueprints/salesforce-to-snowflake-1.0.0.zip"
     },
     {
       "name": "stripe-to-snowflake",
@@ -39,7 +39,7 @@
       "verified_by": null,
       "downloads": 0,
       "tags": ["stripe", "snowflake", "payments", "ai-proposed"],
-      "url": "https://pipelinekit-registry.pages.dev/v1/blueprints/stripe-to-snowflake-1.0.0.zip"
+      "url": "https://registry.pipelinekit.dev/v1/blueprints/stripe-to-snowflake-1.0.0.zip"
     }
   ]
 }

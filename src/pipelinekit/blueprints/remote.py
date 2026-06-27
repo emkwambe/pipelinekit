@@ -28,7 +28,7 @@ from typing import Optional
 from pipelinekit.blueprints.validator import BlueprintValidator
 from pipelinekit.core.errors import BlueprintError, RegistryError
 
-REGISTRY_BASE_URL = "https://pipelinekit-registry.pages.dev/v1"
+REGISTRY_BASE_URL = "https://registry.pipelinekit.dev/v1"
 CATALOG_URL = f"{REGISTRY_BASE_URL}/catalog.json"
 CATALOG_CACHE_TTL_HOURS = 24
 

@@ -98,7 +98,9 @@
     .hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:2rem;
       max-width:1100px;margin:3rem auto 0;align-items:center}
     .hero-grid .terminal{margin:0}
-    .hero-diagram{width:100%;height:420px;border:none;border-radius:8px;background:var(--bg)}
+    .hero-diagram{width:100%;background:var(--code-bg);border:1px solid var(--border);
+      border-radius:12px;padding:18px 18px 10px;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+    .hero-diagram svg{display:block;width:100%;height:auto}
 
     /* Trust bar */
     .trustbar{border-top:1px solid var(--border);border-bottom:1px solid var(--border);
@@ -252,11 +254,40 @@
           <div class="terminal-body"><code id="term"></code><span class="cursor"></span></div>
         </div>
 
-        <!-- Right: coordination layer diagram -->
-        <iframe src="/assets/pipelinekit_coordination_layer.html"
-                class="hero-diagram"
-                loading="lazy"
-                title="PipelineKit coordination layer diagram"></iframe>
+        <!-- Right: coordination layer diagram (inline SVG — no external load) -->
+        <div class="hero-diagram" role="img"
+             aria-label="PipelineKit is the coordination layer above your existing stack — dbt, dlt, Snowflake, Airbyte, and Soda.">
+          <svg viewBox="0 0 600 440" xmlns="http://www.w3.org/2000/svg" font-family="'Inter',system-ui,sans-serif">
+            <text x="300" y="32" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="13" letter-spacing="2" fill="#888888">THE COORDINATION LAYER</text>
+
+            <g stroke="#00d4aa" stroke-width="1.5" stroke-opacity="0.45">
+              <line x1="300" y1="160" x2="70" y2="298" />
+              <line x1="300" y1="160" x2="185" y2="298" />
+              <line x1="300" y1="160" x2="300" y2="298" />
+              <line x1="300" y1="160" x2="415" y2="298" />
+              <line x1="300" y1="160" x2="530" y2="298" />
+            </g>
+
+            <rect x="90" y="66" width="420" height="92" rx="12" fill="#00d4aa" fill-opacity="0.08" stroke="#00d4aa" stroke-width="1.5" />
+            <text x="300" y="108" text-anchor="middle" font-size="30" font-weight="700" fill="#00d4aa">PipelineKit</text>
+            <text x="300" y="134" text-anchor="middle" font-size="13" fill="#888888">designs · validates · governs · diagnoses</text>
+
+            <g font-family="'JetBrains Mono',monospace" font-size="15" fill="#ffffff">
+              <rect x="24"  y="300" width="92" height="56" rx="8" fill="#111111" stroke="#222222" />
+              <text x="70"  y="333" text-anchor="middle">dbt</text>
+              <rect x="139" y="300" width="92" height="56" rx="8" fill="#111111" stroke="#222222" />
+              <text x="185" y="333" text-anchor="middle">dlt</text>
+              <rect x="254" y="300" width="92" height="56" rx="8" fill="#111111" stroke="#222222" />
+              <text x="300" y="333" text-anchor="middle" font-size="13">Snowflake</text>
+              <rect x="369" y="300" width="92" height="56" rx="8" fill="#111111" stroke="#222222" />
+              <text x="415" y="333" text-anchor="middle" font-size="14">Airbyte</text>
+              <rect x="484" y="300" width="92" height="56" rx="8" fill="#111111" stroke="#222222" />
+              <text x="530" y="333" text-anchor="middle">Soda</text>
+            </g>
+
+            <text x="300" y="404" text-anchor="middle" font-size="13" fill="#888888">your existing stack</text>
+          </svg>
+        </div>
       </div>
     </div>
   </header>

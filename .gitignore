@@ -52,3 +52,8 @@ docs/institutional-memory/
 docs/web/
 docs/reference/PROJECT-STATUS.md
 docs/reference/SYNTHETIC-DATA-REQUIREMENTS*.md
+
+# Local artifacts
+airbyte-connection.json
+inspect-pipelinekit.ps1
+logs/

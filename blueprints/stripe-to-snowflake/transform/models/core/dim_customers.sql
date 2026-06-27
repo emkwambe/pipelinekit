@@ -46,11 +46,7 @@ final as (
         coalesce(cs.total_successful_charges, 0)        as total_successful_charges,
         coalesce(cs.lifetime_value, 0.00)               as lifetime_value,
         cs.first_charge_at,
-        cs.last_charge_at,
-
-        -- metadata
-        c._dlt_load_id,
-        c._dlt_id
+        cs.last_charge_at
 
     from customers c
     left join charge_summary cs

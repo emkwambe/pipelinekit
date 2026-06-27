@@ -48,11 +48,7 @@ final as (
         case
             when ch.status = 'succeeded' then ch.amount
             else 0
-        end                                             as successful_amount,
-
-        -- metadata
-        ch._dlt_load_id,
-        ch._dlt_id
+        end                                             as successful_amount
 
     from charges ch
     left join customers c

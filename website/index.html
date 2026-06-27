@@ -173,10 +173,27 @@
     .copyright{border-top:1px solid var(--border);margin-top:40px;padding-top:24px;
       text-align:center;color:var(--text-muted);font-size:.85rem}
 
+    /* Why / coordination layer */
+    .compare{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);
+      border:1px solid var(--border);border-radius:12px;overflow:hidden;max-width:880px;margin:0 auto}
+    .compare > div{background:var(--surface);padding:15px 20px;font-size:.95rem;display:flex;align-items:center}
+    .compare-head{font-weight:600;font-size:.78rem;text-transform:uppercase;letter-spacing:.06em}
+    .compare-head.without{color:#ef8a8a;background:rgba(239,68,68,.09)}
+    .compare-head.with{color:var(--primary);background:rgba(0,212,170,.09)}
+    .cell-l{color:var(--text-muted)}
+    .cell-r{color:var(--text)}
+    .cell-r code{font-family:var(--mono);color:#9fe9d8;font-size:.86rem}
+    .icp{display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:880px;margin:40px auto 0}
+    .icp-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:22px}
+    .icp-card h4{font-size:.98rem;color:var(--primary);margin-bottom:6px}
+    .icp-card p{color:var(--text-muted);font-size:.92rem}
+
     /* Responsive */
     @media (max-width:860px){
       .nav-links{display:none}
       .flow{grid-template-columns:1fr}
+      .icp{grid-template-columns:1fr}
+      .compare > div{padding:13px 14px;font-size:.88rem}
       .cards{grid-template-columns:1fr}
       .foot-grid{grid-template-columns:1fr 1fr}
       .panel{padding:32px 22px}
@@ -198,7 +215,7 @@
         <a href="#platform">Platform</a>
         <a href="#blueprints">Blueprints</a>
         <a href="#migration">Migration</a>
-        <a href="#partners">Pricing</a>
+        <a href="#partners" title="Design Partner Program">Pricing</a>
         <a href="https://github.com/emkwambe/pipelinekit/tree/main/docs">Docs</a>
       </div>
       <a class="btn btn-primary nav-cta" href="#contact">Get Started →</a>
@@ -233,6 +250,58 @@
          <b>5 AI providers</b> &nbsp;·&nbsp; <b>registry.pipelinekit.dev live</b></p>
     </div>
   </div>
+
+  <!-- WHY — coordination layer -->
+  <section id="why">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Not another tool. The coordination layer.</h2>
+        <p>You already have dbt, Snowflake, Airbyte. PipelineKit removes the engineering drag between them.</p>
+      </div>
+
+      <div class="compare">
+        <div class="compare-head without">Without PipelineKit</div>
+        <div class="compare-head with">With PipelineKit</div>
+
+        <div class="cell-l">Blank-page project setup</div>
+        <div class="cell-r"><code>pipelinekit init</code></div>
+
+        <div class="cell-l">Manual pipeline design</div>
+        <div class="cell-r"><code>pipelinekit generate blueprint</code></div>
+
+        <div class="cell-l">Inconsistent team output</div>
+        <div class="cell-r">Shared blueprint standard</div>
+
+        <div class="cell-l">“It works on prod only”</div>
+        <div class="cell-r">Local verification first</div>
+
+        <div class="cell-l">Log-diving at 2am</div>
+        <div class="cell-r"><code>pipelinekit diagnose</code></div>
+
+        <div class="cell-l">Vendor lock-in creep</div>
+        <div class="cell-r">Portable blueprints you own</div>
+      </div>
+
+      <div class="icp">
+        <div class="icp-card">
+          <h4>Solo engineers</h4>
+          <p>Faster starts. No boilerplate. Clean structure.</p>
+        </div>
+        <div class="icp-card">
+          <h4>Analytics teams</h4>
+          <p>One standard. Every pipeline. Every time.</p>
+        </div>
+        <div class="icp-card">
+          <h4>Consultancies</h4>
+          <p>Repeatable delivery. Reusable blueprints. Better margin.</p>
+        </div>
+        <div class="icp-card">
+          <h4>CTOs</h4>
+          <p>Less vendor lock-in. More portable architecture.</p>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <!-- 4. LIFECYCLE -->
   <section id="platform">

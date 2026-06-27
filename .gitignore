@@ -44,3 +44,11 @@ pipelinekit.proposed.yaml
 
 # Local blueprint verification seed artifacts (RealityDB-generated)
 *_seed.sql
+
+# Internal documentation — lives in pipelinekit-internal (private repo)
+docs/decisions/
+docs/specifications/
+docs/institutional-memory/
+docs/web/
+docs/reference/PROJECT-STATUS.md
+docs/reference/SYNTHETIC-DATA-REQUIREMENTS*.md

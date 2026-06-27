@@ -1,0 +1,48 @@
+# pipelinekit.example.yaml
+# Copy to your project root as pipelinekit.yaml and fill in your credentials
+
+pipeline:
+  name: stripe-to-snowflake-blueprint-003
+  version: "1.0.0"
+  description: "Blueprint #003 — Stripe to Snowflake trusted analytics"
+
+runtime:
+  environment: local
+
+# Credentials are read from environment variables via ${VAR} interpolation
+# (ADR-017). Set the referenced vars before running. See docs/runbook.md.
+ingestion:
+  source:
+    type: stripe
+    api_key: "${STRIPE_API_KEY}"
+    tables:
+      - charges
+      - customers
+  destination:
+    type: snowflake
+    account: "${SNOWFLAKE_ACCOUNT}"
+    database: "${SNOWFLAKE_DATABASE}"
+    user: "${SNOWFLAKE_USER}"
+    password: "${SNOWFLAKE_PASSWORD}"
+    warehouse: "${SNOWFLAKE_WAREHOUSE}"
+    schema: "raw"
+
+transformation:
+  enabled: true
+  project_dir: ./transform
+
+contracts:
+  enabled: true
+  directory: ./contracts
+
+quality:
+  enabled: true
+  checks_dir: ./quality
+
+diagnostics:
+  enabled: true
+  provider: anthropic
+
+notifications:
+  enabled: false
+  channels: []

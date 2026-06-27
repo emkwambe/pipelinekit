@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PipelineKit — AI-native operating system for trusted analytics pipelines</title>
+  <meta name="description" content="Design, build, distribute, operate, diagnose, migrate, and govern analytics pipelines from a single CLI. Verified blueprints. AI diagnostics. Production-ready.">
+  <meta name="theme-color" content="#0a0a0a">
+  <link rel="canonical" href="https://pipelinekit.dev/">
+
+  <!-- Open Graph / Twitter -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://pipelinekit.dev/">
+  <meta property="og:title" content="PipelineKit — AI-native operating system for trusted analytics pipelines">
+  <meta property="og:description" content="Design, build, distribute, operate, diagnose, migrate, and govern analytics pipelines from a single CLI. Verified blueprints. AI diagnostics. Production-ready.">
+  <meta property="og:site_name" content="PipelineKit">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="PipelineKit — AI-native operating system for trusted analytics pipelines">
+  <meta name="twitter:description" content="Verified blueprints. AI diagnostics. Migration intelligence. The lifecycle platform above dlt, dbt, and Soda.">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg:#0a0a0a; --surface:#111111; --border:#222222; --primary:#00d4aa;
+      --text:#ffffff; --text-muted:#888888; --code-bg:#1a1a2e;
+      --success:#22c55e; --warning:#f59e0b; --error:#ef4444;
+      --maxw:1200px;
+      --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+      --sans:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{
+      background:var(--bg); color:var(--text); font-family:var(--sans);
+      line-height:1.6; -webkit-font-smoothing:antialiased; font-size:16px;
+    }
+    a{color:inherit;text-decoration:none}
+    .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+    section{padding:80px 0}
+    h1,h2,h3{font-weight:700;line-height:1.15;letter-spacing:-0.02em}
+    h2{font-size:clamp(1.7rem,4vw,2.5rem);margin-bottom:14px}
+    .muted{color:var(--text-muted)}
+    .teal{color:var(--primary)}
+    code,pre,.mono{font-family:var(--mono)}
+    .section-head{max-width:720px;margin:0 auto 48px;text-align:center}
+    .section-head p{color:var(--text-muted);font-size:1.05rem;margin-top:8px}
+
+    /* Buttons */
+    .btn{display:inline-flex;align-items:center;gap:8px;font-weight:600;
+      padding:12px 22px;border-radius:8px;font-size:.98rem;border:1px solid transparent;
+      transition:transform .12s ease,background .2s ease,border-color .2s ease;white-space:nowrap}
+    .btn:hover{transform:translateY(-1px)}
+    .btn-primary{background:var(--primary);color:#04201b}
+    .btn-primary:hover{background:#19e7bd}
+    .btn-outline{border-color:var(--border);color:var(--text);background:transparent}
+    .btn-outline:hover{border-color:var(--primary);color:var(--primary)}
+
+    /* Nav */
+    nav{position:sticky;top:0;z-index:50;background:rgba(10,10,10,.82);
+      backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+    .nav-inner{display:flex;align-items:center;gap:24px;height:64px}
+    .brand{font-weight:700;font-size:1.1rem;letter-spacing:-.02em}
+    .brand b{color:var(--primary)}
+    .nav-links{display:flex;gap:26px;margin-left:18px}
+    .nav-links a{color:var(--text-muted);font-size:.94rem;font-weight:500}
+    .nav-links a:hover{color:var(--text)}
+    .nav-cta{margin-left:auto}
+
+    /* Hero */
+    .hero{padding:84px 0 56px;text-align:center}
+    .hero h1{font-size:clamp(2.2rem,6vw,4rem);max-width:900px;margin:0 auto}
+    .hero .sub{color:var(--text-muted);font-size:clamp(1.05rem,2.2vw,1.3rem);
+      max-width:760px;margin:22px auto 32px}
+    .hero-ctas{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-bottom:48px}
+
+    /* Terminal */
+    .terminal{max-width:760px;margin:0 auto;background:var(--code-bg);
+      border:1px solid var(--border);border-radius:12px;overflow:hidden;text-align:left;
+      box-shadow:0 24px 60px rgba(0,0,0,.5)}
+    .terminal-bar{display:flex;align-items:center;gap:8px;padding:12px 16px;
+      border-bottom:1px solid rgba(255,255,255,.06)}
+    .dot{width:11px;height:11px;border-radius:50%}
+    .dot.r{background:#ff5f56}.dot.y{background:#ffbd2e}.dot.g{background:#27c93f}
+    .terminal-bar .title{margin-left:8px;color:var(--text-muted);font-family:var(--mono);font-size:.78rem}
+    .terminal-body{padding:20px;min-height:300px}
+    #term{font-family:var(--mono);font-size:.86rem;line-height:1.7;color:#cfe9e2;
+      white-space:pre-wrap;word-break:break-word}
+    .cursor{display:inline-block;width:9px;height:1.05em;background:var(--primary);
+      vertical-align:text-bottom;animation:blink 1s step-end infinite}
+    @keyframes blink{50%{opacity:0}}
+
+    /* Trust bar */
+    .trustbar{border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+      background:var(--surface);padding:18px 0}
+    .trustbar p{text-align:center;color:var(--text-muted);font-family:var(--mono);
+      font-size:.86rem;letter-spacing:.01em}
+    .trustbar b{color:var(--text);font-weight:500}
+
+    /* Lifecycle */
+    .lifecycle{position:relative;max-width:760px;margin:0 auto;padding-left:28px}
+    .lifecycle::before{content:"";position:absolute;left:6px;top:6px;bottom:6px;
+      width:2px;background:linear-gradient(var(--primary),rgba(0,212,170,.12))}
+    .life-card{position:relative;background:var(--surface);border:1px solid var(--border);
+      border-radius:10px;padding:20px 22px;margin-bottom:18px}
+    .life-card::before{content:"";position:absolute;left:-28px;top:26px;width:12px;height:12px;
+      border-radius:50%;background:var(--primary);box-shadow:0 0 0 4px var(--bg)}
+    .life-verb{font-family:var(--mono);color:var(--primary);font-weight:500;font-size:.85rem;
+      letter-spacing:.12em;display:flex;align-items:center;gap:10px}
+    .badge-soon{font-family:var(--sans);font-size:.66rem;letter-spacing:.04em;color:var(--warning);
+      border:1px solid rgba(245,158,11,.4);border-radius:20px;padding:2px 9px;text-transform:uppercase}
+    .life-card p{margin:8px 0 12px;color:#d6d6d6;font-size:.98rem}
+    .cmd{background:var(--bg);border:1px solid var(--border);border-radius:6px;
+      padding:9px 12px;font-family:var(--mono);font-size:.82rem;color:#9fe9d8;overflow-x:auto}
+    .cmd + .cmd{margin-top:8px}
+
+    /* Trust model */
+    .flow{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;max-width:920px;margin:0 auto}
+    .flow .col{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px}
+    .flow .col h3{font-size:1.05rem;color:var(--primary);font-family:var(--mono);margin-bottom:12px}
+    .flow .col ul{list-style:none;color:var(--text-muted);font-size:.9rem}
+    .flow .col li{padding:5px 0;border-bottom:1px dashed rgba(255,255,255,.06)}
+    .flow .col li:last-child{border-bottom:none}
+    .flow-note{text-align:center;color:var(--text-muted);max-width:640px;margin:28px auto 0;font-size:1rem}
+
+    /* Blueprints */
+    .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;
+      display:flex;flex-direction:column;gap:6px;transition:border-color .2s}
+    .card:hover{border-color:var(--primary)}
+    .card .bp-title{font-family:var(--mono);font-size:1.05rem;font-weight:500}
+    .card .verified{color:var(--success);font-size:.9rem}
+    .card .stat{color:var(--text-muted);font-family:var(--mono);font-size:.85rem}
+    .card .install{margin-top:14px;color:var(--primary);font-weight:600;font-size:.92rem}
+    .center-cta{text-align:center;margin-top:36px}
+
+    /* Providers */
+    .providers{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-top:8px}
+    .pbadge{background:var(--surface);border:1px solid var(--border);border-radius:30px;
+      padding:12px 22px;font-family:var(--mono);font-size:.9rem}
+    .pbadge span{color:var(--text-muted);font-size:.78rem}
+
+    /* Migration + partner */
+    .panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+      padding:44px;max-width:860px;margin:0 auto;text-align:center}
+    .panel p{color:var(--text-muted);max-width:600px;margin:14px auto 24px;font-size:1.05rem}
+    .reqs{list-style:none;display:inline-block;text-align:left;margin:8px auto 26px}
+    .reqs li{padding:6px 0;color:#d6d6d6}
+    .reqs li::before{content:"✓";color:var(--primary);font-weight:700;margin-right:10px}
+
+    /* Contact */
+    .form{max-width:620px;margin:0 auto;background:var(--surface);border:1px solid var(--border);
+      border-radius:14px;padding:34px}
+    .form label{display:block;font-size:.85rem;color:var(--text-muted);margin:14px 0 6px}
+    .form input,.form select,.form textarea{width:100%;background:var(--bg);
+      border:1px solid var(--border);border-radius:8px;padding:11px 13px;color:var(--text);
+      font-family:var(--sans);font-size:.95rem}
+    .form input:focus,.form select:focus,.form textarea:focus{outline:none;border-color:var(--primary)}
+    .form textarea{min-height:110px;resize:vertical}
+    .form button{margin-top:22px;width:100%;justify-content:center}
+    .form .commit{text-align:center;color:var(--text-muted);font-size:.84rem;margin-top:14px}
+
+    /* Footer */
+    footer{border-top:1px solid var(--border);background:var(--surface);padding:56px 0 32px}
+    .foot-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:28px}
+    .foot-brand b{color:var(--primary)}
+    .foot-brand p{color:var(--text-muted);font-size:.9rem;margin-top:8px}
+    .foot-col h4{font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:12px}
+    .foot-col a{display:block;color:#cdcdcd;font-size:.92rem;padding:4px 0}
+    .foot-col a:hover{color:var(--primary)}
+    .copyright{border-top:1px solid var(--border);margin-top:40px;padding-top:24px;
+      text-align:center;color:var(--text-muted);font-size:.85rem}
+
+    /* Responsive */
+    @media (max-width:860px){
+      .nav-links{display:none}
+      .flow{grid-template-columns:1fr}
+      .cards{grid-template-columns:1fr}
+      .foot-grid{grid-template-columns:1fr 1fr}
+      .panel{padding:32px 22px}
+      section{padding:60px 0}
+    }
+    @media (max-width:520px){
+      .foot-grid{grid-template-columns:1fr}
+      .hero-ctas .btn{width:100%;justify-content:center}
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 1. NAVIGATION -->
+  <nav>
+    <div class="wrap nav-inner">
+      <a class="brand" href="#top"><b>Pipeline</b>Kit</a>
+      <div class="nav-links">
+        <a href="#platform">Platform</a>
+        <a href="#blueprints">Blueprints</a>
+        <a href="#migration">Migration</a>
+        <a href="#partners">Pricing</a>
+        <a href="https://github.com/emkwambe/pipelinekit/tree/main/docs">Docs</a>
+      </div>
+      <a class="btn btn-primary nav-cta" href="#contact">Get Started →</a>
+    </div>
+  </nav>
+
+  <!-- 2. HERO -->
+  <header id="top" class="hero">
+    <div class="wrap">
+      <h1>The AI-native operating system<br>for trusted analytics pipelines.</h1>
+      <p class="sub">Design, build, distribute, operate, diagnose, migrate, and govern
+        analytics pipelines — from a single CLI with verifiable trust at every step.</p>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href="https://github.com/emkwambe/pipelinekit/blob/main/docs/guides/GETTING-STARTED.md">Install PipelineKit →</a>
+        <a class="btn btn-outline" href="https://registry.pipelinekit.dev">Browse Blueprints →</a>
+      </div>
+
+      <div class="terminal" aria-hidden="true">
+        <div class="terminal-bar">
+          <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+          <span class="title">pipelinekit — generate blueprint</span>
+        </div>
+        <div class="terminal-body"><code id="term"></code><span class="cursor"></span></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- 3. TRUST BAR -->
+  <div class="trustbar">
+    <div class="wrap">
+      <p><b>3 verified blueprints</b> &nbsp;·&nbsp; <b>307 passing tests</b> &nbsp;·&nbsp;
+         <b>5 AI providers</b> &nbsp;·&nbsp; <b>registry.pipelinekit.dev live</b></p>
+    </div>
+  </div>
+
+  <!-- 4. LIFECYCLE -->
+  <section id="platform">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>The complete pipeline lifecycle — in one platform.</h2>
+        <p>Nine verbs. One CLI. Every capability is a command.</p>
+      </div>
+      <div class="lifecycle">
+
+        <div class="life-card">
+          <div class="life-verb">DESIGN</div>
+          <p>AI-assisted blueprint creation. Design production-ready pipelines in minutes, not days.</p>
+          <div class="cmd">pipelinekit generate blueprint --interactive</div>
+        </div>
+
+        <div class="life-card">
+          <div class="life-verb">BUILD</div>
+          <p>Initialize, validate, and configure trusted pipelines without becoming infrastructure experts.</p>
+          <div class="cmd">pipelinekit init</div>
+          <div class="cmd">pipelinekit validate</div>
+        </div>
+
+        <div class="life-card">
+          <div class="life-verb">DISTRIBUTE</div>
+          <p>Install proven blueprints from the registry. Upgrade with governance. Roll back with confidence.</p>
+          <div class="cmd">pipelinekit blueprint install postgres-to-snowflake</div>
+          <div class="cmd">pipelinekit blueprint upgrade postgres-to-snowflake</div>
+        </div>
+
+        <div class="life-card">
+          <div class="life-verb">OPERATE</div>
+          <p>Run pipelines with verifiable step results, contract enforcement, and quality checks.</p>
+          <div class="cmd">pipelinekit run</div>
+          <div class="cmd">pipelinekit status</div>
+        </div>
+
+        <div class="life-card">
+          <div class="life-verb">OBSERVE <span class="badge-soon">coming soon</span></div>
+          <p>See what is failing, slow, or at risk — across all pipelines. Freshness SLAs. Contract violations. Volume anomalies.</p>
+          <div class="cmd">pipelinekit health</div>
+        </div>
+
+        <div class="life-card">
+          <div class="life-verb">DIAGNOSE</div>
+          <p>AI finds root causes instead of you searching logs. You approve the fix. Evidence-first, provider-agnostic.</p>
+          <div class="cmd">pipelinekit diagnose --provider anthropic</div>
+        </div>
+
+        <div class="life-card">
+          <div class="life-verb">MIGRATE</div>
+          <p>Translate Airbyte, Fivetran, or custom Python pipelines to PipelineKit in one command.</p>
+          <div class="cmd">pipelinekit migrate analyze airbyte-connection.json</div>
+        </div>
+
+        <div class="life-card">
+          <div class="life-verb">GOVERN</div>
+          <p>Data contracts. Quality checks. Freshness SLAs. Alert routing. A full audit trail.</p>
+          <div class="cmd">pipelinekit validate --contracts</div>
+        </div>
+
+        <div class="life-card">
+          <div class="life-verb">LEARN <span class="badge-soon">coming soon</span></div>
+          <p>Train engineers on synthetic enterprises — not toy examples. Powered by RealityDB.</p>
+          <div class="cmd">academy.pipelinekit.dev</div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. TRUST MODEL -->
+  <section id="trust-model" style="background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>AI proposes. You approve. Apply writes.</h2>
+        <p>The system is your copilot — not your autopilot.</p>
+      </div>
+      <div class="flow">
+        <div class="col">
+          <h3>AI Proposes</h3>
+          <ul>
+            <li>Confidence: 0.92</li>
+            <li>18 assets</li>
+            <li>10 decisions surfaced</li>
+          </ul>
+        </div>
+        <div class="col">
+          <h3>Human Approves</h3>
+          <ul>
+            <li>18 assets reviewed</li>
+            <li>Assumptions confirmed</li>
+            <li>Decisions made</li>
+          </ul>
+        </div>
+        <div class="col">
+          <h3>Apply Writes</h3>
+          <ul>
+            <li>Files written to disk</li>
+            <li>Blueprint validated</li>
+            <li>Version recorded</li>
+          </ul>
+        </div>
+      </div>
+      <p class="flow-note">PipelineKit's AI systems never execute without human confirmation. Every
+        proposal carries a confidence score, a list of assumptions, and the decisions only you can make.</p>
+    </div>
+  </section>
+
+  <!-- 6. BLUEPRINTS -->
+  <section id="blueprints">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Verified blueprints. Production-ready from day one.</h2>
+        <p>Every blueprint is run end-to-end and recorded — not asserted.</p>
+      </div>
+      <div class="cards">
+        <div class="card">
+          <div class="bp-title">postgres → snowflake</div>
+          <div class="muted">v1.0.0</div>
+          <div class="verified">✅ Verified</div>
+          <div class="stat">7/7 dbt tests · 0.7 min</div>
+          <a class="install" href="https://registry.pipelinekit.dev">Install blueprint →</a>
+        </div>
+        <div class="card">
+          <div class="bp-title">salesforce → snowflake</div>
+          <div class="muted">v1.0.0</div>
+          <div class="verified">✅ Verified</div>
+          <div class="stat">9/9 dbt tests · 0.2 min</div>
+          <a class="install" href="https://registry.pipelinekit.dev">Install blueprint →</a>
+        </div>
+        <div class="card">
+          <div class="bp-title">stripe → snowflake</div>
+          <div class="muted">v1.0.0</div>
+          <div class="verified">✅ Verified</div>
+          <div class="stat">43/43 dbt tests · 1 min</div>
+          <a class="install" href="https://registry.pipelinekit.dev">Install blueprint →</a>
+        </div>
+      </div>
+      <div class="center-cta">
+        <a class="btn btn-outline" href="https://registry.pipelinekit.dev/v1/catalog.json">Browse full catalog →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. AI PROVIDERS -->
+  <section id="providers" style="background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Bring your own AI. Own your intelligence.</h2>
+        <p>PipelineKit works with every major AI provider — or none at all. Run air-gapped on Ollama.
+           Use Anthropic for diagnostics. Switch providers without touching your pipeline configuration.</p>
+      </div>
+      <div class="providers">
+        <div class="pbadge">Anthropic <span>(US)</span></div>
+        <div class="pbadge">OpenAI <span>(US)</span></div>
+        <div class="pbadge">Mistral <span>(EU)</span></div>
+        <div class="pbadge">DeepSeek <span>(China)</span></div>
+        <div class="pbadge">Ollama <span>(Local)</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8. MIGRATION TEASER -->
+  <section id="migration">
+    <div class="wrap">
+      <div class="panel">
+        <h2>Already running Airbyte or Fivetran?</h2>
+        <p>Analyze your existing configuration in one command. PipelineKit maps every connection,
+           identifies gaps, and generates a draft <span class="mono teal">pipelinekit.yaml</span> — ready to validate.</p>
+        <a class="btn btn-primary" href="https://github.com/emkwambe/pipelinekit/blob/main/docs/guides/MIGRATION-GUIDE.md">See how migration works →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9. DESIGN PARTNER -->
+  <section id="partners" style="background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+    <div class="wrap">
+      <div class="panel">
+        <h2>We are looking for design partners.</h2>
+        <p>PipelineKit is production-ready and seeking 3–5 design partners to shape the roadmap. You get
+           direct access to the engineering team, priority support, and pricing locked at the design-partner
+           rate — currently <span class="teal">$0/month for 90 days</span>.</p>
+        <ul class="reqs">
+          <li>You have existing analytics pipelines</li>
+          <li>You are using Snowflake, BigQuery, or DuckDB</li>
+          <li>You have experienced at least one pipeline failure in production</li>
+          <li>You want to be part of shaping a platform</li>
+        </ul>
+        <div><a class="btn btn-primary" href="#contact">Apply to be a design partner →</a></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10. CONTACT -->
+  <section id="contact">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Apply to be a design partner.</h2>
+        <p>We respond to every inquiry within 48 hours.</p>
+      </div>
+      <form class="form" action="mailto:eddy@mpingo.ai" method="post" enctype="text/plain">
+        <label for="name">Name</label>
+        <input id="name" name="name" type="text" autocomplete="name" required>
+
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="email" required>
+
+        <label for="company">Company</label>
+        <input id="company" name="company" type="text" autocomplete="organization">
+
+        <label for="stack">Current pipeline stack</label>
+        <select id="stack" name="stack">
+          <option value="airbyte">Airbyte</option>
+          <option value="fivetran">Fivetran</option>
+          <option value="custom-python">Custom Python (dlt / SQLAlchemy / psycopg2)</option>
+          <option value="dbt-only">dbt only</option>
+          <option value="other">Other</option>
+        </select>
+
+        <label for="pain">Biggest pipeline pain point</label>
+        <textarea id="pain" name="pain" placeholder="Tell us about a pipeline failure you've lived through..."></textarea>
+
+        <button class="btn btn-primary" type="submit">Send application →</button>
+        <p class="commit">Or email <a class="teal" href="mailto:eddy@mpingo.ai">eddy@mpingo.ai</a> directly.</p>
+      </form>
+    </div>
+  </section>
+
+  <!-- 11. FOOTER -->
+  <footer>
+    <div class="wrap">
+      <div class="foot-grid">
+        <div class="foot-brand">
+          <div class="brand"><b>Pipeline</b>Kit</div>
+          <p>PipelineKit by Mpingo Systems LLC<br>Raleigh, NC</p>
+        </div>
+        <div class="foot-col">
+          <h4>Product</h4>
+          <a href="#platform">Platform</a>
+          <a href="#blueprints">Blueprints</a>
+          <a href="#migration">Migration</a>
+          <a href="#partners">Pricing</a>
+        </div>
+        <div class="foot-col">
+          <h4>Resources</h4>
+          <a href="https://github.com/emkwambe/pipelinekit/tree/main/docs">Docs</a>
+          <a href="https://github.com/emkwambe/pipelinekit/releases">Changelog</a>
+          <a href="https://github.com/emkwambe/pipelinekit">GitHub</a>
+          <a href="https://registry.pipelinekit.dev">Registry</a>
+        </div>
+        <div class="foot-col">
+          <h4>Company</h4>
+          <a href="https://github.com/emkwambe/pipelinekit#readme">About</a>
+          <a href="#contact">Contact</a>
+          <a href="https://github.com/emkwambe/pipelinekit/commits/main">Blog</a>
+        </div>
+      </div>
+      <div class="copyright">© 2026 Mpingo Systems LLC · Built with Cloudflare Pages</div>
+    </div>
+  </footer>
+
+  <!-- Terminal typewriter animation (vanilla JS, loops cleanly) -->
+  <script>
+    (function () {
+      var script =
+        "$ pipelinekit generate blueprint \\\n" +
+        "    --source stripe \\\n" +
+        "    --destination snowflake \\\n" +
+        "    --interactive\n\n" +
+        "Proposing stripe-to-snowflake blueprint...\n\n" +
+        "Plan ID:     plan-stripe-snowflake-20260627\n" +
+        "Assets:      18 proposed\n" +
+        "Confidence:  0.92\n\n" +
+        "[a]ccept  [r]eject  [e]edit  [x]explain  [y]accept all";
+      var el = document.getElementById("term");
+      if (!el) return;
+      var i = 0;
+      function tick() {
+        if (i <= script.length) {
+          el.textContent = script.slice(0, i);
+          i++;
+          setTimeout(tick, 14);
+        } else {
+          setTimeout(function () { i = 0; tick(); }, 1500);
+        }
+      }
+      tick();
+    })();
+  </script>
+</body>
+</html>

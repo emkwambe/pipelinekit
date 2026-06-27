@@ -12,6 +12,7 @@ on:
     branches: [main]
     paths:
       - 'docs/diagrams/*.mmd'
+      - 'docs/diagrams/*.md'
 
 permissions:
   contents: write

@@ -1,9 +1,11 @@
 name: Render Diagrams
 
-# Render every Mermaid diagram under docs/diagrams/ to PNG whenever a .mmd
-# source changes on main, then commit the PNGs back. The push of PNGs does not
-# re-trigger this workflow: the path filter only matches *.mmd, and pushes made
-# with GITHUB_TOKEN do not start new workflow runs.
+# Build a static docs/diagrams/index.html that renders every Mermaid diagram
+# client-side via the Mermaid CDN. This avoids Chromium/puppeteer entirely:
+# CI only generates a text file, and rendering happens in the viewer's browser.
+#
+# The committed index.html does NOT re-trigger this workflow: the path filter
+# only matches *.mmd, and pushes made with GITHUB_TOKEN do not start new runs.
 on:
   workflow_dispatch:
   push:
@@ -15,7 +17,7 @@ permissions:
   contents: write
 
 jobs:
-  render:
+  build-index:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -23,38 +25,23 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          node-version: 22
+          python-version: '3.12'
 
-      - name: Install Chrome
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y google-chrome-stable
+      - name: Build diagrams index.html
+        run: python3 .github/scripts/build_diagram_index.py
 
-      - name: Create puppeteer config
-        run: echo '{"executablePath":"/usr/bin/google-chrome-stable","args":["--no-sandbox","--disable-setuid-sandbox"]}' > /tmp/puppeteer-config.json
-
-      - name: Create png directory
-        run: mkdir -p docs/diagrams/png
-
-      - name: Render diagrams
-        run: |
-          for f in docs/diagrams/*.mmd; do
-            name=$(basename "$f" .mmd)
-            npx -y @mermaid-js/mermaid-cli -i "$f" -o "docs/diagrams/png/${name}.png" -p /tmp/puppeteer-config.json
-          done
-
-      - name: Commit PNGs
+      - name: Commit index.html
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/diagrams/png
+          git add docs/diagrams/index.html
           if git diff --staged --quiet; then
-            echo "No PNG changes to commit."
+            echo "No index changes to commit."
           else
-            git commit -m "ci: render diagram PNGs"
+            git commit -m "ci: build diagrams index.html"
             git push
           fi

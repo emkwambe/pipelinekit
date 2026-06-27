@@ -40,14 +40,14 @@
       "description": "Stripe payments to Snowflake trusted analytics pipeline",
       "source": "stripe",
       "destination": "snowflake",
-      "verified": false,
-      "verified_at": null,
-      "verified_by": null,
+      "verified": true,
+      "verified_at": "2026-06-27",
+      "verified_by": "mpingo-systems",
       "downloads": 0,
-      "tags": ["stripe", "snowflake", "payments", "ai-proposed"],
+      "tags": ["stripe", "snowflake", "payments", "ai-proposed", "verified"],
       "url": "https://registry.pipelinekit.dev/v1/blueprints/stripe-to-snowflake-1.0.0.zip",
       "changelog": {
-        "1.0.0": ["Initial release — AI-proposed, human-approved"]
+        "1.0.0": ["Initial release — AI-proposed, human-approved; locally verified 2026-06-27 (10,000 rows, 43/43 dbt tests)"]
       }
     }
   ]

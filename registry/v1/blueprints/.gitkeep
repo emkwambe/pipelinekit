@@ -1,0 +1,3 @@
+# Placeholder so git tracks this directory.
+# Blueprint zip files (e.g. postgres-to-snowflake-1.0.0.zip) are added here
+# before deploying to Cloudflare Pages. See ../../README.md.

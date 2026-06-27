@@ -1,0 +1,54 @@
+name: Render Diagrams
+
+# Render every Mermaid diagram under docs/diagrams/ to PNG whenever a .mmd
+# source changes on main, then commit the PNGs back. The push of PNGs does not
+# re-trigger this workflow: the path filter only matches *.mmd, and pushes made
+# with GITHUB_TOKEN do not start new workflow runs.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/diagrams/*.mmd'
+
+permissions:
+  contents: write
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Render diagrams to PNG
+        run: |
+          set -euo pipefail
+          mkdir -p docs/diagrams/png
+          # Chromium needs --no-sandbox on the CI runner.
+          echo '{"args":["--no-sandbox"]}' > puppeteer.json
+          for f in docs/diagrams/*.mmd; do
+            name="$(basename "$f" .mmd)"
+            echo "Rendering $f -> docs/diagrams/png/$name.png"
+            npx -y @mermaid-js/mermaid-cli -i "$f" -o "docs/diagrams/png/$name.png" -p puppeteer.json
+          done
+          rm -f puppeteer.json
+
+      - name: Commit PNGs
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/diagrams/png
+          if git diff --staged --quiet; then
+            echo "No PNG changes to commit."
+          else
+            git commit -m "ci: render diagram PNGs"
+            git push
+          fi

@@ -22,14 +22,15 @@ renamed as (
 
         -- status
         lower(trim(status))                         as status,
-        coalesce(refunded, false)                   as is_refunded,
+        {{ safe_boolean('refunded') }}              as is_refunded,
 
         -- descriptive
         description,
 
         -- timestamps
-        -- Stripe returns Unix epoch integers; convert to TIMESTAMP_NTZ
-        to_timestamp_ntz(created)                   as created_at,
+        -- Stripe returns Unix epoch integers; convert via the cross-db macro
+        -- (Snowflake to_timestamp_ntz / DuckDB to_timestamp / BigQuery TIMESTAMP_SECONDS).
+        {{ to_timestamp('created') }}               as created_at,
 
         -- dlt metadata
         _dlt_load_id,

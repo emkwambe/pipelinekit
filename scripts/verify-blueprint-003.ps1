@@ -149,8 +149,11 @@ import duckdb
 
 con = duckdb.connect("pipelinekit_pipeline.duckdb")
 con.execute("CREATE SCHEMA IF NOT EXISTS pipelinekit_pipeline_raw")
-# Read and execute the generated SQL (creates charges, customers, refunds).
+# Read the generated SQL (creates charges, customers, refunds). Rewrite the
+# CREATE TABLE statements to CREATE OR REPLACE TABLE so the seed is idempotent
+# and safe to re-run without "table already exists" errors.
 sql = open("pipelinekit_payments_seed.sql").read()
+sql = sql.replace("CREATE TABLE ", "CREATE OR REPLACE TABLE ")
 con.execute(sql)
 # Rename tables to match dbt source expectations (schema pipelinekit_pipeline_raw).
 con.execute("CREATE OR REPLACE TABLE pipelinekit_pipeline_raw.charges AS SELECT * FROM charges")

@@ -253,7 +253,13 @@ Critical rules:
 - Only use tables from the adapter capability registry provided
 - can_auto_apply must be false
 - Follow existing blueprint patterns exactly
-- Return ONLY the JSON object. No markdown. No preamble."""
+- Return ONLY the JSON object. No markdown. No preamble.
+
+PORTABILITY RULE: Never use vendor-specific SQL functions in dbt models.
+Always use the cross-db macros defined in macros/cross_db.sql:
+- Timestamps from integers: {{ to_timestamp('column_name') }}
+- Boolean coercion from strings: {{ safe_boolean('column_name') }}
+- All new blueprints must include macros/cross_db.sql"""
 
 
 def build_proposal_user_prompt(context: "ProposalContext") -> str:

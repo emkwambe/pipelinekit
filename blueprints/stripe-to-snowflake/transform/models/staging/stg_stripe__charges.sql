@@ -28,8 +28,8 @@ renamed as (
         description,
 
         -- timestamps
-        -- Stripe returns Unix epoch integers; convert via the cross-db macro
-        -- (Snowflake to_timestamp_ntz / DuckDB to_timestamp / BigQuery TIMESTAMP_SECONDS).
+        -- Stripe returns Unix epoch integers; the cross-db macro emits the
+        -- correct per-target timestamp conversion (see macros/cross_db.sql).
         {{ to_timestamp('created') }}               as created_at
 
     from source

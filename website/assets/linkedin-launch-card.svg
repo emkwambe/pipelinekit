@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="627" viewBox="0 0 1200 627" role="img" aria-label="PipelineKit — Not another tool. The coordination layer. pipelinekit.dev">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap');
+    .sans { font-family: 'Inter', Helvetica, Arial, sans-serif; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, 'Courier New', monospace; }
+  </style>
+
+  <rect width="1200" height="627" fill="#0a0a0a"/>
+
+  <text class="sans" x="600" y="244" text-anchor="middle" font-size="80" font-weight="700" fill="#ffffff">Not another tool.</text>
+  <text class="sans" x="600" y="340" text-anchor="middle" font-size="80" font-weight="700" fill="#00d4aa">The coordination layer.</text>
+
+  <text class="sans" x="600" y="436" text-anchor="middle" font-size="30" font-weight="500" letter-spacing="0.5" fill="#888888">dbt &#183; dlt &#183; Snowflake &#183; Airbyte &#183; Soda</text>
+
+  <text class="mono" x="600" y="506" text-anchor="middle" font-size="28" font-weight="500" fill="#00d4aa">pipelinekit.dev</text>
+
+  <text class="sans" x="1160" y="596" text-anchor="end" font-size="22" font-weight="600" letter-spacing="0.3" fill="#00d4aa">PipelineKit</text>
+</svg>

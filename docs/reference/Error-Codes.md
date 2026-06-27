@@ -81,8 +81,14 @@ CONFIG · CONTRACT · RUNTIME · ADAPTER · AI · STATE · BLUEPRINT · NOTIFY
 |---|---|
 | PK-NOTIFY-001 | Notification provider unavailable |
 | PK-NOTIFY-002 | Notification delivery failed |
-| PK-NOTIFY-003 | Invalid recipient address |
-| PK-NOTIFY-004 | API key missing or invalid |
+| PK-NOTIFY-003 | Notification target not configured (Resend: recipient empty; Slack: webhook URL not set) |
+| PK-NOTIFY-004 | Notification auth/transport failure (Resend: API key missing/invalid; Slack: webhook request failed) |
+
+These notify codes are shared across alert adapters. The Resend (email) and Slack
+(incoming webhook) adapters both raise `PK-NOTIFY-003` when their destination is
+not configured and `PK-NOTIFY-004` for an auth/transport failure. Adapter `send()`
+never raises — failures are returned as a `NotificationResult(sent=False)` carrying
+the code, and a broken channel never blocks pipeline state recording (SPEC-008).
 
 ---
 

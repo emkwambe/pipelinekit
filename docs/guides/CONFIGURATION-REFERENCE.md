@@ -101,7 +101,22 @@ Notification settings (Resend email).
 | `recipients` | list of string | no | `[]` |
 | `notify_on` | list of string | no | `["pipeline_failed", "contract_violated"]` |
 
-The Resend API key is never stored in config — it is read from `RESEND_API_KEY`.
+`provider` selects the alert channel:
+
+| `provider` | Channel | Required env var | Notes |
+|---|---|---|---|
+| `resend` | Email | `RESEND_API_KEY` | Uses `from_address` and `recipients` |
+| `slack` | Slack incoming webhook | `SLACK_WEBHOOK_URL` | Posts a Block Kit alert to the webhook's channel |
+
+```yaml
+# Slack alerting example
+notifications:
+  enabled: true
+  provider: slack          # SLACK_WEBHOOK_URL must be set
+  notify_on: ["pipeline_failed", "contract_violated"]
+```
+
+Credentials are never stored in config — Resend reads `RESEND_API_KEY` and Slack reads `SLACK_WEBHOOK_URL` from the environment (BYOK, ADR-005). A failing alert channel never blocks the pipeline; the failure is recorded with a `PK-NOTIFY-*` code. One `provider` is active at a time — simultaneous multi-channel delivery (email + Slack together) is a planned enhancement.
 
 ---
 

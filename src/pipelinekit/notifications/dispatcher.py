@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 
 from pipelinekit.adapters.alerts.resend.adapter import ResendNotificationAdapter
+from pipelinekit.adapters.alerts.slack.adapter import SlackNotificationAdapter
 from pipelinekit.config.schema import NotificationsSection
 from pipelinekit.contracts.models import ContractResult
 from pipelinekit.notifications.models import (
@@ -30,15 +31,24 @@ class NotificationDispatcher:
 
     def __init__(self, config: NotificationsSection) -> None:
         self.config = config
-        self._adapter: ResendNotificationAdapter | None = None
+        self._adapter: ResendNotificationAdapter | SlackNotificationAdapter | None = (
+            None
+        )
 
     def initialize(self) -> None:
-        """Build the notification adapter from config. Never raises."""
+        """Build the notification adapter from config. Never raises.
+
+        ``provider`` selects the channel: ``resend`` (email, RESEND_API_KEY) or
+        ``slack`` (incoming webhook, SLACK_WEBHOOK_URL).
+        """
         if self.config.provider == "resend":
             api_key = os.environ.get("RESEND_API_KEY", "")
             self._adapter = ResendNotificationAdapter(
                 api_key=api_key, from_address=self.config.from_address
             )
+        elif self.config.provider == "slack":
+            webhook_url = os.environ.get("SLACK_WEBHOOK_URL", "")
+            self._adapter = SlackNotificationAdapter(webhook_url=webhook_url)
 
     def dispatch(self, notification: Notification) -> NotificationResult:
         """Send a single notification. Never raises — returns a result."""

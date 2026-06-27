@@ -44,5 +44,10 @@ diagnostics:
   provider: anthropic
 
 notifications:
+  # Alerting goes through one provider:
+  #   email — provider: resend   (set RESEND_API_KEY, from_address, recipients)
+  #   slack — provider: slack    (set SLACK_WEBHOOK_URL)
+  # See docs/guides/CONFIGURATION-REFERENCE.md.
   enabled: false
+  provider: resend
   channels: []

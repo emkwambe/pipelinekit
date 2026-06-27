@@ -41,3 +41,6 @@ pipelinekit.proposed.yaml
 
 # Coverage data
 .coverage
+
+# Local blueprint verification seed artifacts (RealityDB-generated)
+*_seed.sql

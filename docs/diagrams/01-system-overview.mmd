@@ -2,19 +2,33 @@
 %% Audience: investors, executives, first-time evaluators.
 %% High-level value picture. Note: "Health" is a deterministic operations
 %% capability (not AI); the other four are AI-assisted.
+%% Layout: top row reads left-to-right (Stack -> Capabilities -> Providers),
+%% then drops down to Blueprint Sources and the trust-model phrase.
+%% The trust node receives only from Capabilities and Blueprint Sources.
 flowchart TB
-    subgraph stack["The Analytics Stack"]
+    subgraph row1[" "]
         direction LR
-        data["RealityDB<br/>data"] --> pk["PipelineKit<br/>pipeline OS"] --> out["Analytics<br/>trusted output"]
-    end
-
-    subgraph caps["Five Capabilities"]
-        direction LR
-        diag["Diagnose"]
-        arch["Architect"]
-        prop["Propose"]
-        mig["Migrate"]
-        hlth["Health"]
+        subgraph stack["The Analytics Stack"]
+            direction LR
+            data["RealityDB<br/>data"] --> pk["PipelineKit<br/>pipeline OS"] --> out["Analytics<br/>trusted output"]
+        end
+        subgraph caps["Five Capabilities"]
+            direction LR
+            diag["Diagnose"]
+            arch["Architect"]
+            prop["Propose"]
+            mig["Migrate"]
+            hlth["Health"]
+        end
+        subgraph prov["AI Providers (BYOK)"]
+            direction LR
+            anth["Anthropic<br/>US"]
+            oai["OpenAI<br/>US"]
+            oll["Ollama<br/>local"]
+            ds["DeepSeek<br/>China"]
+            mis["Mistral<br/>EU"]
+        end
+        stack --> caps --> prov
     end
 
     subgraph bp["Blueprint Sources"]
@@ -24,24 +38,10 @@ flowchart TB
         reg["Registry-installed"]
     end
 
-    subgraph prov["AI Providers (BYOK)"]
-        direction LR
-        anth["Anthropic<br/>US"]
-        oai["OpenAI<br/>US"]
-        oll["Ollama<br/>local"]
-        ds["DeepSeek<br/>China"]
-        mis["Mistral<br/>EU"]
-    end
+    trust["AI Proposes → Human Approves → Apply Writes"]
 
-    pk --> caps
-    pk --> bp
-    diag --> prov
-    arch --> prov
-    prop --> prov
-    mig --> prov
-
-    trust["AI Proposes  —  Human Approves  —  Apply Writes"]
-    prov --> trust
+    caps --> bp
+    caps --> trust
     bp --> trust
 
     classDef phrase fill:#0a7d55,color:#ffffff,font-weight:bold,stroke:#064;

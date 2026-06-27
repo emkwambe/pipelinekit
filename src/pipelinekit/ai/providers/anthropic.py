@@ -35,10 +35,11 @@ if TYPE_CHECKING:
     from pipelinekit.ai.proposal_models import BlueprintProposal, ProposalContext
 
 _ENV_KEY = "ANTHROPIC_API_KEY"
-# Blueprint proposals return ~13 full files; 8192 truncated them mid-JSON, so the
-# ceiling is raised. It is only a ceiling — short diagnostic/architecture
-# responses are unaffected.
-_MAX_TOKENS = 16000
+# Blueprint proposals return ~13 full files; 8192 — and even 16000 — truncated a
+# full proposal mid-JSON (surfacing as PK-GEN-001), so the ceiling is raised to
+# 32000. claude-sonnet-4-6 supports well above this. It is only a ceiling —
+# short diagnostic/architecture responses are unaffected.
+_MAX_TOKENS = 32000
 
 
 class AnthropicProvider:

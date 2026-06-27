@@ -28,7 +28,8 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['succeeded', 'pending', 'failed']
+              arguments:
+                values: ['succeeded', 'pending', 'failed']
       - name: is_refunded
         description: "True if the charge has been fully refunded"
         tests:

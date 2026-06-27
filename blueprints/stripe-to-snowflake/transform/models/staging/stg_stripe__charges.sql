@@ -30,11 +30,7 @@ renamed as (
         -- timestamps
         -- Stripe returns Unix epoch integers; convert via the cross-db macro
         -- (Snowflake to_timestamp_ntz / DuckDB to_timestamp / BigQuery TIMESTAMP_SECONDS).
-        {{ to_timestamp('created') }}               as created_at,
-
-        -- dlt metadata
-        _dlt_load_id,
-        _dlt_id
+        {{ to_timestamp('created') }}               as created_at
 
     from source
 

@@ -217,9 +217,18 @@ class RemoteRegistry:
     # -- internals (mock seams) ---------------------------------------------
 
     def _http_get(self, url: str) -> bytes:
-        """Fetch ``url`` and return the raw bytes. The network seam for tests."""
+        """Fetch ``url`` and return the raw bytes. The network seam for tests.
+
+        Sends an explicit User-Agent: Cloudflare Pages returns HTTP 403 to
+        requests with no User-Agent (urllib sends none by default), which would
+        otherwise surface as a spurious ``PK-REGISTRY-001``.
+        """
         try:
-            with urllib.request.urlopen(url, timeout=30) as response:  # noqa: S310
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": "PipelineKit/1.0 (https://pipelinekit.dev)"},
+            )
+            with urllib.request.urlopen(req, timeout=30) as response:  # noqa: S310
                 return bytes(response.read())
         except (urllib.error.URLError, OSError, ValueError) as exc:
             raise RegistryError(

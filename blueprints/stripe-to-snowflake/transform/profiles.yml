@@ -1,5 +1,13 @@
+# dbt profile for Blueprint #003 (Stripe -> Snowflake).
+# Credentials via environment variables (BYOK, ADR-005). Never commit secrets.
+#
+# Target selection is env-driven and defaults to the Snowflake `prod` target, so
+# production behavior is unchanged when DBT_TARGET is unset. Local verification
+# (scripts/verify-blueprint-003.ps1 -Local) sets DBT_TARGET=local to build into a
+# local DuckDB file instead — no cloud credentials required.
+
 stripe_snowflake:
-  target: prod
+  target: "{{ env_var('DBT_TARGET', 'prod') }}"
   outputs:
     prod:
       type: snowflake
@@ -23,3 +31,8 @@ stripe_snowflake:
       schema: "{{ env_var('SNOWFLAKE_SCHEMA') }}_dev"
       threads: 2
       client_session_keep_alive: false
+    local:
+      type: duckdb
+      path: "{{ env_var('DUCKDB_PATH', 'pipelinekit_pipeline.duckdb') }}"
+      schema: "{{ env_var('DBT_SOURCE_SCHEMA', 'pipelinekit_pipeline_raw') }}"
+      threads: 4

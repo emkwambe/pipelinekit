@@ -43,6 +43,9 @@ if TYPE_CHECKING:
 
 _ENV_KEY = "DEEPSEEK_API_KEY"
 _BASE_URL = "https://api.deepseek.com"
+# Cap only the blueprint-proposal response. deepseek-chat's hard output limit is
+# 8192 tokens; diagnose/architect pass no cap (SDK default).
+_PROPOSAL_MAX_TOKENS = 8192
 
 
 class DeepSeekProvider:
@@ -62,8 +65,12 @@ class DeepSeekProvider:
     def __init__(self, model: str = "deepseek-chat") -> None:
         self.model = model
 
-    def _complete(self, system: str, user: str) -> str:
-        """Call the DeepSeek API (OpenAI-compatible) and return the raw text."""
+    def _complete(self, system: str, user: str, max_tokens: int | None = None) -> str:
+        """Call the DeepSeek API (OpenAI-compatible) and return the raw text.
+
+        ``max_tokens`` caps the response when set; ``None`` (diagnose/architect)
+        uses the SDK default.
+        """
         api_key = os.environ.get(_ENV_KEY)
         if not api_key:
             raise LLMError(
@@ -82,6 +89,7 @@ class DeepSeekProvider:
                     {"role": "user", "content": user},
                 ],
                 response_format={"type": "json_object"},
+                max_tokens=max_tokens,
             )
             return response.choices[0].message.content or ""
         except LLMError:
@@ -123,7 +131,9 @@ class DeepSeekProvider:
     def propose_blueprint(self, context: "ProposalContext") -> "BlueprintProposal":
         """Propose a blueprint from context (SPEC-015). Never writes files."""
         raw = self._complete(
-            PROPOSAL_SYSTEM_PROMPT, build_proposal_user_prompt(context)
+            PROPOSAL_SYSTEM_PROMPT,
+            build_proposal_user_prompt(context),
+            max_tokens=_PROPOSAL_MAX_TOKENS,
         )
         return parse_proposal_response(raw, context, self.name, self.model)
 

@@ -37,6 +37,9 @@ if TYPE_CHECKING:
 
 _ENV_HOST = "OLLAMA_HOST"
 _DEFAULT_HOST = "http://localhost:11434"
+# Cap only the blueprint-proposal response. Ollama names this ``num_predict``
+# (passed via ``options``); diagnose/architect pass no cap (server default).
+_PROPOSAL_MAX_TOKENS = 32000
 
 
 class OllamaProvider:
@@ -49,8 +52,12 @@ class OllamaProvider:
         # Gracefully default the host when OLLAMA_HOST is not set.
         self.host = os.environ.get(_ENV_HOST, _DEFAULT_HOST)
 
-    def _complete(self, system: str, user: str) -> str:
-        """Call the local Ollama server and return the raw text response."""
+    def _complete(self, system: str, user: str, max_tokens: int | None = None) -> str:
+        """Call the local Ollama server and return the raw text response.
+
+        ``max_tokens`` caps the response (Ollama's ``num_predict``) when set;
+        ``None`` (diagnose/architect) uses the server default.
+        """
         try:
             import ollama  # noqa: PLC0415 — provider import isolated here
 
@@ -62,6 +69,9 @@ class OllamaProvider:
                     {"role": "user", "content": user},
                 ],
                 format="json",
+                options=(
+                    {"num_predict": max_tokens} if max_tokens is not None else None
+                ),
             )
             return str(response["message"]["content"])
         except Exception as exc:
@@ -101,7 +111,9 @@ class OllamaProvider:
     def propose_blueprint(self, context: "ProposalContext") -> "BlueprintProposal":
         """Propose a blueprint from context (SPEC-015). Never writes files."""
         raw = self._complete(
-            PROPOSAL_SYSTEM_PROMPT, build_proposal_user_prompt(context)
+            PROPOSAL_SYSTEM_PROMPT,
+            build_proposal_user_prompt(context),
+            max_tokens=_PROPOSAL_MAX_TOKENS,
         )
         return parse_proposal_response(raw, context, self.name, self.model)
 

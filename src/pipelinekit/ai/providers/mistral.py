@@ -35,6 +35,9 @@ if TYPE_CHECKING:
     from pipelinekit.ai.proposal_models import BlueprintProposal, ProposalContext
 
 _ENV_KEY = "MISTRAL_API_KEY"
+# Cap only the blueprint-proposal response. Mistral Large supports 32000 output
+# tokens; diagnose/architect pass no cap (SDK default).
+_PROPOSAL_MAX_TOKENS = 32000
 
 
 class MistralProvider:
@@ -53,8 +56,12 @@ class MistralProvider:
     def __init__(self, model: str = "mistral-large-latest") -> None:
         self.model = model
 
-    def _complete(self, system: str, user: str) -> str:
-        """Call the Mistral API and return the raw text response."""
+    def _complete(self, system: str, user: str, max_tokens: int | None = None) -> str:
+        """Call the Mistral API and return the raw text response.
+
+        ``max_tokens`` caps the response when set; ``None`` (diagnose/architect)
+        uses the SDK default.
+        """
         api_key = os.environ.get(_ENV_KEY)
         if not api_key:
             raise LLMError(
@@ -73,6 +80,7 @@ class MistralProvider:
                     {"role": "user", "content": user},
                 ],
                 response_format={"type": "json_object"},
+                max_tokens=max_tokens,
             )
             return response.choices[0].message.content or ""
         except LLMError:
@@ -114,7 +122,9 @@ class MistralProvider:
     def propose_blueprint(self, context: "ProposalContext") -> "BlueprintProposal":
         """Propose a blueprint from context (SPEC-015). Never writes files."""
         raw = self._complete(
-            PROPOSAL_SYSTEM_PROMPT, build_proposal_user_prompt(context)
+            PROPOSAL_SYSTEM_PROMPT,
+            build_proposal_user_prompt(context),
+            max_tokens=_PROPOSAL_MAX_TOKENS,
         )
         return parse_proposal_response(raw, context, self.name, self.model)
 

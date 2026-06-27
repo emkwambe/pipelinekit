@@ -35,6 +35,9 @@ if TYPE_CHECKING:
     from pipelinekit.ai.proposal_models import BlueprintProposal, ProposalContext
 
 _ENV_KEY = "OPENAI_API_KEY"
+# Cap only the blueprint-proposal response (~13 full files). gpt-4o's hard output
+# limit is 16384 tokens; diagnose/architect pass no cap (SDK default).
+_PROPOSAL_MAX_TOKENS = 16384
 
 
 class OpenAIProvider:
@@ -45,8 +48,12 @@ class OpenAIProvider:
     def __init__(self, model: str = "gpt-4o") -> None:
         self.model = model
 
-    def _complete(self, system: str, user: str) -> str:
-        """Call the OpenAI API and return the raw text response."""
+    def _complete(self, system: str, user: str, max_tokens: int | None = None) -> str:
+        """Call the OpenAI API and return the raw text response.
+
+        ``max_tokens`` caps the response when set; ``None`` (diagnose/architect)
+        uses the SDK default.
+        """
         api_key = os.environ.get(_ENV_KEY)
         if not api_key:
             raise LLMError(
@@ -65,6 +72,7 @@ class OpenAIProvider:
                     {"role": "user", "content": user},
                 ],
                 response_format={"type": "json_object"},
+                max_tokens=max_tokens,
             )
             return response.choices[0].message.content or ""
         except LLMError:
@@ -106,7 +114,9 @@ class OpenAIProvider:
     def propose_blueprint(self, context: "ProposalContext") -> "BlueprintProposal":
         """Propose a blueprint from context (SPEC-015). Never writes files."""
         raw = self._complete(
-            PROPOSAL_SYSTEM_PROMPT, build_proposal_user_prompt(context)
+            PROPOSAL_SYSTEM_PROMPT,
+            build_proposal_user_prompt(context),
+            max_tokens=_PROPOSAL_MAX_TOKENS,
         )
         return parse_proposal_response(raw, context, self.name, self.model)
 

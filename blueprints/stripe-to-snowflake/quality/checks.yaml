@@ -1,0 +1,23 @@
+# Soda checks for the charges table (Blueprint #003 — stripe-to-snowflake).
+# Executed by the Soda quality adapter against the transformed charges table
+# (stg_stripe__charges: charge_id, amount, currency, status, created_at, ...).
+
+checks for charges:
+  # Freshness — charges should be no older than 6 hours (matches the contract).
+  - freshness(created_at) < 6h
+
+  # Volume — the table should never be empty.
+  - row_count > 0
+
+  # Completeness — key columns must never be null.
+  - missing_count(charge_id) = 0
+  - missing_count(amount) = 0
+  - missing_count(currency) = 0
+  - missing_count(status) = 0
+
+  # Uniqueness — charge_id is the primary key.
+  - duplicate_count(charge_id) = 0
+
+  # Validity — status is one of the dbt accepted_values.
+  - invalid_count(status) = 0:
+      valid values: [succeeded, pending, failed]

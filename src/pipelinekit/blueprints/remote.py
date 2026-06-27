@@ -27,6 +27,7 @@ from typing import Optional
 
 from pipelinekit.blueprints.validator import BlueprintValidator
 from pipelinekit.core.errors import BlueprintError, RegistryError
+from pipelinekit.state import db
 
 REGISTRY_BASE_URL = "https://registry.pipelinekit.dev/v1"
 CATALOG_URL = f"{REGISTRY_BASE_URL}/catalog.json"
@@ -62,6 +63,7 @@ class CatalogEntry:
     downloads: int
     tags: list[str]
     url: str
+    changelog: dict = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: dict) -> "CatalogEntry":
@@ -77,6 +79,7 @@ class CatalogEntry:
             downloads=int(data.get("downloads", 0)),
             tags=list(data.get("tags", [])),
             url=data.get("url", ""),
+            changelog=dict(data.get("changelog", {})),
         )
 
 
@@ -213,6 +216,214 @@ class RemoteRegistry:
                 shutil.rmtree(target)
             shutil.copytree(root, target)
         return entry.version
+
+    # -- version management (SPEC-018) --------------------------------------
+
+    def version_status(self, cwd: Path | None = None) -> list[dict]:
+        """Compare every installed blueprint against the registry catalog.
+
+        Returns one dict per installed blueprint:
+        ``{name, installed_version, registry_version, outdated}``. A blueprint
+        absent from the catalog has ``registry_version=None`` and
+        ``outdated=False``. Uses the cached catalog (24h TTL).
+        """
+        installed = db.get_installed_blueprints(cwd=cwd)
+        by_name = {e.name: e for e in self.fetch_catalog().blueprints}
+        statuses: list[dict] = []
+        for row in installed:
+            entry = by_name.get(row["name"])
+            registry_version = entry.version if entry else None
+            outdated = bool(
+                registry_version and self._is_newer(registry_version, row["version"])
+            )
+            statuses.append(
+                {
+                    "name": row["name"],
+                    "installed_version": row["version"],
+                    "registry_version": registry_version,
+                    "outdated": outdated,
+                }
+            )
+        return statuses
+
+    def outdated(self, cwd: Path | None = None) -> list[dict]:
+        """Return only the installed blueprints with a newer registry version.
+
+        Empty list when everything is current (SPEC-018).
+        """
+        return [s for s in self.version_status(cwd=cwd) if s["outdated"]]
+
+    def upgrade(
+        self,
+        name: str,
+        dry_run: bool = False,
+        yes: bool = False,
+        cwd: Path | None = None,
+    ) -> str:
+        """Upgrade a blueprint to the latest registry version. Returns it.
+
+        Backs up the existing blueprint to
+        ``.pipelinekit/backups/<name>-<version>/`` before writing the new one,
+        validates the download (schema + required assets) before any write, and
+        records the change in ``blueprint_versions``. ``yes`` is accepted for API
+        symmetry; the confirmation prompt is the CLI's responsibility so the core
+        stays non-interactive and testable.
+
+        Raises:
+            RegistryError: ``PK-REGISTRY-004`` if the blueprint is not in the
+                catalog, ``PK-REGISTRY-006`` if already at the latest version,
+                ``PK-REGISTRY-002`` if the download fails validation.
+        """
+        base = cwd if cwd is not None else Path.cwd()
+        entry = self.fetch_catalog().get(name)
+        if entry is None:
+            raise RegistryError(
+                "PK-REGISTRY-004",
+                f"Blueprint not found in catalog: {name}",
+                {"name": name},
+            )
+
+        current = self._installed_version(name, cwd)
+        if current is not None and not self._is_newer(entry.version, current):
+            raise RegistryError(
+                "PK-REGISTRY-006",
+                f"{name} is already at the latest version ({current}).",
+                {"name": name, "version": current},
+            )
+
+        if dry_run:
+            return entry.version
+
+        target = base / "blueprints" / name
+        backup_path: Path | None = None
+        if target.exists():
+            backup_path = self._backup_dir(base) / f"{name}-{current or 'unknown'}"
+            if backup_path.exists():
+                shutil.rmtree(backup_path)
+            backup_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(target, backup_path)
+
+        archive = self._download_archive(entry.url)
+        with tempfile.TemporaryDirectory() as tmp:
+            extract_dir = Path(tmp)
+            self._extract(archive, extract_dir)
+            root = self._find_blueprint_root(extract_dir)
+            self._validate_blueprint(root)  # raises PK-REGISTRY-002 on failure
+            if target.exists():
+                shutil.rmtree(target)
+            shutil.copytree(root, target)
+
+        db.insert_installed_blueprint(
+            entry.name,
+            entry.version,
+            entry.source,
+            entry.destination,
+            entry.verified,
+            entry.url,
+            cwd=cwd,
+        )
+        db.insert_blueprint_version(
+            name,
+            current,
+            entry.version,
+            "upgrade",
+            str(backup_path) if backup_path else None,
+            cwd=cwd,
+        )
+        return entry.version
+
+    def rollback(
+        self,
+        name: str,
+        version: str | None = None,
+        cwd: Path | None = None,
+    ) -> str:
+        """Restore a blueprint from a local backup. Returns the restored version.
+
+        With no ``version``, restores the most recent backup for ``name``.
+
+        Raises:
+            RegistryError: ``PK-REGISTRY-007`` if no matching backup exists.
+        """
+        base = cwd if cwd is not None else Path.cwd()
+        backups = self._backup_dir(base)
+
+        backup_path: Path | None = None
+        if version is not None:
+            candidate = backups / f"{name}-{version}"
+            backup_path = candidate if candidate.is_dir() else None
+        elif backups.is_dir():
+            matches = sorted(p for p in backups.glob(f"{name}-*") if p.is_dir())
+            backup_path = matches[-1] if matches else None
+
+        if backup_path is None:
+            raise RegistryError(
+                "PK-REGISTRY-007",
+                f"No backup found for {name}"
+                + (f" v{version}" if version else "")
+                + ". Upgrade creates a backup you can roll back to.",
+                {"name": name, "version": version},
+            )
+
+        restored_version = (
+            self._read_version(backup_path) or backup_path.name[len(name) + 1 :]
+        )
+        target = base / "blueprints" / name
+        if target.exists():
+            shutil.rmtree(target)
+        shutil.copytree(backup_path, target)
+
+        db.insert_blueprint_version(
+            name,
+            None,
+            restored_version,
+            "rollback",
+            str(backup_path),
+            cwd=cwd,
+        )
+        return restored_version
+
+    # -- version helpers -----------------------------------------------------
+
+    @staticmethod
+    def _version_key(version: str) -> tuple[int, ...]:
+        """Parse a dotted version into an int tuple for deterministic compare."""
+        parts: list[int] = []
+        for piece in str(version).split("."):
+            digits = "".join(ch for ch in piece if ch.isdigit())
+            parts.append(int(digits) if digits else 0)
+        return tuple(parts)
+
+    @classmethod
+    def _is_newer(cls, candidate: str, current: str) -> bool:
+        """Return True if ``candidate`` is a newer version than ``current``."""
+        return cls._version_key(candidate) > cls._version_key(current)
+
+    def _installed_version(self, name: str, cwd: Path | None) -> Optional[str]:
+        """Resolve the installed version from state, falling back to disk."""
+        for row in db.get_installed_blueprints(cwd=cwd):
+            if row["name"] == name:
+                return str(row["version"])
+        base = cwd if cwd is not None else Path.cwd()
+        return self._read_version(base / "blueprints" / name)
+
+    @staticmethod
+    def _read_version(blueprint_dir: Path) -> Optional[str]:
+        """Return the ``version`` from a blueprint dir's ``blueprint.json``."""
+        meta = blueprint_dir / "blueprint.json"
+        if not meta.is_file():
+            return None
+        try:
+            data = json.loads(meta.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        version = data.get("version")
+        return str(version) if version is not None else None
+
+    @staticmethod
+    def _backup_dir(base: Path) -> Path:
+        """Return the project's blueprint backup directory."""
+        return base / ".pipelinekit" / "backups"
 
     # -- internals (mock seams) ---------------------------------------------
 

@@ -7,6 +7,8 @@ blueprint itself — execution delegates to the runtime (SPEC-006).
 
 from __future__ import annotations
 
+import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import typer
@@ -207,6 +209,158 @@ def install_command(
         )
     console.print(f"Run 'pipelinekit blueprint info {name}' for details.", style="dim")
     raise typer.Exit(0)
+
+
+@blueprint_app.command("outdated")
+def outdated_command(
+    as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
+) -> None:
+    """Show installed blueprint versions against the registry."""
+    registry = RemoteRegistry()
+    try:
+        statuses = registry.version_status()
+    except RegistryError as exc:
+        console.print(f"✗ [{exc.code}] {exc.message}", style="bold red")
+        raise typer.Exit(1) from exc
+
+    if as_json:
+        payload = {
+            "checked_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "blueprints": statuses,
+        }
+        console.print_json(json.dumps(payload))
+        raise typer.Exit(0)
+
+    if not statuses:
+        console.print("No installed blueprints to check.")
+        console.print(
+            "  Install one with: pipelinekit blueprint install <name>", style="dim"
+        )
+        raise typer.Exit(0)
+
+    console.print("Blueprint Version Status")
+    console.print("─" * 56)
+    table = Table()
+    table.add_column("Blueprint", style="cyan", no_wrap=True)
+    table.add_column("Installed")
+    table.add_column("Registry")
+    table.add_column("Status")
+    outdated_count = 0
+    for status in statuses:
+        if status["outdated"]:
+            outdated_count += 1
+            label = "⚠ Update available"
+        elif status["registry_version"] is None:
+            label = "· Not in registry"
+        else:
+            label = "✓ Up to date"
+        table.add_row(
+            status["name"],
+            status["installed_version"],
+            status["registry_version"] or "—",
+            label,
+        )
+    console.print(table)
+
+    if outdated_count:
+        console.print(f"\n{outdated_count} blueprint(s) can be upgraded.")
+        console.print("Run: pipelinekit blueprint upgrade <name>", style="dim")
+    else:
+        console.print("\nAll blueprints are up to date.", style="green")
+    raise typer.Exit(0)
+
+
+@blueprint_app.command("upgrade")
+def upgrade_command(
+    name: str = typer.Argument(..., help="Blueprint to upgrade."),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show the upgrade without writing."
+    ),
+    yes: bool = typer.Option(False, "--yes", help="Skip the confirmation prompt."),
+) -> None:
+    """Upgrade a blueprint to the latest registry version (with backup)."""
+    registry = RemoteRegistry()
+
+    try:
+        entry = registry.fetch_catalog().get(name)
+    except RegistryError as exc:
+        console.print(f"✗ [{exc.code}] {exc.message}", style="bold red")
+        raise typer.Exit(1) from exc
+    if entry is None:
+        console.print(
+            f"✗ [PK-REGISTRY-004] Blueprint not found in catalog: {name}",
+            style="bold red",
+        )
+        raise typer.Exit(1)
+
+    current = next(
+        (s["installed_version"] for s in _safe_status(registry) if s["name"] == name),
+        None,
+    )
+    arrow = f"{current} → {entry.version}" if current else f"→ {entry.version}"
+
+    # Validate the upgrade is available (raises PK-REGISTRY-004 / 006).
+    try:
+        registry.upgrade(name, dry_run=True)
+    except RegistryError as exc:
+        console.print(f"✗ [{exc.code}] {exc.message}", style="bold red")
+        raise typer.Exit(1) from exc
+
+    if dry_run:
+        console.print(f"Would upgrade {name} {arrow}")
+        console.print("No files written.", style="dim")
+        raise typer.Exit(0)
+
+    console.print(f"Upgrading {name} {arrow}...")
+    changelog = entry.changelog.get(entry.version) if entry.changelog else None
+    if changelog:
+        console.print(f"\nChanges in {entry.version}:")
+        for line in changelog:
+            console.print(f"  • {line}", style="dim")
+
+    if not yes and not typer.confirm(
+        f"\nUpgrade {name} to v{entry.version}?", default=False
+    ):
+        console.print("Upgrade cancelled. No files written.", style="dim")
+        raise typer.Exit(0)
+
+    try:
+        new_version = registry.upgrade(name, yes=yes)
+    except RegistryError as exc:
+        console.print(f"✗ [{exc.code}] {exc.message}", style="bold red")
+        raise typer.Exit(1) from exc
+
+    console.print(f"\n✓ {name} upgraded to v{new_version}.", style="green")
+    console.print(f"Rollback: pipelinekit blueprint rollback {name}", style="dim")
+    raise typer.Exit(0)
+
+
+@blueprint_app.command("rollback")
+def rollback_command(
+    name: str = typer.Argument(..., help="Blueprint to roll back."),
+    version: str = typer.Option(
+        None, "--version", "-v", help="A specific backed-up version to restore."
+    ),
+) -> None:
+    """Restore a blueprint from a local backup created during upgrade."""
+    registry = RemoteRegistry()
+    suffix = f" to {version}" if version else ""
+    console.print(f"Rolling back {name}{suffix}...")
+    try:
+        restored = registry.rollback(name, version)
+    except RegistryError as exc:
+        console.print(f"✗ [{exc.code}] {exc.message}", style="bold red")
+        raise typer.Exit(1) from exc
+    console.print(f"✓ {name} rolled back to v{restored}.", style="green")
+    raise typer.Exit(0)
+
+
+def _safe_status(registry: RemoteRegistry) -> list[dict]:
+    """Return version status, or an empty list if the registry is unreachable."""
+    try:
+        return registry.version_status()
+    except RegistryError:
+        return []
 
 
 def _count_contracts(blueprint_dir: Path) -> int:

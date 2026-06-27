@@ -165,6 +165,8 @@ a missing tool resolves to an `info` result rather than raising.
 | PK-REGISTRY-003 | Blueprint already installed — use --force to overwrite |
 | PK-REGISTRY-004 | Blueprint not found in catalog |
 | PK-REGISTRY-005 | Version not found in catalog |
+| PK-REGISTRY-006 | Blueprint already at latest version (upgrade) |
+| PK-REGISTRY-007 | No backup found for rollback |
 
 `RegistryError` carries the `PK-REGISTRY-*` codes. Every installed blueprint is
 schema-validated and asset-checked before any write (ADR-019); offline, a cached

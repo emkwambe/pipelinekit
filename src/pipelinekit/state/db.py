@@ -121,6 +121,16 @@ CREATE TABLE IF NOT EXISTS installed_blueprints (
     installed_at    TEXT NOT NULL,
     registry_url    TEXT
 );
+
+CREATE TABLE IF NOT EXISTS blueprint_versions (
+    id           TEXT PRIMARY KEY,
+    name         TEXT NOT NULL,
+    from_version TEXT,
+    to_version   TEXT NOT NULL,
+    action       TEXT NOT NULL,
+    backup_path  TEXT,
+    applied_at   TEXT NOT NULL
+);
 """
 
 
@@ -590,6 +600,83 @@ def insert_installed_blueprint(
         raise StateError(
             "PK-STATE-002",
             f"Cannot record installed blueprint {name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def get_installed_blueprints(cwd: Path | None = None) -> list[dict]:
+    """Return every recorded installed blueprint, sorted by name (SPEC-018).
+
+    Returns an empty list on a fresh database; never raises on emptiness.
+
+    Raises:
+        StateError: ``PK-STATE-001`` if the database is unavailable.
+    """
+    initialize(cwd)
+    db_path = get_db_path(cwd)
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT name, version, source, destination, verified,
+                       installed_at, registry_url
+                FROM installed_blueprints
+                ORDER BY name
+                """
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            "Cannot read installed blueprints from state database",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return [dict(row) for row in rows]
+
+
+def insert_blueprint_version(
+    name: str,
+    from_version: str | None,
+    to_version: str,
+    action: str,
+    backup_path: str | None = None,
+    cwd: Path | None = None,
+) -> None:
+    """Record one blueprint version transition (SPEC-018).
+
+    ``action`` is ``install`` | ``upgrade`` | ``rollback``. This is an audit log
+    of version changes; it never moves files itself.
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the record cannot be written.
+    """
+    initialize(cwd)
+    db_path = get_db_path(cwd)
+    record_id = f"bv-{uuid.uuid4().hex[:8]}"
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO blueprint_versions (
+                    id, name, from_version, to_version, action,
+                    backup_path, applied_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record_id,
+                    name,
+                    from_version,
+                    to_version,
+                    action,
+                    backup_path,
+                    _utc_now(),
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot record version change for blueprint {name}",
             {"path": str(db_path), "detail": str(exc)},
         ) from exc
 

@@ -5,6 +5,7 @@ name: Render Diagrams
 # re-trigger this workflow: the path filter only matches *.mmd, and pushes made
 # with GITHUB_TOKEN do not start new workflow runs.
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:

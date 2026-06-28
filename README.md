@@ -6,15 +6,21 @@ The AI-native operating system for trusted analytics pipelines.
 
 PipelineKit is a CLI-first coordination layer that sits above your existing analytics stack — dbt, Snowflake, Airbyte, Soda, and more. Instead of replacing those tools, it orchestrates them behind a single deterministic command surface: it designs pipelines from blueprints, validates configuration and data contracts before anything runs, enforces quality on every execution, and adds an AI layer that diagnoses failures and proposes new pipelines without ever touching production on its own. The goal is to shrink Time-to-Trusted-Data — the gap between "we need this pipeline" and "we trust these numbers."
 
-## Quickstart (5 commands)
+## Quickstart
+
+**Requirements:** Python 3.11+, Docker (for Blueprint #001), dbt-core
 
 ```bash
-pip install pipelinekit
+git clone https://github.com/emkwambe/pipelinekit.git
+cd pipelinekit
+pip install -e .
 pipelinekit health --strict
 pipelinekit blueprint install postgres-to-snowflake
 pipelinekit validate
 pipelinekit run
 ```
+
+PyPI package coming soon. Star the repo to be notified.
 
 `health --strict` confirms your environment and credentials are ready. `blueprint install` pulls a complete, verified pipeline package. `validate` checks configuration and data contracts before execution, and `run` moves data through ingestion → transformation → quality as deterministic steps.
 

@@ -29,6 +29,7 @@ from pipelinekit.cli.generate import apply_app, generate_app  # noqa: E402
 from pipelinekit.cli.health import health_app  # noqa: E402
 from pipelinekit.cli.init import init_command  # noqa: E402
 from pipelinekit.cli.migrate import migrate_app  # noqa: E402
+from pipelinekit.cli.quality import quality_app  # noqa: E402
 from pipelinekit.cli.run import run_command  # noqa: E402
 from pipelinekit.cli.status import status_command  # noqa: E402
 from pipelinekit.cli.validate import validate_command  # noqa: E402
@@ -74,3 +75,4 @@ app.add_typer(generate_app, name="generate")
 app.add_typer(apply_app, name="apply")
 app.add_typer(migrate_app, name="migrate")
 app.add_typer(contract_app, name="contract")
+app.add_typer(quality_app, name="quality")

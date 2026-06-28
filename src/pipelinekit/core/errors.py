@@ -78,3 +78,8 @@ class MigrationError(PipelineKitError):
     """Raised when migration analysis fails — config not found, format not
     recognised, blocking gaps on apply, AI analysis failure, or an unparseable
     Python file (ADR-020, SPEC-017). Carries ``PK-MIGRATE-*`` codes."""
+
+
+class QualityError(PipelineKitError):
+    """Raised when quality coverage scanning fails — no blueprints to scan or an
+    unparseable schema file (ADR-023, SPEC-022). Carries ``PK-QM-*`` codes."""

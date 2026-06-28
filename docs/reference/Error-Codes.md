@@ -75,6 +75,16 @@ DC-8 versioning codes are carried by `ContractError` (PK-DC-008/009) and
 `StateError` (PK-DC-010). DC-9 (SPEC-021) surfaces `PK-DC-011` in the
 `contract snapshot` warning block when a MAJOR bump is blocked without `--force`.
 
+### QM — Quality Management (QM-4, SPEC-022)
+
+| Code | Meaning |
+|---|---|
+| PK-QM-001 | No blueprints found for coverage scan — no installed blueprints were found in the blueprints directory. Fix: run `pipelinekit blueprint install <name>` first. |
+| PK-QM-002 | Schema file parse error — a `schema.yml` file could not be parsed as valid YAML. Fix: check the file for YAML syntax errors. |
+
+QM-4 quality-coverage codes are carried by `QualityError` (read-only scanning;
+no `state.db` writes).
+
 ---
 
 ## Phase 3 Registry — Trust Layer

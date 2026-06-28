@@ -1,1 +1,0 @@
-# .claude / templates / README.md

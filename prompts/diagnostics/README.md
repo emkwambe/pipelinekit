@@ -1,1 +1,0 @@
-# prompts / diagnostics / README.md

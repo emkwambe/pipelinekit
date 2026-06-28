@@ -57,3 +57,10 @@ docs/reference/SYNTHETIC-DATA-REQUIREMENTS*.md
 airbyte-connection.json
 inspect-pipelinekit.ps1
 logs/
+
+# Internal AI framework — lives in pipelinekit-internal
+.claude/
+.mcp/
+agents/
+prompts/
+skills/

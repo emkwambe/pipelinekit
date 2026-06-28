@@ -95,10 +95,12 @@
     .cursor{display:inline-block;width:9px;height:1.05em;background:var(--primary);
       vertical-align:text-bottom;animation:blink 1s step-end infinite}
     @keyframes blink{50%{opacity:0}}
-    .hero-grid{display:grid;grid-template-columns:1fr 1.4fr;gap:2rem;
-      max-width:1300px;margin:3rem auto 0;align-items:center}
+    .hero-grid-outer{max-width:1400px;margin:3rem auto 0;padding:0 1rem}
+    .hero-grid{display:grid;grid-template-columns:1fr 1.8fr;gap:2rem;align-items:center}
     .hero-grid .terminal{margin:0}
-    .hero-diagram-wrap{transform:scale(0.85);transform-origin:top left;width:118%}
+    .hero-diagram-frame{position:relative;overflow:hidden;border-radius:8px;height:420px}
+    .hero-diagram-frame iframe{position:absolute;top:0;left:0;width:160%;height:160%;
+      border:none;transform:scale(0.625);transform-origin:top left}
 
     /* Trust bar */
     .trustbar{border-top:1px solid var(--border);border-bottom:1px solid var(--border);
@@ -200,6 +202,7 @@
     @media (max-width:860px){
       .nav-links{display:none}
       .hero-grid{grid-template-columns:1fr}
+      .hero-diagram-frame{height:300px}
       .flow{grid-template-columns:1fr}
       .icp{grid-template-columns:1fr}
       .compare > div{padding:13px 14px;font-size:.88rem}
@@ -242,23 +245,24 @@
         <a class="btn btn-outline" href="https://registry.pipelinekit.dev">Browse Blueprints →</a>
       </div>
 
-      <div class="hero-grid">
-        <!-- Left: CLI animation -->
-        <div class="terminal" aria-hidden="true">
-          <div class="terminal-bar">
-            <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
-            <span class="title">pipelinekit — generate blueprint</span>
+      <div class="hero-grid-outer">
+        <div class="hero-grid">
+          <!-- Left: CLI animation -->
+          <div class="terminal" aria-hidden="true">
+            <div class="terminal-bar">
+              <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+              <span class="title">pipelinekit — generate blueprint</span>
+            </div>
+            <div class="terminal-body"><code id="term"></code><span class="cursor"></span></div>
           </div>
-          <div class="terminal-body"><code id="term"></code><span class="cursor"></span></div>
-        </div>
 
-        <!-- Right: approved coordination layer diagram (bundled HTML, rendered in iframe) -->
-        <div class="hero-diagram-wrap">
-          <iframe src="https://pipelinekit.dev/assets/pipelinekit_coordination_layer.html"
-                  style="width:100%; height:500px; border:none; border-radius:8px; overflow:hidden;"
-                  scrolling="no"
-                  loading="lazy"
-                  title="PipelineKit coordination layer"></iframe>
+          <!-- Right: approved coordination layer diagram — render full internal width, scale to fit -->
+          <div class="hero-diagram-frame">
+            <iframe src="https://pipelinekit.dev/assets/pipelinekit_coordination_layer.html"
+                    scrolling="no"
+                    loading="lazy"
+                    title="PipelineKit coordination layer"></iframe>
+          </div>
         </div>
       </div>
     </div>

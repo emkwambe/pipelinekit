@@ -4,6 +4,15 @@ All notable changes to PipelineKit are documented in this file.
 
 ## [Unreleased]
 
+### Added — Phase 2 Sprint 3 (QM-4 Coverage Monitoring)
+- `pipelinekit quality coverage` — dbt test and Soda check coverage per blueprint
+- `pipelinekit quality coverage --blueprint <name>` — filter by blueprint
+- `pipelinekit quality coverage --format json` — machine-readable output
+- Coverage metrics: column coverage %, untested columns, Soda check inventory
+- New error codes: PK-QM-001, PK-QM-002
+- New quality module: src/pipelinekit/quality/
+
+
 ### Added — Phase 2 Sprint 1 (DC-8 Schema Versioning)
 - `pipelinekit contract version` — show current semantic version of all installed contracts
 - `pipelinekit contract version --history` — full version history per contract  

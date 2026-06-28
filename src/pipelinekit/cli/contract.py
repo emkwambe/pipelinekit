@@ -1,13 +1,15 @@
-"""``pipelinekit contract`` — schema versioning for data contracts (DC-8).
+"""``pipelinekit contract`` — schema versioning for data contracts (DC-8/DC-9).
 
 Orchestration only: discovers contract YAML files in installed blueprints,
-delegates versioning to ``contracts.versioning``, and renders results with Rich.
-The CLI never computes versions or touches ``state.db`` directly beyond resolving
-the database path (SPEC-020, ADR-003 CLI-first).
+delegates versioning and breaking-change detection to ``contracts.versioning``,
+and renders results with Rich. The CLI never computes versions or touches
+``state.db`` directly beyond resolving the database path (SPEC-020, SPEC-021,
+ADR-003 CLI-first).
 """
 
 from __future__ import annotations
 
+import json
 from typing import Optional, Tuple
 
 import typer
@@ -17,6 +19,8 @@ from rich.table import Table
 
 from pipelinekit.blueprints.registry import BlueprintRegistry
 from pipelinekit.contracts.versioning import (
+    BreakingChange,
+    detect_breaking_changes,
     diff_contract_versions,
     get_contract_history,
     get_contract_version,
@@ -185,35 +189,154 @@ def _render_diff(blueprint: str, version_a: str, version_b: str, db_path: str) -
         raise typer.Exit(1)
 
 
+def _label(before: Optional[str], after: str) -> str:
+    """Describe a version transition for snapshot output."""
+    if before is None:
+        return "new"
+    if before == after:
+        return "unchanged"
+    return f"{before} → {after}"
+
+
+def _detect(name: str, contract_file: str, content: dict, db_path: str):
+    """Return a BreakingChange for this contract, or None (DC-9)."""
+    latest = db.get_latest_contract_version(name, contract_file, db_path)
+    if latest is None:
+        return None
+    old_content = json.loads(latest["contract_content"])
+    blueprint_dir = str(BlueprintRegistry().blueprints_dir / name)
+    return detect_breaking_changes(
+        name, contract_file, old_content, content, blueprint_dir, db_path
+    )
+
+
+def _render_breaking(bc: BreakingChange) -> None:
+    """Render the DC-9 breaking-change warning block (SPEC-021)."""
+    console.print(
+        "\n⚠ [PK-DC-011] Breaking change detected — snapshot blocked",
+        style="bold yellow",
+    )
+    console.print("─" * 45, style="yellow")
+    console.print(f"  Contract:    {bc.blueprint_name} / {bc.contract_file}")
+    console.print(
+        f"  Change:      v{bc.current_version} → v{bc.proposed_version} (MAJOR)"
+    )
+    console.print(f"\n  Removed columns ({len(bc.removed_columns)}):")
+    for col in bc.removed_columns:
+        console.print(f"    • {col}")
+    if bc.dbt_impact:
+        console.print(f"\n  dbt model impact ({len(bc.dbt_impact)} references found):")
+        for impact in bc.dbt_impact:
+            console.print(
+                f"    • {impact.model_file}  "
+                f"(line {impact.line_number}: {impact.column_name})"
+            )
+    else:
+        console.print("\n  dbt model impact: none found.")
+    console.print(
+        "\n  Re-run with --force to accept this breaking change and proceed.",
+        style="dim",
+    )
+    console.print(
+        f"  Existing version v{bc.current_version} is preserved until you confirm.",
+        style="dim",
+    )
+
+
 @contract_app.command("snapshot")
-def snapshot_command() -> None:
-    """Snapshot every contract in installed blueprints, versioning each."""
+def snapshot_command(
+    force: bool = typer.Option(
+        False, "--force", help="Accept breaking changes and proceed."
+    ),
+) -> None:
+    """Snapshot every contract, blocking on breaking changes unless --force."""
     db_path = _db_path()
     contracts = _discover_contracts(None)
     if not contracts:
         console.print("No contracts found in installed blueprints")
         raise typer.Exit(0)
 
-    results = []
-    for name, contract_file, content in contracts:
-        latest = get_contract_version(name, contract_file, db_path)
-        before = latest.version if latest is not None else None
-        version = snapshot_contract(name, contract_file, content, db_path)
-        is_new = before is None
-        unchanged = before is not None and before == version.version
-        if is_new:
-            label = "new"
-        elif unchanged:
-            label = "unchanged"
-        else:
-            label = f"{before} → {version.version}"
-        results.append((contract_file, version.version, label))
+    written: list[tuple[str, str, str]] = []
+    forced: list[tuple[str, str]] = []
+    blocked: list[BreakingChange] = []
 
-    console.print(f"✓ Snapshotted {len(results)} contract(s)", style="green")
-    width = max(len(f) for f, _v, _l in results)
-    for contract_file, version_str, label in results:
+    for name, contract_file, content in contracts:
+        breaking = _detect(name, contract_file, content, db_path)
+        if breaking is not None and not force:
+            blocked.append(breaking)
+            continue
+
+        before = get_contract_version(name, contract_file, db_path)
+        before_version = before.version if before is not None else None
+        version = snapshot_contract(name, contract_file, content, db_path)
+        if breaking is not None and force:
+            forced.append((contract_file, version.version))
+        written.append(
+            (contract_file, version.version, _label(before_version, version.version))
+        )
+
+    if written:
+        console.print(f"✓ Snapshotted {len(written)} contract(s)", style="green")
+        width = max(len(f) for f, _v, _l in written)
+        for contract_file, version_str, label in written:
+            console.print(
+                f"  {contract_file.ljust(width)}  → v{version_str} ({label})",
+                style="dim",
+            )
+
+    for contract_file, version_str in forced:
         console.print(
-            f"  {contract_file.ljust(width)}  → v{version_str} ({label})",
+            f"⚠ Breaking change accepted (--force). Wrote v{version_str}.",
+            style="yellow",
+        )
+
+    for breaking in blocked:
+        _render_breaking(breaking)
+
+    raise typer.Exit(1 if blocked else 0)
+
+
+@contract_app.command("check-breaking")
+def check_breaking_command() -> None:
+    """Check all contracts for breaking changes without snapshotting (DC-9)."""
+    db_path = _db_path()
+    console.print("Breaking Change Check")
+    console.print("─" * 21)
+    console.print("Comparing current contracts against latest snapshots...\n")
+
+    contracts = _discover_contracts(None)
+    if not contracts:
+        console.print("No contracts found in installed blueprints")
+        raise typer.Exit(0)
+
+    width = max(len(contract_file) for _n, contract_file, _c in contracts)
+    any_breaking = False
+    for name, contract_file, content in contracts:
+        latest = db.get_latest_contract_version(name, contract_file, db_path)
+        if latest is None:
+            console.print(
+                f"· {contract_file.ljust(width)} — no baseline (run snapshot first)",
+                style="dim",
+            )
+            continue
+        breaking = _detect(name, contract_file, content, db_path)
+        if breaking is None:
+            console.print(
+                f"✓ {contract_file.ljust(width)} — no breaking changes",
+                style="green",
+            )
+        else:
+            any_breaking = True
+            console.print(
+                f"⚠ {contract_file.ljust(width)} — BREAKING: "
+                f"{len(breaking.removed_columns)} column(s) removed",
+                style="yellow",
+            )
+
+    if any_breaking:
+        console.print(
+            "\nRun 'pipelinekit contract snapshot' to see full impact details.",
             style="dim",
         )
+        raise typer.Exit(1)
     raise typer.Exit(0)

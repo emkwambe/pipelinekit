@@ -72,6 +72,29 @@ class ContractDiff:
     change_type: str = "none"  # "patch" | "minor" | "major" | "none"
 
 
+@dataclass
+class DbtImpact:
+    """One reference to a contract column inside a dbt model (DC-9)."""
+
+    model_file: str  # relative to the blueprint dir, e.g. transform/models/...
+    column_name: str  # which column is referenced
+    line_number: int  # 1-indexed line where the reference appears
+
+
+@dataclass
+class BreakingChange:
+    """A breaking (MAJOR) contract change with its downstream dbt impact (DC-9)."""
+
+    contract_file: str
+    blueprint_name: str
+    current_version: str
+    proposed_version: str
+    removed_columns: list[str]
+    renamed_columns: list[tuple[str, str]]  # (old_name, new_name)
+    dbt_impact: list[DbtImpact]
+    change_summary: str
+
+
 def _utc_now() -> str:
     """Return the current time as an ISO 8601 UTC string."""
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -330,4 +353,102 @@ def _row_to_version(row: dict) -> ContractVersion:
         contract_content=json.loads(row["contract_content"]),
         created_at=row["created_at"],
         created_by=row["created_by"],
+    )
+
+
+# -- DC-9: breaking change detection (SPEC-021) ------------------------------
+
+
+def scan_dbt_impact(
+    blueprint_dir: str | Path, column_names: list[str]
+) -> list[DbtImpact]:
+    """Scan a blueprint's dbt models for references to the given columns (DC-9).
+
+    Walks every ``*.sql`` under ``{blueprint_dir}/transform/models/`` and records
+    each line where a column name appears as a standalone identifier (word
+    boundary). ``model_file`` is the path relative to ``blueprint_dir`` and
+    ``line_number`` is 1-indexed.
+
+    Returns an empty list — never an error — when ``column_names`` is empty or
+    the ``transform/models/`` directory does not exist.
+    """
+    if not column_names:
+        return []
+
+    root = Path(blueprint_dir)
+    models_dir = root / "transform" / "models"
+    if not models_dir.is_dir():
+        return []
+
+    impacts: list[DbtImpact] = []
+    for sql_path in sorted(models_dir.rglob("*.sql")):
+        try:
+            lines = sql_path.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            continue
+        relative = sql_path.relative_to(root).as_posix()
+        for line_number, line in enumerate(lines, start=1):
+            for col in column_names:
+                if re.search(r"\b" + re.escape(col) + r"\b", line):
+                    impacts.append(
+                        DbtImpact(
+                            model_file=relative,
+                            column_name=col,
+                            line_number=line_number,
+                        )
+                    )
+    return impacts
+
+
+def detect_breaking_changes(
+    blueprint_name: str,
+    contract_file: str,
+    old_content: dict,
+    new_content: dict,
+    blueprint_dir: str | Path,
+    db_path: str | Path,
+) -> BreakingChange | None:
+    """Detect a breaking (MAJOR) contract change and its dbt impact (DC-9).
+
+    Uses the deterministic DC-8 ``compute_next_version`` to decide whether the
+    diff is MAJOR. If it is not MAJOR, returns None. If it is, identifies the
+    removed columns (present in ``old_content`` but absent in ``new_content``)
+    and scans the blueprint's dbt models for downstream references.
+
+    Renames surface as a removed column (the old name disappears), so they are
+    caught as breaking via ``removed_columns``; ``renamed_columns`` is left empty
+    because a reliable rename heuristic is out of scope for DC-9 (SPEC-021).
+    """
+    latest = db.get_latest_contract_version(blueprint_name, contract_file, db_path)
+    current = latest["version"] if latest is not None else None
+
+    proposed_version, change_type = compute_next_version(
+        current, old_content, new_content
+    )
+    if change_type != "major":
+        return None
+
+    _old_required, old_all = _columns(old_content)
+    _new_required, new_all = _columns(new_content)
+    removed_columns = sorted(old_all - new_all)
+
+    dbt_impact = scan_dbt_impact(blueprint_dir, removed_columns)
+
+    references = (
+        f"{len(dbt_impact)} dbt reference(s)" if dbt_impact else "no dbt references"
+    )
+    change_summary = (
+        f"{len(removed_columns)} column(s) removed — {references}; "
+        f"v{current or '0.0.0'} → v{proposed_version} (MAJOR)"
+    )
+
+    return BreakingChange(
+        contract_file=contract_file,
+        blueprint_name=blueprint_name,
+        current_version=current or "0.0.0",
+        proposed_version=proposed_version,
+        removed_columns=removed_columns,
+        renamed_columns=[],
+        dbt_impact=dbt_impact,
+        change_summary=change_summary,
     )

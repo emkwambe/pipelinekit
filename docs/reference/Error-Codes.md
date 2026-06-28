@@ -69,9 +69,11 @@ CONFIG · CONTRACT · RUNTIME · ADAPTER · AI · STATE · BLUEPRINT · NOTIFY
 | PK-DC-008 | Contract version not found — `--diff` references a version that does not exist. Fix: run `pipelinekit contract version --history` to see available versions. |
 | PK-DC-009 | Version format invalid — version string does not match MAJOR.MINOR.PATCH. Fix: use semantic version format, e.g. `v1.0.0` or `1.0.0`. |
 | PK-DC-010 | State database error during snapshot — `state.db` write failed during contract snapshot. Fix: check disk space and `state.db` file permissions. |
+| PK-DC-011 | Breaking change blocked — contract snapshot would produce a MAJOR version bump. The snapshot was blocked to prevent unacknowledged breaking changes. Fix: review the breaking changes listed above, then re-run with `--force`. |
 
 DC-8 versioning codes are carried by `ContractError` (PK-DC-008/009) and
-`StateError` (PK-DC-010).
+`StateError` (PK-DC-010). DC-9 (SPEC-021) surfaces `PK-DC-011` in the
+`contract snapshot` warning block when a MAJOR bump is blocked without `--force`.
 
 ---
 

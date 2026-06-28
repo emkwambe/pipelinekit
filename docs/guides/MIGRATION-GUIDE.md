@@ -1,129 +1,410 @@
-# Migrating to PipelineKit
+# PipelineKit Migration Guide
 
-PipelineKit reads an existing pipeline definition and proposes a PipelineKit equivalent. It reads and proposes — it never executes your existing pipeline, connects to a source, or writes a file without your approval.
+**Migrating from Airbyte, Fivetran, or custom Python pipelines**
 
-This guide covers the migration path for Airbyte, Fivetran, and custom Python pipelines.
-
----
-
-## Why Migrate?
-
-- **Licensing.** PipelineKit is Apache 2.0. If your current tooling is under ELv2 or GPL, PipelineKit gives you an open, permissively licensed alternative you can build on freely.
-- **AI-native operations.** Once on PipelineKit you get AI diagnostics (`diagnose`), architecture reasoning (`architect`), and blueprint proposal (`generate`) — capabilities that observe and recommend, never auto-apply.
-- **Blueprint-driven standardization.** Migrating onto a verified blueprint replaces a bespoke pipeline with a contract-enforced, quality-checked, documented one.
+**Version:** 0.1.0  
+**Last updated:** June 28, 2026
 
 ---
 
-## Supported Source Tools
+## Overview
 
-| Tool | Config file | What PipelineKit reads |
+PipelineKit's migration intelligence reads your existing pipeline configuration and produces a draft `pipelinekit.yaml` — ready to validate, fill in, and run.
+
+**Supported sources:**
+
+| Tool | Config file | Confidence |
 |---|---|---|
-| Airbyte | `connection.json` (config-API or public-API export) | source/destination type, streams, sync mode |
-| Fivetran | `connector.json` | connector type, schema, enabled tables, sync frequency |
-| Custom Python | `.py` file | connection strings, destination hint, table names (via AST inspection) |
-| Existing `pipelinekit.yaml` | native | upgrade-path analysis |
+| Airbyte | `airbyte-connection.json` | High (complete config) |
+| Airbyte | `airbyte-connection.json` | Low (sparse config) |
+| Fivetran | `fivetran-connector.json` | High (complete config) |
+| Custom Python | `pipeline.py` (dlt/SQLAlchemy/psycopg2) | Medium |
 
-Parsing is deterministic. The Python parser uses `ast.parse()` only — it **never executes** the file it reads.
+**What migration does:**
+- Maps your source/destination to PipelineKit equivalents
+- Identifies gaps (missing credentials, unsupported features)
+- Generates a `pipelinekit.proposed.yaml` with FIXME markers
+- Never overwrites your existing `pipelinekit.yaml`
+
+**What migration does NOT do:**
+- Execute anything
+- Connect to your source or destination
+- Move any data
 
 ---
 
-## The Migration Flow
-
-### Step 1 — Export your existing config
-
-Export your Airbyte connection (`connection.json`), Fivetran connector (`connector.json`), or locate your custom Python pipeline file.
-
-### Step 2 — Analyze
+## Quick Start
 
 ```bash
-pipelinekit migrate analyze airbyte-connection.json
-pipelinekit migrate analyze connector.json --provider mistral
-pipelinekit migrate analyze my_pipeline.py
+# Analyze your Airbyte config
+poetry run pipelinekit migrate analyze airbyte-connection.json
+
+# Write draft config even if gaps exist
+poetry run pipelinekit migrate analyze airbyte-connection.json --write-draft
+
+# Apply if no blocking gaps
+poetry run pipelinekit migrate analyze airbyte-connection.json --apply
 ```
 
-This parses the config deterministically, then asks the configured AI provider to map it onto PipelineKit and identify gaps. No files are written.
+---
 
-If you do not have a `pipelinekit.yaml` in the directory yet, pass `--provider` so PipelineKit knows which AI provider to use (the API key is read from that provider's environment variable).
+## Step-by-Step: Airbyte → PipelineKit
 
-### Step 3 — Review the proposal
+### Step 1 — Export your Airbyte connection config
 
-The analysis prints:
+In Airbyte UI:
+1. Go to **Connections** → select your connection
+2. Click **Settings** → **Export connection**
+3. Save as `airbyte-connection.json`
 
-- **Confidence** — `0.00`–`1.00` for the overall migration.
-- **Mappings** — each source field classified as **clean** (maps directly), **partial** (maps with adjustment), **manual** (needs significant human work), or **unsupported** (no equivalent).
-- **Gaps** — explicit items you must resolve, each **blocking** or non-blocking.
-- **Blueprint recommendation** — the installed blueprint that best fits, if any.
-
-### Step 4 — Write the draft
-
+Or from Airbyte API:
 ```bash
-pipelinekit migrate analyze airbyte-connection.json --apply
+curl -X GET "https://your-airbyte-instance/api/v1/connections/{connectionId}" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  > airbyte-connection.json
 ```
 
-`--apply` writes the proposed config to **`pipelinekit.proposed.yaml`** — never to `pipelinekit.yaml`, so it can't overwrite a live config. If blocking gaps remain, the write is refused with `PK-MIGRATE-003`. To write the draft anyway (with FIXME markers in place of the missing values), add `--write-draft`:
-
-```bash
-pipelinekit migrate analyze airbyte-connection.json --apply --write-draft
+A typical Airbyte config looks like:
+```json
+{
+  "connectionId": "abc-123",
+  "name": "postgres-to-snowflake",
+  "sourceId": "src-456",
+  "destinationId": "dest-789",
+  "syncCatalog": {
+    "streams": [
+      {
+        "stream": { "name": "orders", "namespace": "public" },
+        "config": { "syncMode": "incremental", "cursorField": ["updated_at"] }
+      }
+    ]
+  },
+  "scheduleData": { "cron": { "cronExpression": "0 * * * *" } }
+}
 ```
 
-### Step 5 — Fill in FIXME markers
-
-Open `pipelinekit.proposed.yaml` and resolve every gap — credentials, table lists, schedules, and anything the proposal could not infer. Credentials use `${VAR}` interpolation; set the environment variables, do not hardcode secrets.
-
-### Step 6 — Validate
+### Step 2 — Run migration analysis
 
 ```bash
-# rename the draft once you have filled it in
+poetry run pipelinekit migrate analyze airbyte-connection.json
+```
+
+**Example output:**
+```
+Migration Analysis: airbyte-connection.json
+────────────────────────────────────────────
+Source tool:    Airbyte
+Source type:    postgres
+Destination:    snowflake
+Confidence:     0.82
+
+Mappings:
+  ✓ source.type          postgres → ingestion.source.type: postgres
+  ✓ destination.type     snowflake → ingestion.destination.type: snowflake
+  ✓ streams[0].name      orders → ingestion.tables: [orders]
+  ⚠ streams[0].syncMode  incremental → write_disposition: append (cursor required)
+  ✗ scheduleData.cron    Not mapped — PipelineKit uses external orchestration
+
+Gaps (2 found):
+  [BLOCKING] Source credentials not present in config
+  [BLOCKING] Destination credentials not present in config
+
+Run with --write-draft to generate pipelinekit.proposed.yaml
+```
+
+### Step 3 — Generate the draft config
+
+```bash
+poetry run pipelinekit migrate analyze airbyte-connection.json --write-draft
+```
+
+This creates `pipelinekit.proposed.yaml`:
+
+```yaml
+# PipelineKit Configuration — Generated by migration analysis
+# Source: airbyte-connection.json
+# Confidence: 0.82
+# Generated: 2026-06-28
+
+pipeline:
+  name: postgres-to-snowflake
+  version: 1.0.0
+
+runtime:
+  environment: production
+  log_level: INFO
+
+ingestion:
+  source:
+    type: postgres
+    host: "FIXME: set source host"
+    port: 5432
+    database: "FIXME: set source database"
+    username: "FIXME: set username"
+    password: "${POSTGRES_PASSWORD}"
+    schema: public
+  destination:
+    type: snowflake
+    account: "FIXME: set Snowflake account identifier"
+    database: "FIXME: set destination database"
+    schema: "FIXME: set destination schema"
+    warehouse: "FIXME: set warehouse"
+    username: "FIXME: set username"
+    password: "${SNOWFLAKE_PASSWORD}"
+  tables:
+    - orders
+  write_disposition: append
+  incremental:
+    cursor_field: updated_at   # mapped from Airbyte cursorField
+
+transformation:
+  enabled: true
+  dbt_project_dir: ./blueprints/postgres-to-snowflake/transform
+  target: production
+
+contracts:
+  enabled: true
+  contract_dir: ./blueprints/postgres-to-snowflake/contracts
+
+quality:
+  enabled: true
+  checks_file: ./blueprints/postgres-to-snowflake/quality/checks.yaml
+
+diagnostics:
+  enabled: true
+  provider: anthropic
+  api_key: "${ANTHROPIC_API_KEY}"
+
+notifications:
+  enabled: false
+  # Uncomment to enable:
+  # channels:
+  #   - type: slack
+  #     webhook_url: "${SLACK_WEBHOOK_URL}"
+```
+
+### Step 4 — Fill in the FIXME markers
+
+Open `pipelinekit.proposed.yaml` and replace every `FIXME:` value:
+
+```yaml
+# Before:
+host: "FIXME: set source host"
+
+# After:
+host: "db.mycompany.com"
+```
+
+Set environment variables for credentials:
+```bash
+# Windows PowerShell
+$env:POSTGRES_PASSWORD = "your-postgres-password"
+$env:SNOWFLAKE_PASSWORD = "your-snowflake-password"
+$env:ANTHROPIC_API_KEY = "sk-ant-api03-..."
+
+# macOS/Linux
+export POSTGRES_PASSWORD="your-postgres-password"
+export SNOWFLAKE_PASSWORD="your-snowflake-password"
+export ANTHROPIC_API_KEY="sk-ant-api03-..."
+```
+
+### Step 5 — Validate the proposed config
+
+```bash
+poetry run pipelinekit validate pipelinekit.proposed.yaml
+```
+
+Expected:
+```
+✓ pipelinekit.yaml is valid
+  Project: postgres-to-snowflake (v1.0.0)
+```
+
+If validation passes — rename to the active config:
+
+```bash
+# Windows
+Rename-Item pipelinekit.proposed.yaml pipelinekit.yaml
+
+# macOS/Linux
 mv pipelinekit.proposed.yaml pipelinekit.yaml
-pipelinekit validate
-pipelinekit validate --contracts
 ```
 
-### Step 7 — Run
+### Step 6 — Install the matching blueprint
 
 ```bash
-pipelinekit run --dry-run    # confirm adapters are reachable
-pipelinekit run
+poetry run pipelinekit blueprint install postgres-to-snowflake
+```
+
+### Step 7 — Run a dry run first
+
+```bash
+poetry run pipelinekit run --dry-run
+```
+
+This validates all adapters are reachable without moving any data.
+
+### Step 8 — Run the pipeline
+
+```bash
+poetry run pipelinekit run
 ```
 
 ---
 
-## Reading a Migration Proposal
+## Step-by-Step: Fivetran → PipelineKit
 
-**Mapping statuses**
+### Export your Fivetran connector config
 
-- **clean** — the source field maps directly to a PipelineKit field. No action needed.
-- **partial** — it maps, but with an adjustment you should review (e.g. an incremental sync mode mapped to an append write disposition).
-- **manual** — there is a PipelineKit concept, but translating it requires real work.
-- **unsupported** — no PipelineKit equivalent exists; this becomes a gap.
+From Fivetran API:
+```bash
+curl -X GET "https://api.fivetran.com/v1/connectors/{connector_id}" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  > fivetran-connector.json
+```
 
-**Blocking gaps** are gaps that prevent a working pipeline — typically missing credentials, an unmapped table set, or a schedule that PipelineKit does not own. `--apply` refuses to write while any blocking gap remains, unless you pass `--write-draft`.
+### Analyze and migrate
 
-**FIXME markers** appear in the draft wherever a value could not be inferred. Each marks a field you must fill in before `pipelinekit validate` will pass. Treat the draft as a starting point, not a finished config.
+```bash
+poetry run pipelinekit migrate analyze fivetran-connector.json --write-draft
+```
 
-**The `pipelinekit.proposed.yaml` format** is a standard `pipelinekit.yaml` — the same eight sections (see the [Configuration Reference](CONFIGURATION-REFERENCE.md)) — with `${VAR}` placeholders and FIXMEs for unresolved fields. `can_auto_apply` is always `false`.
+The process is identical to Airbyte. Fivetran configs map to the same PipelineKit structure — the parser handles the format difference automatically.
 
 ---
 
-## Common Migration Patterns
+## Step-by-Step: Custom Python → PipelineKit
 
-| From | To | Notes |
+PipelineKit reads Python pipeline files using AST parsing (never executes them).
+
+### Supported patterns
+
+**dlt pipeline:**
+```python
+# pipeline.py — PipelineKit can read this
+import dlt
+
+pipeline = dlt.pipeline(
+    pipeline_name="my_pipeline",
+    destination="snowflake",
+    dataset_name="analytics"
+)
+```
+
+**SQLAlchemy:**
+```python
+from sqlalchemy import create_engine
+engine = create_engine("postgresql://user:pass@host/db")
+```
+
+**psycopg2:**
+```python
+import psycopg2
+conn = psycopg2.connect("host=db.host.com dbname=mydb user=user")
+```
+
+### Run migration analysis
+
+```bash
+poetry run pipelinekit migrate analyze pipeline.py --write-draft
+```
+
+**Note:** Python pipeline confidence is typically lower (0.40-0.60) because the parser reads structure, not runtime behavior. More FIXME markers will appear. This is expected — fill them in manually.
+
+---
+
+## Understanding Confidence Scores
+
+| Score | Meaning | Expected FIXME count |
 |---|---|---|
-| Airbyte Postgres source | `postgres-to-snowflake` blueprint | Cleanest path; host/database/user map directly, credentials become `${VAR}` |
-| Fivetran Salesforce connector | `salesforce-to-snowflake` blueprint | Object/table list maps to the salesforce source; review the field selection |
-| Custom Python (dlt/SQLAlchemy) | any matching blueprint | Best-effort: connection scheme infers the source type, `destination=` infers the destination, list literals infer tables; confidence is intentionally low |
+| 0.80-1.00 | High — most fields mapped | 0-2 |
+| 0.60-0.79 | Medium — key fields mapped | 3-5 |
+| 0.40-0.59 | Low — structure detected | 6-10 |
+| 0.00-0.39 | Sparse — minimal mappings | 10+ |
 
-When a recommended blueprint is installed, the analysis names it so you can adopt its verified transform and contracts instead of starting from a blank config.
+Low confidence does not mean migration failed — it means the source config had less information. The draft is still valid as a starting point.
 
 ---
 
-## After Migration
+## Mapping Reference
+
+### Airbyte → PipelineKit
+
+| Airbyte field | PipelineKit field |
+|---|---|
+| `source.sourceType` | `ingestion.source.type` |
+| `destination.destinationType` | `ingestion.destination.type` |
+| `syncCatalog.streams[].stream.name` | `ingestion.tables[]` |
+| `syncCatalog.streams[].config.syncMode: incremental` | `ingestion.write_disposition: append` |
+| `syncCatalog.streams[].config.syncMode: full_refresh` | `ingestion.write_disposition: replace` |
+| `syncCatalog.streams[].config.cursorField` | `ingestion.incremental.cursor_field` |
+| `scheduleData.cron` | Not mapped — use external orchestrator |
+
+### Fivetran → PipelineKit
+
+| Fivetran field | PipelineKit field |
+|---|---|
+| `service` | `ingestion.source.type` |
+| `destination_schema` | `ingestion.destination.schema` |
+| `sync_frequency` | Not mapped — use external orchestrator |
+| `table_selection` | `ingestion.tables[]` |
+
+---
+
+## What Does Not Migrate
+
+Some Airbyte/Fivetran features have no direct PipelineKit equivalent:
+
+| Feature | Alternative |
+|---|---|
+| Airbyte platform UI | PipelineKit CLI |
+| Airbyte managed connectors | dlt source packages |
+| Fivetran automatic schema migration | dbt migrations |
+| Built-in scheduling | Airflow, Dagster, cron, GitHub Actions |
+| Airbyte normalization | dbt models (included in blueprints) |
+
+PipelineKit deliberately does not include scheduling — it integrates with your existing orchestrator rather than replacing it.
+
+---
+
+## Getting Help
+
+If migration analysis produces unexpected results:
 
 ```bash
-pipelinekit health          # deps, security, blueprints, specs, tests
-pipelinekit diagnose        # AI root-cause analysis once you have runs
+# Run with verbose output
+poetry run pipelinekit migrate analyze your-config.json --write-draft
+
+# Check what PipelineKit detected
+cat pipelinekit.proposed.yaml
+
+# Validate after filling FIXMEs
+poetry run pipelinekit validate pipelinekit.proposed.yaml
 ```
 
-- **Run `pipelinekit health`** to confirm the installation and project are sound.
-- **Set up alerting** by enabling the `notifications` section (Resend email; the API key comes from `RESEND_API_KEY`).
-- **Enable AI diagnostics** by setting `diagnostics.enabled: true` and a `diagnostics.provider` in `pipelinekit.yaml`.
+For complex migrations — apply as design partner for direct support:
+[pipelinekit.dev/contact](https://pipelinekit.dev/#contact)
+
+---
+
+## Common Migration Errors
+
+**`PK-MIGRATE-001` — Config format not recognized**
+- Cause: File is not a valid Airbyte/Fivetran JSON or Python file
+- Fix: Verify the file exports correctly from the source tool
+
+**`PK-MIGRATE-002` — Config file is not valid JSON**
+- Cause: File written with UTF-8 BOM on Windows
+- Fix: `[System.IO.File]::WriteAllText($path, $content, [System.Text.UTF8Encoding]::new($false))`
+
+**`PK-MIGRATE-003` — Blocking gaps exist**
+- Cause: Required fields (credentials) missing from source config
+- Fix: Use `--write-draft` to generate config with FIXME markers, then fill manually
+
+**Low confidence on Airbyte sparse config**
+- Cause: Config exported without credential fields (expected — Airbyte redacts secrets)
+- Fix: Fill credentials in `pipelinekit.proposed.yaml` using environment variables
+
+---
+
+*See also: [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | [CLI-REFERENCE.md](CLI-REFERENCE.md) | [pipelinekit.dev](https://pipelinekit.dev)*

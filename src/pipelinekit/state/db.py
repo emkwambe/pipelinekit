@@ -18,8 +18,12 @@ import sqlite3
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pipelinekit.core.errors import StateError
+
+if TYPE_CHECKING:
+    from pipelinekit.contracts.versioning import ContractVersion
 
 STATE_DIR = ".pipelinekit"
 STATE_DB = "state.db"
@@ -131,6 +135,23 @@ CREATE TABLE IF NOT EXISTS blueprint_versions (
     backup_path  TEXT,
     applied_at   TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS dc_contract_versions (
+    id TEXT PRIMARY KEY,
+    blueprint_name TEXT NOT NULL,
+    contract_file TEXT NOT NULL,
+    version TEXT NOT NULL,
+    version_major INTEGER NOT NULL,
+    version_minor INTEGER NOT NULL,
+    version_patch INTEGER NOT NULL,
+    content_hash TEXT NOT NULL,
+    contract_content TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    created_by TEXT NOT NULL DEFAULT 'pipelinekit'
+);
+
+CREATE INDEX IF NOT EXISTS idx_dc_contract_versions_blueprint
+    ON dc_contract_versions(blueprint_name, contract_file, created_at);
 """
 
 
@@ -679,6 +700,153 @@ def insert_blueprint_version(
             f"Cannot record version change for blueprint {name}",
             {"path": str(db_path), "detail": str(exc)},
         ) from exc
+
+
+_CONTRACT_VERSIONS_DDL = """
+CREATE TABLE IF NOT EXISTS dc_contract_versions (
+    id TEXT PRIMARY KEY,
+    blueprint_name TEXT NOT NULL,
+    contract_file TEXT NOT NULL,
+    version TEXT NOT NULL,
+    version_major INTEGER NOT NULL,
+    version_minor INTEGER NOT NULL,
+    version_patch INTEGER NOT NULL,
+    content_hash TEXT NOT NULL,
+    contract_content TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    created_by TEXT NOT NULL DEFAULT 'pipelinekit'
+);
+
+CREATE INDEX IF NOT EXISTS idx_dc_contract_versions_blueprint
+    ON dc_contract_versions(blueprint_name, contract_file, created_at);
+"""
+
+
+def _connect_versions(db_path: str | Path) -> sqlite3.Connection:
+    """Open ``db_path`` and ensure the ``dc_contract_versions`` table exists.
+
+    DC-8 (SPEC-020) threads an explicit ``db_path`` rather than ``cwd`` so the
+    versioning layer is testable against a ``tmp_path`` database. The table DDL
+    is idempotent, so a raw path with no prior ``initialize`` still works.
+    """
+    conn = sqlite3.connect(db_path)
+    conn.executescript(_CONTRACT_VERSIONS_DDL)
+    return conn
+
+
+def insert_contract_version(version: ContractVersion, db_path: str | Path) -> None:
+    """Persist one contract version snapshot (DC-8, SPEC-020).
+
+    Raises:
+        StateError: ``PK-DC-010`` if the snapshot cannot be written.
+    """
+    try:
+        with _connect_versions(db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO dc_contract_versions (
+                    id, blueprint_name, contract_file, version,
+                    version_major, version_minor, version_patch,
+                    content_hash, contract_content, created_at, created_by
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    version.id,
+                    version.blueprint_name,
+                    version.contract_file,
+                    version.version,
+                    version.version_major,
+                    version.version_minor,
+                    version.version_patch,
+                    version.content_hash,
+                    json.dumps(version.contract_content, sort_keys=True),
+                    version.created_at,
+                    version.created_by,
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-DC-010",
+            f"Cannot write contract version for {version.contract_file}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def get_latest_contract_version(
+    blueprint_name: str, contract_file: str, db_path: str | Path
+) -> dict | None:
+    """Return the most recent stored version of a contract, or None (DC-8)."""
+    try:
+        with _connect_versions(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                """
+                SELECT * FROM dc_contract_versions
+                WHERE blueprint_name = ? AND contract_file = ?
+                ORDER BY created_at DESC, version_major DESC,
+                         version_minor DESC, version_patch DESC
+                LIMIT 1
+                """,
+                (blueprint_name, contract_file),
+            ).fetchone()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            f"Cannot read contract version for {contract_file}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return dict(row) if row is not None else None
+
+
+def get_contract_version_history(
+    blueprint_name: str, contract_file: str, db_path: str | Path
+) -> list[dict]:
+    """Return all stored versions of a contract, newest first (DC-8)."""
+    try:
+        with _connect_versions(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT * FROM dc_contract_versions
+                WHERE blueprint_name = ? AND contract_file = ?
+                ORDER BY created_at DESC, version_major DESC,
+                         version_minor DESC, version_patch DESC
+                """,
+                (blueprint_name, contract_file),
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            f"Cannot read contract history for {contract_file}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return [dict(row) for row in rows]
+
+
+def get_contract_version_by_semver(
+    blueprint_name: str, contract_file: str, version: str, db_path: str | Path
+) -> dict | None:
+    """Return a specific stored version by semver string, or None (DC-8)."""
+    try:
+        with _connect_versions(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                """
+                SELECT * FROM dc_contract_versions
+                WHERE blueprint_name = ? AND contract_file = ? AND version = ?
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (blueprint_name, contract_file, version),
+            ).fetchone()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            f"Cannot read contract version {version} for {contract_file}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return dict(row) if row is not None else None
 
 
 def ensure_gitignore_entry(cwd: Path | None = None) -> None:

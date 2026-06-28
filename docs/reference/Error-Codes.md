@@ -62,6 +62,17 @@ CONFIG · CONTRACT · RUNTIME · ADAPTER · AI · STATE · BLUEPRINT · NOTIFY
 | PK-CONTRACT-007 | Contract file not found for table |
 | PK-CONTRACT-008 | Contract file is invalid YAML or schema |
 
+### DC — Contract Schema Versioning (DC-8, SPEC-020)
+
+| Code | Meaning |
+|---|---|
+| PK-DC-008 | Contract version not found — `--diff` references a version that does not exist. Fix: run `pipelinekit contract version --history` to see available versions. |
+| PK-DC-009 | Version format invalid — version string does not match MAJOR.MINOR.PATCH. Fix: use semantic version format, e.g. `v1.0.0` or `1.0.0`. |
+| PK-DC-010 | State database error during snapshot — `state.db` write failed during contract snapshot. Fix: check disk space and `state.db` file permissions. |
+
+DC-8 versioning codes are carried by `ContractError` (PK-DC-008/009) and
+`StateError` (PK-DC-010).
+
 ---
 
 ## Phase 3 Registry — Trust Layer

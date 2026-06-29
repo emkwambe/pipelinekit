@@ -24,6 +24,7 @@ from pipelinekit.core.errors import StateError
 
 if TYPE_CHECKING:
     from pipelinekit.contracts.versioning import ContractVersion
+    from pipelinekit.governance.ownership import BlueprintOwner
 
 STATE_DIR = ".pipelinekit"
 STATE_DB = "state.db"
@@ -152,6 +153,17 @@ CREATE TABLE IF NOT EXISTS dc_contract_versions (
 
 CREATE INDEX IF NOT EXISTS idx_dc_contract_versions_blueprint
     ON dc_contract_versions(blueprint_name, contract_file, created_at);
+
+CREATE TABLE IF NOT EXISTS gm_owners (
+    id TEXT PRIMARY KEY,
+    blueprint_name TEXT NOT NULL UNIQUE,
+    owner_name TEXT NOT NULL,
+    owner_email TEXT NOT NULL,
+    team_name TEXT,
+    notes TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 """
 
 
@@ -847,6 +859,123 @@ def get_contract_version_by_semver(
             {"path": str(db_path), "detail": str(exc)},
         ) from exc
     return dict(row) if row is not None else None
+
+
+_GM_OWNERS_DDL = """
+CREATE TABLE IF NOT EXISTS gm_owners (
+    id TEXT PRIMARY KEY,
+    blueprint_name TEXT NOT NULL UNIQUE,
+    owner_name TEXT NOT NULL,
+    owner_email TEXT NOT NULL,
+    team_name TEXT,
+    notes TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+"""
+
+
+def _connect_owners(db_path: str | Path) -> sqlite3.Connection:
+    """Open ``db_path`` and ensure the ``gm_owners`` table exists.
+
+    GM-1 (SPEC-023) threads an explicit ``db_path`` rather than ``cwd`` so the
+    ownership layer is testable against a ``tmp_path`` database. The table DDL is
+    idempotent, so a raw path with no prior ``initialize`` still works.
+    """
+    conn = sqlite3.connect(db_path)
+    conn.executescript(_GM_OWNERS_DDL)
+    return conn
+
+
+def upsert_owner(owner: BlueprintOwner, db_path: str | Path) -> None:
+    """Insert or replace the owner for a blueprint (GM-1, SPEC-023).
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the owner cannot be written.
+    """
+    try:
+        with _connect_owners(db_path) as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO gm_owners (
+                    id, blueprint_name, owner_name, owner_email,
+                    team_name, notes, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    owner.id,
+                    owner.blueprint_name,
+                    owner.owner_name,
+                    owner.owner_email,
+                    owner.team_name,
+                    owner.notes,
+                    owner.created_at,
+                    owner.updated_at,
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot write owner for blueprint {owner.blueprint_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def get_owner(blueprint_name: str, db_path: str | Path) -> dict | None:
+    """Return the owner row for a blueprint, or None if not set (GM-1)."""
+    try:
+        with _connect_owners(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT * FROM gm_owners WHERE blueprint_name = ?",
+                (blueprint_name,),
+            ).fetchone()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            f"Cannot read owner for blueprint {blueprint_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return dict(row) if row is not None else None
+
+
+def get_all_owners(db_path: str | Path) -> list[dict]:
+    """Return every stored owner row, sorted by blueprint name (GM-1)."""
+    try:
+        with _connect_owners(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT * FROM gm_owners ORDER BY blueprint_name"
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            "Cannot read owners from state database",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return [dict(row) for row in rows]
+
+
+def delete_owner(blueprint_name: str, db_path: str | Path) -> bool:
+    """Delete a blueprint's owner. Return True if a row was removed (GM-1).
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the delete cannot be executed.
+    """
+    try:
+        with _connect_owners(db_path) as conn:
+            cursor = conn.execute(
+                "DELETE FROM gm_owners WHERE blueprint_name = ?",
+                (blueprint_name,),
+            )
+            return cursor.rowcount > 0
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot delete owner for blueprint {blueprint_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
 
 
 def ensure_gitignore_entry(cwd: Path | None = None) -> None:

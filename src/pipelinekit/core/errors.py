@@ -83,3 +83,8 @@ class MigrationError(PipelineKitError):
 class QualityError(PipelineKitError):
     """Raised when quality coverage scanning fails — no blueprints to scan or an
     unparseable schema file (ADR-023, SPEC-022). Carries ``PK-QM-*`` codes."""
+
+
+class GovernanceError(PipelineKitError):
+    """Raised when a governance operation fails — blueprint not installed or an
+    invalid owner email (ADR-024, SPEC-023). Carries ``PK-GM-*`` codes."""

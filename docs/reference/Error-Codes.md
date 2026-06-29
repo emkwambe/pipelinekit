@@ -85,6 +85,17 @@ DC-8 versioning codes are carried by `ContractError` (PK-DC-008/009) and
 QM-4 quality-coverage codes are carried by `QualityError` (read-only scanning;
 no `state.db` writes).
 
+### GM — Governance Management (GM-1, SPEC-023)
+
+| Code | Meaning |
+|---|---|
+| PK-GM-001 | Blueprint not found — the specified blueprint is not installed. Fix: run `pipelinekit blueprint list` to see installed blueprints, then `pipelinekit blueprint install <name>` to install. |
+| PK-GM-002 | Invalid email address — the owner email is not valid. Fix: provide a valid email address (must contain `@` and a domain with a dot). |
+
+GM-1 governance codes are carried by `GovernanceError`. Ownership is stored in
+the `gm_owners` table; missing ownership is surfaced as a warning (never a
+failure) by the `ownership` health check.
+
 ---
 
 ## Phase 3 Registry — Trust Layer

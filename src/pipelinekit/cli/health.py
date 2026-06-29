@@ -16,6 +16,7 @@ from rich.console import Console
 from pipelinekit.health import ERROR, INFO, OK, WARNING, HealthCheckResult
 from pipelinekit.health.blueprints import BlueprintHealthChecker
 from pipelinekit.health.deps import DepsChecker
+from pipelinekit.health.ownership import OwnershipHealthChecker
 from pipelinekit.health.security import SecurityChecker
 from pipelinekit.health.specs import SpecDriftChecker
 from pipelinekit.health.tests import TestsChecker
@@ -41,6 +42,7 @@ def _run_all() -> list[HealthCheckResult]:
         BlueprintHealthChecker().check(),
         SpecDriftChecker().check(),
         TestsChecker().check(),
+        OwnershipHealthChecker().check(),
     ]
 
 
@@ -167,4 +169,11 @@ def specs_command(
 def tests_command() -> None:
     """Report the last test run's coverage."""
     _render_one(TestsChecker().check())
+    raise typer.Exit(0)
+
+
+@health_app.command("ownership")
+def ownership_command() -> None:
+    """Warn about installed blueprints that have no assigned owner."""
+    _render_one(OwnershipHealthChecker().check())
     raise typer.Exit(0)

@@ -4,6 +4,16 @@ All notable changes to PipelineKit are documented in this file.
 
 ## [Unreleased]
 
+### Added — Phase 2 Sprint 4 (GM-1 Ownership Assignment)
+- `pipelinekit governance owner set` — assign owner to a blueprint
+- `pipelinekit governance owner get` — view owner details
+- `pipelinekit governance owner list` — list all blueprints with ownership status
+- `pipelinekit governance owner remove` — remove owner from a blueprint
+- `pipelinekit health --strict` now includes ownership check (6th check)
+- New error codes: PK-GM-001, PK-GM-002
+- New governance module: src/pipelinekit/governance/
+
+
 ### Added — Phase 2 Sprint 3 (QM-4 Coverage Monitoring)
 - `pipelinekit quality coverage` — dbt test and Soda check coverage per blueprint
 - `pipelinekit quality coverage --blueprint <name>` — filter by blueprint

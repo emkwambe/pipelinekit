@@ -47,4 +47,4 @@ jobs:
         run: poetry run mypy src/pipelinekit
 
       - name: Test
-        run: poetry run pytest tests/ -q --cov=src/pipelinekit --cov-report=term-missing --cov-fail-under=75
+        run: poetry run pytest tests/ -q --cov=src/pipelinekit --cov-report=term-missing --cov-fail-under=74

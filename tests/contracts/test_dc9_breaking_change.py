@@ -9,8 +9,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from typer.testing import CliRunner
-
 from pipelinekit.cli import contract as contract_cli
 from pipelinekit.cli.contract import contract_app
 from pipelinekit.contracts.versioning import (
@@ -19,6 +17,7 @@ from pipelinekit.contracts.versioning import (
     scan_dbt_impact,
     snapshot_contract,
 )
+from typer.testing import CliRunner
 
 runner = CliRunner()
 

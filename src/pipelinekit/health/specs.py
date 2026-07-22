@@ -29,6 +29,11 @@ _IMPLEMENTED_SPECS = frozenset(
         "SPEC-009",
         "SPEC-010",
         "SPEC-011",
+        # Phase 2 capabilities
+        "SPEC-020",  # DC-8 Schema Versioning
+        "SPEC-021",  # DC-9 Breaking Change Detection
+        "SPEC-022",  # QM-4 Coverage Monitoring
+        "SPEC-023",  # GM-1 Ownership Assignment
     }
 )
 

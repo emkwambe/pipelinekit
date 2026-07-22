@@ -96,13 +96,17 @@ poetry run pipelinekit health --strict
 
 Expected output:
 ```
-✓ Python 3.11+
-✓ dbt-core installed
-✓ dlt installed
-✓ soda-core installed
-✓ Docker running
-✓ ANTHROPIC_API_KEY set
-All health checks passed.
+PipelineKit Health Check
+────────────────────────
+
+  deps         ✓  ...
+  security     ✓  ...
+  blueprints   ✓  ...
+  specs        ✓  ...
+  tests        ✓  ...
+  ownership    ✓  ...
+
+6/6 checks passed
 ```
 
 If any check fails — see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).

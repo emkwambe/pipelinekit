@@ -14,6 +14,7 @@ in-memory fake; Phase 2 callers pass a real connection.
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -126,8 +127,16 @@ class ContractValidator:
             for contract in self.load_all_contracts()
         ]
 
+    _TABLE_NAME_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_.]*$")
+
     def _fetch(self, connection: Any, table: str) -> tuple[list[str], list[dict]]:
         """Read a table's columns and rows via a DB-API-style connection."""
+        if not self._TABLE_NAME_RE.match(table):
+            raise ContractError(
+                "PK-CONTRACT-001",
+                f"Invalid table name for contract validation: '{table}'",
+                {"table": table},
+            )
         cursor = connection.cursor()
         cursor.execute(f'SELECT * FROM "{table}"')
         description = cursor.description or []

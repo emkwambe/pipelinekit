@@ -14,5 +14,6 @@
   "tags": ["postgres", "snowflake", "product-analytics"],
   "kpis": ["Daily Orders", "Revenue", "Customers", "Order Value", "Retention"],
   "deploy_time_minutes": 60,
-  "time_to_trusted_data_hours": 24
+  "time_to_trusted_data_hours": 24,
+  "status": "verified"
 }

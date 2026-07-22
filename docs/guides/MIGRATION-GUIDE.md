@@ -159,16 +159,15 @@ ingestion:
 
 transformation:
   enabled: true
-  dbt_project_dir: ./blueprints/postgres-to-snowflake/transform
-  target: production
+  project_dir: ./blueprints/postgres-to-snowflake/transform
 
 contracts:
   enabled: true
-  contract_dir: ./blueprints/postgres-to-snowflake/contracts
+  directory: ./blueprints/postgres-to-snowflake/contracts
 
 quality:
   enabled: true
-  checks_file: ./blueprints/postgres-to-snowflake/quality/checks.yaml
+  checks_dir: ./blueprints/postgres-to-snowflake/quality/checks.yaml
 
 diagnostics:
   enabled: true
@@ -210,17 +209,7 @@ export ANTHROPIC_API_KEY="sk-ant-api03-..."
 
 ### Step 5 — Validate the proposed config
 
-```bash
-poetry run pipelinekit validate pipelinekit.proposed.yaml
-```
-
-Expected:
-```
-✓ pipelinekit.yaml is valid
-  Project: postgres-to-snowflake (v1.0.0)
-```
-
-If validation passes — rename to the active config:
+Make sure `pipelinekit.yaml` is the active config in the current directory (copy or rename `pipelinekit.proposed.yaml` first):
 
 ```bash
 # Windows
@@ -228,6 +217,18 @@ Rename-Item pipelinekit.proposed.yaml pipelinekit.yaml
 
 # macOS/Linux
 mv pipelinekit.proposed.yaml pipelinekit.yaml
+```
+
+Then validate:
+
+```bash
+poetry run pipelinekit validate
+```
+
+Expected:
+```
+✓ pipelinekit.yaml is valid
+  Project: postgres-to-snowflake (v1.0.0)
 ```
 
 ### Step 6 — Install the matching blueprint
@@ -378,8 +379,8 @@ poetry run pipelinekit migrate analyze your-config.json --write-draft
 # Check what PipelineKit detected
 cat pipelinekit.proposed.yaml
 
-# Validate after filling FIXMEs
-poetry run pipelinekit validate pipelinekit.proposed.yaml
+# Ensure pipelinekit.yaml is in the current directory, then validate
+poetry run pipelinekit validate
 ```
 
 For complex migrations — apply as design partner for direct support:

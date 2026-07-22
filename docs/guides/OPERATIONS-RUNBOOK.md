@@ -49,6 +49,16 @@ The ingestion adapter could not connect. Check that the source host/credentials 
 ### `PK-ADAPTER-002` — dbt build failed
 The transformation step failed. Inspect the dbt run output and the blueprint's `transform/logs/`. Common causes: a model references a missing source/column, or the destination schema differs from what the models expect. Fix the model or the source, then re-run.
 
+### Recovery model in v0.1.0
+
+PipelineKit does not yet support partial reruns, step-level retries, or automatic retry logic. When a run fails, the recovery path is:
+
+1. Inspect the failing step using `pipelinekit status` and the `PK-*` error code.
+2. Apply the fix (source connectivity, dbt model, contract definition, etc.).
+3. Re-run the entire pipeline with `pipelinekit run`.
+
+This is consistent with the current full-refresh ingestion model (`write_disposition="replace"`). Future releases may add incremental loads and step-level retries.
+
 ### `PK-AI-001` — Missing API key
 The configured AI provider has no key (or is unreachable). Set the provider's environment variable — `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, or `MISTRAL_API_KEY` — or use `ollama` (local, no key). You can override per-invocation with `--provider`.
 
@@ -56,7 +66,7 @@ The configured AI provider has no key (or is unreachable). Set the provider's en
 A contract YAML is malformed or fails its schema. Run `pipelinekit validate --contracts` to see which file and why, then fix the definition (see the [Configuration Reference](CONFIGURATION-REFERENCE.md) contract format).
 
 ### `PK-REGISTRY-001` — Registry unreachable
-The remote registry could not be reached and no cached catalog is available. The public registry is not yet deployed, so this is expected today. The three catalog blueprints already exist in the repo under `blueprints/` — use them directly; no install needed.
+The remote registry at `registry.pipelinekit.dev` could not be reached and no cached catalog is available. Check network connectivity, or use the three catalog blueprints already present in the repo under `blueprints/`.
 
 ---
 
@@ -77,6 +87,14 @@ pipelinekit health           # or: pipelinekit health --strict  (exit 1 on any w
 ```
 
 `health` is non-blocking by default (always exits 0) so it is safe to run anywhere. Use `--strict` in CI when you want a warning to fail the build. Each full run is recorded in state.
+
+---
+
+## Pipeline Semantics
+
+### v0.1.0 ingestion behavior
+
+`pipelinekit run` currently performs a **full refresh** on every execution: the ingestion adapter uses `write_disposition="replace"`. There is no incremental loading, append mode, or change-data-capture in this release. Plan rerun frequency and warehouse costs accordingly.
 
 ---
 

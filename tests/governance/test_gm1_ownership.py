@@ -10,11 +10,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from pipelinekit.core.errors import GovernanceError
 from pipelinekit.governance.ownership import (
-    get_ownership_report,
     get_owner,
+    get_ownership_report,
     remove_owner,
     set_owner,
     validate_email,

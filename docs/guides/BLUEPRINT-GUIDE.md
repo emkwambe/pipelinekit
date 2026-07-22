@@ -50,7 +50,7 @@ pipelinekit blueprint install postgres-to-snowflake --force   # overwrite
 
 `blueprint info` shows the source, destination, contract count, KPIs, deploy-time target, and Time-to-Trusted-Data target. `blueprint validate` checks `blueprint.json` against `schemas/blueprint.schema.json` and reports detected contracts, dbt project, and quality checks.
 
-> **Registry status:** the public registry (`registry.pipelinekit.dev`) is not yet deployed. Until it is, `blueprint search` and `blueprint install` return `PK-REGISTRY-001` (registry unreachable). The three catalog blueprints are already present in the repo under `blueprints/`.
+> **Registry status:** the public registry at **[registry.pipelinekit.dev](https://registry.pipelinekit.dev)** is live and lists 3 verified blueprints. You can search and install directly; the three catalog blueprints are also present in the repo under `blueprints/`.
 
 ---
 

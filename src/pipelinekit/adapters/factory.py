@@ -13,7 +13,12 @@ from pipelinekit.adapters.quality.soda.adapter import SodaQualityAdapter
 from pipelinekit.adapters.transformation.dbt.adapter import DbtTransformationAdapter
 from pipelinekit.config.schema import PipelineConfig
 
-# dlt source types supported in Phase 2 (SPEC-009).
+# dlt source types supported through the standard runtime path in Phase 2.
+# This is intentionally a conservative release gate (SPEC-009): the dlt adapter
+# can handle additional sources, but each one is enabled here only after it has
+# been end-to-end verified. Salesforce and Stripe blueprints exist and can be
+# proposed by AI, but the standard `pipelinekit run` path currently supports
+# Postgres only.
 _SUPPORTED_SOURCES = {"postgres"}
 
 

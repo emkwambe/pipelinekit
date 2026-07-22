@@ -81,7 +81,7 @@ Download, validate, and write a blueprint from the registry.
 | `--version`, `-v` | Specific version to install |
 | `--force` | Overwrite if already installed |
 
-> The public registry is not yet deployed; `search` and `install` currently return `PK-REGISTRY-001`.
+> The public registry is live at **[registry.pipelinekit.dev](https://registry.pipelinekit.dev)** and currently lists 3 verified blueprints.
 
 ---
 
@@ -169,7 +169,7 @@ Compare two tools for your specific stack and data profile.
 ## Health Commands
 
 ### `pipelinekit health [--strict]`
-Run all five health checks (deps, security, blueprints, specs, tests), print a summary, and record the run.
+Run all six health checks (deps, security, blueprints, specs, tests, ownership), print a summary, and record the run.
 
 | Option | Description |
 |---|---|

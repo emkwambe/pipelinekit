@@ -362,7 +362,7 @@ Show recorded row counts for one table, newest first, with each snapshot's devia
 
 ---
 
-## Governance Commands (GM-1 / GM-2)
+## Governance Commands (GM-1 / GM-2 / GM-3)
 
 Assign ownership to installed blueprints. Ownership is stored in `state.db`; missing ownership surfaces as a warning in `pipelinekit health --strict`.
 
@@ -423,6 +423,71 @@ A non-compliant name is reported as `⚠ {name}  {scope}  does NOT match {patter
 
 #### `pipelinekit governance convention remove <id>`
 Remove a convention by its ID (from `convention list`). Prints `✓ Convention removed`, or `No convention found with ID {id}` if the ID does not exist.
+
+### `pipelinekit governance approver` (GM-3)
+Assign the person authorized to approve changes for a blueprint. Approvers are stored in `state.db` (`gm_approvers`), one per blueprint.
+
+#### `pipelinekit governance approver set <blueprint> --name <name> --email <email>`
+Assign or update the approver of a blueprint.
+
+| Argument / Option | Description |
+|---|---|
+| `blueprint` (required) | Blueprint to assign an approver |
+| `--name` (required) | Approver name |
+| `--email` (required) | Approver email |
+
+```
+✓ Approver set for stripe-to-snowflake: Jane Smith <jane@company.com>
+```
+
+#### `pipelinekit governance approver get <blueprint>`
+Show the approver of a blueprint, or `No approver set for {blueprint}` if none is assigned.
+
+### `pipelinekit governance approval` (GM-3)
+Record approval requests and decisions for pipeline changes, providing SOC 2 CC8 (Change Management) evidence. Requests and decisions are stored in `state.db` (`gm_approval_requests`). **Approvals are record-only — they never block pipeline execution** (hard enforcement gates are planned for GM-6). Request codes are sequential (`REQ-001`, `REQ-002`, …); statuses are `PENDING`, `APPROVED`, or `REJECTED`.
+
+#### `pipelinekit governance approval request --blueprint <name> --change <text> --requested-by <email>`
+Create a `PENDING` approval request.
+
+| Option | Description |
+|---|---|
+| `--blueprint` (required) | Blueprint the change targets |
+| `--change` (required) | Description of the proposed change |
+| `--requested-by` (required) | Email of the requester |
+
+Prints the new request code and details; also shows the assigned approver, or `No approver set for this blueprint` if none is registered (not an error).
+
+```
+✓ Approval request created: REQ-001
+  Blueprint:    stripe-to-snowflake
+  Change:       Upgrade to blueprint v1.1.0
+  Requested by: engineer@company.com
+  Awaiting approval from: Jane Smith <jane@company.com>
+```
+
+#### `pipelinekit governance approval list`
+List pending (`PENDING`) requests as a table: Code, Blueprint, Change, Requested By, Status, Created. Prints `No pending approval requests.` when none are pending. No options. (Decided requests are retained in `state.db` for audit but are not shown here.)
+
+#### `pipelinekit governance approval approve <request_code> [--decided-by <who>]`
+Approve a pending request.
+
+| Argument / Option | Description |
+|---|---|
+| `request_code` (required) | Request code, e.g. `REQ-001` |
+| `--decided-by` | Who approved (default `CLI user`) |
+
+Prints `✓ REQ-001 approved`. Fails with `PK-GM-005` if the code is unknown, or `PK-GM-006` if the request was already decided.
+
+#### `pipelinekit governance approval reject <request_code> [--decided-by <who>] [--reason <text>]`
+Reject a pending request, optionally recording a reason.
+
+| Argument / Option | Description |
+|---|---|
+| `request_code` (required) | Request code, e.g. `REQ-001` |
+| `--decided-by` | Who rejected (default `CLI user`) |
+| `--reason` | Reason for rejection |
+
+Prints `✓ REQ-002 rejected: {reason}` (or without the reason if none given). Fails with `PK-GM-005` (unknown code) or `PK-GM-006` (already decided).
 
 ---
 
@@ -574,6 +639,8 @@ Every error carries a stable `PK-[AREA]-[NUMBER]` code. The table below is the o
 | `PK-GM-002` | Invalid owner email | Provide a valid `name@domain.tld` address |
 | `PK-GM-003` | Invalid convention scope | Use `blueprint`, `table`, `column`, or `contract_file` |
 | `PK-GM-004` | Invalid regex pattern | Fix the regex before adding the convention |
+| `PK-GM-005` | Approval request not found | Run `governance approval list` for valid codes |
+| `PK-GM-006` | Request already decided | Check status with `governance approval list` |
 | `PK-OM-001` | SLO violated | Investigate freshness / row count / coverage |
 | `PK-OM-002` | Invalid SLO type | Use `freshness`, `row_count`, or `coverage` |
 | `PK-AM-001` | Blueprint not found (dependency) | Run `pipelinekit blueprint list` |

@@ -24,6 +24,7 @@ Public-facing status of PipelineKit's EMS (Engineering Management System) capabi
 |---|---|---|
 | Ownership assignment | GM-1 | ✅ Phase 2 |
 | Naming convention enforcement | GM-2 | ✅ Phase 2 |
+| Approval workflow | GM-3 | ✅ Phase 2 |
 
 ### OM — Observability Management
 | Capability | Code | Status |
@@ -50,6 +51,6 @@ Public-facing status of PipelineKit's EMS (Engineering Management System) capabi
 ## Roadmap (Phase 2 continuing)
 - QM-7: Schema drift detection
 - QM-8: Quality scorecard
-- GM-3: Approval workflow
+- GM-6: Policy enforcement (hard gates on approval workflow)
 - OM-5: SLO dashboard
 - AM-5+: Architecture drift detection

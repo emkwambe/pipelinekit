@@ -4,6 +4,17 @@ All notable changes to PipelineKit are documented in this file.
 
 ## [Unreleased]
 
+### Added — Phase 2 Sprint 6 (OM-4 SLO Definition)
+- `pipelinekit observability slo set` — define freshness, row_count, or coverage SLOs
+- `pipelinekit observability slo list` — list all defined SLOs
+- `pipelinekit observability slo check` — evaluate SLOs against state.db data
+- `pipelinekit observability slo remove` — remove an SLO
+- Cross-domain: reads DC-8 (freshness) + QM-6 (row counts) + QM-4 (coverage)
+- NO_DATA status when insufficient pipeline history exists
+- New error codes: PK-OM-001, PK-OM-002
+- New observability module: src/pipelinekit/observability/
+
+
 ### Added — Phase 2 Sprint 5 (QM-6 Volume Anomaly Detection)
 - `pipelinekit quality record-counts` — record row counts for pipeline tables
 - `pipelinekit quality check-anomalies` — detect volume anomalies vs rolling baseline

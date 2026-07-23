@@ -100,10 +100,16 @@ snapshots are stored in the `qm_row_counts` table (`state.db`).
 |---|---|
 | PK-GM-001 | Blueprint not found — the specified blueprint is not installed. Fix: run `pipelinekit blueprint list` to see installed blueprints, then `pipelinekit blueprint install <name>` to install. |
 | PK-GM-002 | Invalid email address — the owner email is not valid. Fix: provide a valid email address (must contain `@` and a domain with a dot). |
+| PK-GM-003 | Invalid convention scope — the scope must be one of: `blueprint`, `table`, `column`, `contract_file`. Fix: use a valid scope. |
+| PK-GM-004 | Invalid regex pattern — the pattern is not valid Python regex syntax. Fix: test your pattern (e.g. at regex101.com) before adding. |
 
 GM-1 governance codes are carried by `GovernanceError`. Ownership is stored in
 the `gm_owners` table; missing ownership is surfaced as a warning (never a
-failure) by the `ownership` health check.
+failure) by the `ownership` health check. GM-2 (SPEC-028) adds naming convention
+enforcement in the `gm_conventions` table; `PK-GM-003` and `PK-GM-004` are raised
+by `convention add`. Convention violations are surfaced as warnings by
+`pipelinekit governance convention check` (which exits 1 on any violation) and
+never block pipeline execution.
 
 ### OM — Observability Management (OM-4, SPEC-025)
 

@@ -29,6 +29,7 @@ if TYPE_CHECKING:
         ContractNotification,
     )
     from pipelinekit.contracts.versioning import ContractVersion
+    from pipelinekit.governance.convention import NamingConvention
     from pipelinekit.governance.ownership import BlueprintOwner
     from pipelinekit.observability.slo import SLODefinition
 
@@ -223,6 +224,14 @@ CREATE TABLE IF NOT EXISTS dc_notifications (
     new_version TEXT NOT NULL,
     change_type TEXT NOT NULL,
     is_read INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS gm_conventions (
+    id TEXT PRIMARY KEY,
+    scope TEXT NOT NULL,
+    pattern TEXT NOT NULL,
+    description TEXT,
     created_at TEXT NOT NULL
 );
 """
@@ -1686,6 +1695,98 @@ def mark_notifications_read(db_path: str | Path) -> int:
         raise StateError(
             "PK-STATE-002",
             "Cannot mark notifications read in state database",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+_GM_CONVENTIONS_DDL = """
+CREATE TABLE IF NOT EXISTS gm_conventions (
+    id TEXT PRIMARY KEY,
+    scope TEXT NOT NULL,
+    pattern TEXT NOT NULL,
+    description TEXT,
+    created_at TEXT NOT NULL
+);
+"""
+
+
+def _connect_conventions(db_path: str | Path) -> sqlite3.Connection:
+    """Open ``db_path`` and ensure the ``gm_conventions`` table exists.
+
+    GM-2 (SPEC-028) threads an explicit ``db_path`` rather than ``cwd`` so the
+    convention layer is testable against a ``tmp_path`` database. The table DDL
+    is idempotent, so a raw path with no prior ``initialize`` still works.
+    """
+    conn = sqlite3.connect(db_path)
+    conn.executescript(_GM_CONVENTIONS_DDL)
+    return conn
+
+
+def insert_convention(convention: NamingConvention, db_path: str | Path) -> None:
+    """Insert a naming convention (GM-2, SPEC-028).
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the convention cannot be written.
+    """
+    try:
+        with _connect_conventions(db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO gm_conventions (
+                    id, scope, pattern, description, created_at
+                )
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    convention.id,
+                    convention.scope,
+                    convention.pattern,
+                    convention.description,
+                    convention.created_at,
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot write convention for scope {convention.scope}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def get_conventions(db_path: str | Path) -> list[dict]:
+    """Return every naming convention, sorted by scope then creation (GM-2)."""
+    try:
+        with _connect_conventions(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT * FROM gm_conventions ORDER BY scope, created_at"
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            "Cannot read conventions from state database",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return [dict(row) for row in rows]
+
+
+def delete_convention(convention_id: str, db_path: str | Path) -> bool:
+    """Delete one convention by id. Return True if a row was removed (GM-2).
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the delete cannot be executed.
+    """
+    try:
+        with _connect_conventions(db_path) as conn:
+            cursor = conn.execute(
+                "DELETE FROM gm_conventions WHERE id = ?",
+                (convention_id,),
+            )
+            return cursor.rowcount > 0
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot delete convention {convention_id}",
             {"path": str(db_path), "detail": str(exc)},
         ) from exc
 

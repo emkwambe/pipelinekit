@@ -16,6 +16,14 @@ from rich.table import Table
 
 from pipelinekit.blueprints.registry import BlueprintRegistry
 from pipelinekit.core.errors import GovernanceError
+from pipelinekit.governance.approval import (
+    approve_request,
+    create_request,
+    get_approver,
+    get_pending_requests,
+    reject_request,
+    set_approver,
+)
 from pipelinekit.governance.convention import (
     add_convention,
     check_blueprint_conventions,
@@ -50,6 +58,20 @@ convention_app = typer.Typer(
     add_completion=False,
 )
 governance_app.add_typer(convention_app, name="convention")
+
+approver_app = typer.Typer(
+    help="Blueprint approver management.",
+    no_args_is_help=True,
+    add_completion=False,
+)
+governance_app.add_typer(approver_app, name="approver")
+
+approval_app = typer.Typer(
+    help="Pipeline change approval workflow.",
+    no_args_is_help=True,
+    add_completion=False,
+)
+governance_app.add_typer(approval_app, name="approval")
 
 
 def _db_path() -> str:
@@ -272,4 +294,141 @@ def convention_remove_command(
         console.print("✓ Convention removed", style="green")
     else:
         console.print(f"No convention found with ID {convention_id}")
+    raise typer.Exit(0)
+
+
+# --- GM-3: approval workflow -----------------------------------------------
+
+
+@approver_app.command("set")
+def approver_set_command(
+    blueprint_name: str = typer.Argument(..., help="Blueprint to assign an approver."),
+    name: str = typer.Option(..., "--name", help="Approver name."),
+    email: str = typer.Option(..., "--email", help="Approver email."),
+) -> None:
+    """Assign or update the approver of a blueprint."""
+    approver = set_approver(blueprint_name, name, email, _db_path())
+    console.print(
+        f"✓ Approver set for {approver.blueprint_name}: "
+        f"{approver.approver_name} <{approver.approver_email}>",
+        style="green",
+    )
+    raise typer.Exit(0)
+
+
+@approver_app.command("get")
+def approver_get_command(
+    blueprint_name: str = typer.Argument(..., help="Blueprint to look up."),
+) -> None:
+    """Show the approver of a blueprint."""
+    approver = get_approver(blueprint_name, _db_path())
+    if approver is None:
+        console.print(f"No approver set for {blueprint_name}")
+        raise typer.Exit(0)
+
+    console.print(f"Approver: {approver.blueprint_name}", style="bold cyan")
+    console.print("─" * 37)
+    console.print(f"  Name:    {approver.approver_name}")
+    console.print(f"  Email:   {approver.approver_email}")
+    console.print(f"  Set at:  {approver.updated_at}")
+    raise typer.Exit(0)
+
+
+@approval_app.command("request")
+def approval_request_command(
+    blueprint: str = typer.Option(..., "--blueprint", help="Blueprint name."),
+    change: str = typer.Option(..., "--change", help="Description of the change."),
+    requested_by: str = typer.Option(
+        ..., "--requested-by", help="Email of the requester."
+    ),
+) -> None:
+    """Create an approval request for a pipeline change."""
+    db_path = _db_path()
+    request = create_request(blueprint, change, requested_by, db_path)
+
+    console.print(f"✓ Approval request created: {request.request_code}", style="green")
+    console.print(f"  Blueprint:    {request.blueprint_name}")
+    console.print(f"  Change:       {request.change_description}")
+    console.print(f"  Requested by: {request.requested_by}")
+
+    approver = get_approver(blueprint, db_path)
+    if approver is not None:
+        console.print(
+            f"  Awaiting approval from: {approver.approver_name} "
+            f"<{approver.approver_email}>"
+        )
+    else:
+        console.print("  No approver set for this blueprint", style="yellow")
+    raise typer.Exit(0)
+
+
+@approval_app.command("list")
+def approval_list_command() -> None:
+    """List pending approval requests."""
+    pending = get_pending_requests(_db_path())
+    if not pending:
+        console.print("No pending approval requests.")
+        raise typer.Exit(0)
+
+    console.print("Pending Approval Requests", style="bold")
+    console.print("─" * 61)
+    table = Table()
+    table.add_column("Code", style="cyan", no_wrap=True)
+    table.add_column("Blueprint")
+    table.add_column("Change")
+    table.add_column("Requested By")
+    table.add_column("Status")
+    table.add_column("Created")
+    for request in pending:
+        table.add_row(
+            request.request_code,
+            request.blueprint_name,
+            request.change_description,
+            request.requested_by,
+            request.status,
+            request.created_at,
+        )
+    console.print(table)
+    raise typer.Exit(0)
+
+
+@approval_app.command("approve")
+def approval_approve_command(
+    request_code: str = typer.Argument(..., help="Request code, e.g. REQ-001."),
+    decided_by: str = typer.Option(
+        "CLI user", "--decided-by", help="Who approved the request."
+    ),
+) -> None:
+    """Approve a pending request."""
+    try:
+        approve_request(request_code, decided_by, _db_path())
+    except GovernanceError as exc:
+        console.print(f"✗ [{exc.code}] {exc.message}", style="bold red")
+        raise typer.Exit(1) from exc
+
+    console.print(f"✓ {request_code} approved", style="green")
+    raise typer.Exit(0)
+
+
+@approval_app.command("reject")
+def approval_reject_command(
+    request_code: str = typer.Argument(..., help="Request code, e.g. REQ-001."),
+    decided_by: str = typer.Option(
+        "CLI user", "--decided-by", help="Who rejected the request."
+    ),
+    reason: Optional[str] = typer.Option(
+        None, "--reason", help="Reason for rejection."
+    ),
+) -> None:
+    """Reject a pending request."""
+    try:
+        reject_request(request_code, decided_by, reason, _db_path())
+    except GovernanceError as exc:
+        console.print(f"✗ [{exc.code}] {exc.message}", style="bold red")
+        raise typer.Exit(1) from exc
+
+    if reason:
+        console.print(f"✓ {request_code} rejected: {reason}", style="green")
+    else:
+        console.print(f"✓ {request_code} rejected", style="green")
     raise typer.Exit(0)

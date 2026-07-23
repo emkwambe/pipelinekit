@@ -1,13 +1,24 @@
-"""Governance Management System (GM) — ownership and naming standards.
+"""Governance Management System (GM) — ownership, naming, and approvals.
 
 GM-1 (SPEC-023) adds deterministic ownership assignment for installed
 blueprints, stored in ``state.db``. GM-2 (SPEC-028) adds regex-based naming
-convention enforcement. No AI. Governance gaps surface as warnings — never as
-blockers.
+convention enforcement. GM-3 (SPEC-031) adds a record-only approval workflow for
+pipeline changes. No AI. Governance gaps surface as warnings — never as blockers.
 """
 
 from __future__ import annotations
 
+from pipelinekit.governance.approval import (
+    ApprovalRequest,
+    Approver,
+    approve_request,
+    create_request,
+    get_all_requests,
+    get_approver,
+    get_pending_requests,
+    reject_request,
+    set_approver,
+)
 from pipelinekit.governance.convention import (
     VALID_SCOPES,
     ConventionCheckResult,
@@ -45,4 +56,14 @@ __all__ = [
     "get_conventions",
     "remove_convention",
     "check_blueprint_conventions",
+    # GM-3 — approval workflow (SPEC-031)
+    "Approver",
+    "ApprovalRequest",
+    "set_approver",
+    "get_approver",
+    "create_request",
+    "approve_request",
+    "reject_request",
+    "get_pending_requests",
+    "get_all_requests",
 ]

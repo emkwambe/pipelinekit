@@ -29,6 +29,7 @@ if TYPE_CHECKING:
         ContractNotification,
     )
     from pipelinekit.contracts.versioning import ContractVersion
+    from pipelinekit.governance.approval import ApprovalRequest, Approver
     from pipelinekit.governance.convention import NamingConvention
     from pipelinekit.governance.ownership import BlueprintOwner
     from pipelinekit.observability.slo import SLODefinition
@@ -233,6 +234,28 @@ CREATE TABLE IF NOT EXISTS gm_conventions (
     pattern TEXT NOT NULL,
     description TEXT,
     created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS gm_approvers (
+    id TEXT PRIMARY KEY,
+    blueprint_name TEXT NOT NULL UNIQUE,
+    approver_name TEXT NOT NULL,
+    approver_email TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS gm_approval_requests (
+    id TEXT PRIMARY KEY,
+    request_code TEXT NOT NULL UNIQUE,
+    blueprint_name TEXT NOT NULL,
+    change_description TEXT NOT NULL,
+    requested_by TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'PENDING',
+    decided_by TEXT,
+    decision_reason TEXT,
+    created_at TEXT NOT NULL,
+    decided_at TEXT
 );
 """
 
@@ -1789,6 +1812,241 @@ def delete_convention(convention_id: str, db_path: str | Path) -> bool:
             f"Cannot delete convention {convention_id}",
             {"path": str(db_path), "detail": str(exc)},
         ) from exc
+
+
+_GM_APPROVAL_DDL = """
+CREATE TABLE IF NOT EXISTS gm_approvers (
+    id TEXT PRIMARY KEY,
+    blueprint_name TEXT NOT NULL UNIQUE,
+    approver_name TEXT NOT NULL,
+    approver_email TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS gm_approval_requests (
+    id TEXT PRIMARY KEY,
+    request_code TEXT NOT NULL UNIQUE,
+    blueprint_name TEXT NOT NULL,
+    change_description TEXT NOT NULL,
+    requested_by TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'PENDING',
+    decided_by TEXT,
+    decision_reason TEXT,
+    created_at TEXT NOT NULL,
+    decided_at TEXT
+);
+"""
+
+
+def _connect_approval(db_path: str | Path) -> sqlite3.Connection:
+    """Open ``db_path`` and ensure the GM-3 approval tables exist.
+
+    GM-3 (SPEC-031) threads an explicit ``db_path`` rather than ``cwd`` so the
+    approval layer is testable against a ``tmp_path`` database. The DDL is
+    idempotent, so a raw path with no prior ``initialize`` still works.
+    """
+    conn = sqlite3.connect(db_path)
+    conn.executescript(_GM_APPROVAL_DDL)
+    return conn
+
+
+def upsert_approver(approver: Approver, db_path: str | Path) -> None:
+    """Insert or replace the approver for a blueprint (GM-3, SPEC-031).
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the approver cannot be written.
+    """
+    try:
+        with _connect_approval(db_path) as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO gm_approvers (
+                    id, blueprint_name, approver_name, approver_email,
+                    created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    approver.id,
+                    approver.blueprint_name,
+                    approver.approver_name,
+                    approver.approver_email,
+                    approver.created_at,
+                    approver.updated_at,
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot write approver for blueprint {approver.blueprint_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def get_approver(blueprint_name: str, db_path: str | Path) -> dict | None:
+    """Return the approver row for a blueprint, or None if not set (GM-3)."""
+    try:
+        with _connect_approval(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT * FROM gm_approvers WHERE blueprint_name = ?",
+                (blueprint_name,),
+            ).fetchone()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            f"Cannot read approver for blueprint {blueprint_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return dict(row) if row is not None else None
+
+
+def insert_approval_request(request: ApprovalRequest, db_path: str | Path) -> None:
+    """Insert a new approval request (GM-3, SPEC-031).
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the request cannot be written.
+    """
+    try:
+        with _connect_approval(db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO gm_approval_requests (
+                    id, request_code, blueprint_name, change_description,
+                    requested_by, status, decided_by, decision_reason,
+                    created_at, decided_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    request.id,
+                    request.request_code,
+                    request.blueprint_name,
+                    request.change_description,
+                    request.requested_by,
+                    request.status,
+                    request.decided_by,
+                    request.decision_reason,
+                    request.created_at,
+                    request.decided_at,
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot write approval request {request.request_code}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def count_approval_requests(db_path: str | Path) -> int:
+    """Return the total number of approval requests, for code generation (GM-3)."""
+    try:
+        with _connect_approval(db_path) as conn:
+            row = conn.execute("SELECT COUNT(*) FROM gm_approval_requests").fetchone()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            "Cannot count approval requests in state database",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return int(row[0]) if row is not None else 0
+
+
+def update_request_status(
+    request_code: str,
+    status: str,
+    decided_by: str,
+    decision_reason: str | None,
+    decided_at: str,
+    db_path: str | Path,
+) -> bool:
+    """Update a request's decision fields. Return True if a row changed (GM-3).
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the update cannot be executed.
+    """
+    try:
+        with _connect_approval(db_path) as conn:
+            cursor = conn.execute(
+                """
+                UPDATE gm_approval_requests
+                SET status = ?, decided_by = ?, decision_reason = ?, decided_at = ?
+                WHERE request_code = ?
+                """,
+                (status, decided_by, decision_reason, decided_at, request_code),
+            )
+            return cursor.rowcount > 0
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot update approval request {request_code}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def get_pending_requests(db_path: str | Path) -> list[dict]:
+    """Return all PENDING approval requests, oldest first (GM-3)."""
+    try:
+        with _connect_approval(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT * FROM gm_approval_requests
+                WHERE status = 'PENDING'
+                ORDER BY created_at, request_code
+                """
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            "Cannot read pending approval requests from state database",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return [dict(row) for row in rows]
+
+
+def get_all_requests_for_blueprint(
+    blueprint_name: str, db_path: str | Path
+) -> list[dict]:
+    """Return all approval requests for a blueprint, newest first (GM-3)."""
+    try:
+        with _connect_approval(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT * FROM gm_approval_requests
+                WHERE blueprint_name = ?
+                ORDER BY created_at DESC, request_code DESC
+                """,
+                (blueprint_name,),
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            f"Cannot read approval requests for blueprint {blueprint_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return [dict(row) for row in rows]
+
+
+def get_request_by_code(request_code: str, db_path: str | Path) -> dict | None:
+    """Return one approval request by its code, or None (GM-3)."""
+    try:
+        with _connect_approval(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT * FROM gm_approval_requests WHERE request_code = ?",
+                (request_code,),
+            ).fetchone()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            f"Cannot read approval request {request_code}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return dict(row) if row is not None else None
 
 
 def ensure_gitignore_entry(cwd: Path | None = None) -> None:

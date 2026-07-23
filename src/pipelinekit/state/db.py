@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING
 from pipelinekit.core.errors import StateError
 
 if TYPE_CHECKING:
+    from pipelinekit.architecture.dependency import BlueprintDependency
     from pipelinekit.contracts.versioning import ContractVersion
     from pipelinekit.governance.ownership import BlueprintOwner
     from pipelinekit.observability.slo import SLODefinition
@@ -187,6 +188,16 @@ CREATE TABLE IF NOT EXISTS om_slos (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     UNIQUE(blueprint_name, table_name, slo_type)
+);
+
+CREATE TABLE IF NOT EXISTS am_dependencies (
+    id TEXT PRIMARY KEY,
+    from_blueprint TEXT NOT NULL,
+    to_blueprint TEXT NOT NULL,
+    dependency_type TEXT NOT NULL,
+    reason TEXT,
+    detected_at TEXT NOT NULL,
+    UNIQUE(from_blueprint, to_blueprint, dependency_type)
 );
 """
 
@@ -1285,6 +1296,144 @@ def delete_slo(
         raise StateError(
             "PK-STATE-002",
             f"Cannot delete SLO for {blueprint_name}/{table_name}/{slo_type}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+_AM_DEPENDENCIES_DDL = """
+CREATE TABLE IF NOT EXISTS am_dependencies (
+    id TEXT PRIMARY KEY,
+    from_blueprint TEXT NOT NULL,
+    to_blueprint TEXT NOT NULL,
+    dependency_type TEXT NOT NULL,
+    reason TEXT,
+    detected_at TEXT NOT NULL,
+    UNIQUE(from_blueprint, to_blueprint, dependency_type)
+);
+"""
+
+
+def _connect_dependencies(db_path: str | Path) -> sqlite3.Connection:
+    """Open ``db_path`` and ensure the ``am_dependencies`` table exists.
+
+    AM-4 (SPEC-026) threads an explicit ``db_path`` rather than ``cwd`` so the
+    dependency layer is testable against a ``tmp_path`` database. The table DDL
+    is idempotent, so a raw path with no prior ``initialize`` still works.
+    """
+    conn = sqlite3.connect(db_path)
+    conn.executescript(_AM_DEPENDENCIES_DDL)
+    return conn
+
+
+def insert_dependency(dep: BlueprintDependency, db_path: str | Path) -> None:
+    """Insert or replace a blueprint dependency (AM-4, SPEC-026).
+
+    The ``UNIQUE(from_blueprint, to_blueprint, dependency_type)`` constraint
+    means re-detecting the same edge replaces it rather than duplicating.
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the dependency cannot be written.
+    """
+    try:
+        with _connect_dependencies(db_path) as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO am_dependencies (
+                    id, from_blueprint, to_blueprint,
+                    dependency_type, reason, detected_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    dep.id,
+                    dep.from_blueprint,
+                    dep.to_blueprint,
+                    dep.dependency_type,
+                    dep.reason,
+                    dep.detected_at,
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot write dependency {dep.from_blueprint} -> {dep.to_blueprint}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def get_all_dependencies(db_path: str | Path) -> list[dict]:
+    """Return every dependency, sorted by from, to, then type (AM-4)."""
+    try:
+        with _connect_dependencies(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT * FROM am_dependencies
+                ORDER BY from_blueprint, to_blueprint, dependency_type
+                """
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            "Cannot read dependencies from state database",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return [dict(row) for row in rows]
+
+
+def get_dependencies_from(blueprint_name: str, db_path: str | Path) -> list[dict]:
+    """Return dependencies where ``blueprint_name`` is the ``from`` end (AM-4).
+
+    These are the edges whose downstream ``to_blueprint`` is affected when
+    ``blueprint_name`` changes (impact analysis).
+    """
+    try:
+        with _connect_dependencies(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT * FROM am_dependencies
+                WHERE from_blueprint = ?
+                ORDER BY to_blueprint, dependency_type
+                """,
+                (blueprint_name,),
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            f"Cannot read dependencies for blueprint {blueprint_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return [dict(row) for row in rows]
+
+
+def delete_dependency(
+    from_blueprint: str,
+    to_blueprint: str,
+    db_path: str | Path,
+) -> bool:
+    """Delete every dependency edge between two blueprints (AM-4).
+
+    Removes all dependency types for the ordered pair. Returns True if any row
+    was removed.
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the delete cannot be executed.
+    """
+    try:
+        with _connect_dependencies(db_path) as conn:
+            cursor = conn.execute(
+                """
+                DELETE FROM am_dependencies
+                WHERE from_blueprint = ? AND to_blueprint = ?
+                """,
+                (from_blueprint, to_blueprint),
+            )
+            return cursor.rowcount > 0
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot delete dependency {from_blueprint} -> {to_blueprint}",
             {"path": str(db_path), "detail": str(exc)},
         ) from exc
 

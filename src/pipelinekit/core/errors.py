@@ -57,7 +57,10 @@ class LLMError(PipelineKitError):
 
 
 class ArchitectureError(PipelineKitError):
-    """Raised when architecture context collection or reasoning fails."""
+    """Raised when architecture context collection or reasoning fails
+    (``PK-ARCH-*``), or when a blueprint dependency operation fails — blueprint
+    not installed or an invalid dependency type (AM-4, ADR-027, SPEC-026;
+    ``PK-AM-*``)."""
 
 
 class HealthError(PipelineKitError):

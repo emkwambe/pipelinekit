@@ -114,6 +114,19 @@ raised** — it is surfaced as warning text by `pipelinekit observability slo
 check` (which exits 1 on any violation) and in `pipelinekit health --strict`.
 A missing data source yields `NO_DATA`, never a failure.
 
+### AM — Architecture Management (AM-4, SPEC-026)
+
+| Code | Meaning |
+|---|---|
+| PK-AM-001 | Blueprint not found — one or both blueprints in the dependency are not installed. Fix: run `pipelinekit blueprint list` to see installed blueprints. |
+| PK-AM-002 | Invalid dependency type — the dependency type must be one of: `contract`, `dbt_source`, `manual`. Fix: use a valid dependency type. |
+
+AM-4 maps blueprint dependencies in the `am_dependencies` table by statically
+reading contract, `sources.yml`, and `blueprint.json` files. `PK-AM-001` and
+`PK-AM-002` are carried by `ArchitectureError` (raised by `dependency add`).
+Auto-detection returning no edges is a valid result — the current blueprints are
+independent pipelines.
+
 ---
 
 ## Phase 3 Registry — Trust Layer

@@ -4,6 +4,16 @@ All notable changes to PipelineKit are documented in this file.
 
 ## [Unreleased]
 
+### Added — Phase 2 Sprint 9 (GM-2 Naming Convention Enforcement)
+- `pipelinekit governance convention add` — define naming convention with regex pattern
+- `pipelinekit governance convention list` — list all conventions
+- `pipelinekit governance convention check` — validate blueprint names against conventions
+- `pipelinekit governance convention remove` — remove a convention
+- Scopes: blueprint | table | column | contract_file
+- New error codes: PK-GM-003 (invalid scope), PK-GM-004 (invalid regex)
+- New state.db table: gm_conventions
+
+
 ### Added — Phase 2 Sprint 8 (DC-10 Consumer Notification)
 - `pipelinekit contract consumer add` — register consumer for contract table
 - `pipelinekit contract consumer list` — list all registered consumers

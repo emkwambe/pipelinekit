@@ -4,6 +4,16 @@ All notable changes to PipelineKit are documented in this file.
 
 ## [Unreleased]
 
+### Added — Phase 2 Sprint 7 (AM-4 Dependency Analysis)
+- `pipelinekit architect dependency scan` — auto-detect blueprint dependencies
+- `pipelinekit architect dependency list` — list all dependencies
+- `pipelinekit architect dependency add` — add manual dependency
+- `pipelinekit architect dependency remove` — remove dependency
+- `pipelinekit architect dependency impact` — show blast radius of a change
+- New error codes: PK-AM-001, PK-AM-002
+- New architecture module: src/pipelinekit/architecture/
+
+
 ### Added — Phase 2 Sprint 6 (OM-4 SLO Definition)
 - `pipelinekit observability slo set` — define freshness, row_count, or coverage SLOs
 - `pipelinekit observability slo list` — list all defined SLOs

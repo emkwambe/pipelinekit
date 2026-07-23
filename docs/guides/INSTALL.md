@@ -321,6 +321,45 @@ If all five steps complete without error — PipelineKit is fully installed and 
 
 ---
 
+## Phase 2 capabilities
+
+Once installed, explore what PipelineKit can do across its five management domains:
+
+```bash
+# Snapshot and version your data contracts
+pipelinekit contract snapshot
+pipelinekit contract version
+
+# Check for schema drift and breaking changes
+pipelinekit contract check-breaking
+
+# See quality coverage across all blueprints
+pipelinekit quality coverage
+
+# Record row counts and detect volume anomalies
+pipelinekit quality record-counts --blueprint <name> --table <table>:<count>
+pipelinekit quality check-anomalies --blueprint <name>
+
+# Assign ownership to blueprints
+pipelinekit governance owner set <blueprint> --name "Your Name" --email you@example.com
+pipelinekit governance owner list
+
+# Define and evaluate Service Level Objectives
+pipelinekit observability slo set <blueprint> --table <table> --type freshness --threshold 6 --unit hours
+pipelinekit observability slo check <blueprint>
+
+# Map blueprint dependencies
+pipelinekit architect dependency scan
+pipelinekit architect dependency impact <blueprint>
+
+# Full health check across all domains
+pipelinekit health --strict
+```
+
+See the [CLI Reference](CLI-REFERENCE.md) for every command, option, and example output.
+
+---
+
 ## Common installation issues
 
 See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for the top 10 errors and their fixes.

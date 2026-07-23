@@ -83,6 +83,36 @@ Download, validate, and write a blueprint from the registry.
 
 > The public registry is live at **[registry.pipelinekit.dev](https://registry.pipelinekit.dev)** and currently lists 3 verified blueprints.
 
+### `pipelinekit blueprint outdated [--json]`
+Compare installed blueprint versions against the registry.
+
+| Option | Description |
+|---|---|
+| `--json` | Output the status as JSON instead of a table |
+
+Shows each blueprint's installed version, the registry version, and whether an update is available. No installed blueprints exits 0 with a hint.
+
+### `pipelinekit blueprint upgrade <name> [--dry-run] [--yes]`
+Upgrade a blueprint to the latest registry version. A backup is taken first so the change can be rolled back.
+
+| Argument / Option | Description |
+|---|---|
+| `name` (required) | Blueprint to upgrade |
+| `--dry-run` | Show the upgrade (`installed → registry`) without writing |
+| `--yes` | Skip the confirmation prompt |
+
+Prints the target version's changelog and prompts before writing (unless `--yes`). Fails with `PK-REGISTRY-004` if the blueprint is not in the catalog, or `PK-REGISTRY-006` if it is already at the latest version.
+
+### `pipelinekit blueprint rollback <name> [--version]`
+Restore a blueprint from a local backup created during a prior `upgrade`.
+
+| Argument / Option | Description |
+|---|---|
+| `name` (required) | Blueprint to roll back |
+| `--version`, `-v` | A specific backed-up version to restore (defaults to the most recent backup) |
+
+Fails with `PK-REGISTRY-007` if no backup exists for the blueprint.
+
 ---
 
 ## Generate Commands
@@ -164,6 +194,176 @@ Compare two tools for your specific stack and data profile.
 | `tool-a`, `tool-b` (required) | The two tools to compare |
 | `--provider`, `-p` | AI provider override |
 
+### `pipelinekit architect dependency` (AM-4)
+Map dependencies between installed blueprints and analyze the impact of a change. An edge `from → to` means `to` depends on `from` (`from` is upstream). Dependencies are stored in `state.db`; discovery is a static read of blueprint files — no execution, no AI.
+
+#### `pipelinekit architect dependency scan`
+Auto-detect dependencies by reading each blueprint's contracts, dbt `sources.yml`, and `blueprint.json`. No options. Finding zero dependencies is a valid result — the current blueprints are independent pipelines.
+
+```
+Scanning 3 blueprint(s) for dependencies...
+✓ No auto-detected dependencies found (add manual dependencies with 'dependency add')
+```
+
+#### `pipelinekit architect dependency list`
+Show every stored dependency as a table: From, To, Type, Reason, Detected. Prints `No dependencies defined.` when empty. No options.
+
+#### `pipelinekit architect dependency add <from> <to> --type <type> [--reason]`
+Add a manual dependency edge.
+
+| Argument / Option | Description |
+|---|---|
+| `from` (required) | Upstream (producer) blueprint |
+| `to` (required) | Downstream (consumer) blueprint |
+| `--type` (required) | `contract` \| `dbt_source` \| `manual` |
+| `--reason` | Why the dependency exists |
+
+Fails with `PK-AM-001` if either blueprint is not installed, or `PK-AM-002` for an invalid type.
+
+#### `pipelinekit architect dependency remove <from> <to>`
+Remove the dependency between two blueprints (all types for the pair). Prints `No dependency found` if none existed.
+
+#### `pipelinekit architect dependency impact <blueprint>`
+Show which blueprints are affected if `<blueprint>` changes (every edge where it is the upstream `from`).
+
+```
+Impact Analysis — postgres-to-snowflake
+─────────────────────────────────────────
+If postgres-to-snowflake changes, these blueprints may be affected:
+  → stripe-to-snowflake (manual: orders feed stripe reconciliation)
+1 blueprint(s) depend on postgres-to-snowflake
+```
+
+---
+
+## Contract Commands (DC-8 / DC-9)
+
+Version data contracts and detect breaking schema changes. Contracts are discovered under `blueprints/<name>/contracts/*.yaml`; version snapshots are stored in `state.db`.
+
+### `pipelinekit contract version [--history] [--blueprint <name>] [--diff <a> <b>]`
+Show contract versions: the latest of every contract by default.
+
+| Option | Description |
+|---|---|
+| `--history` | Show the full version history per contract |
+| `--blueprint` | Filter to a single blueprint |
+| `--diff <a> <b>` | Diff two versions, e.g. `--diff v1.0.0 v1.1.0` (takes two values; requires `--blueprint`) |
+
+Diff output marks `+` added fields, `-` removed fields, and `~` changed constraints. A `--diff` referencing an unknown version fails with `PK-DC-008`.
+
+### `pipelinekit contract snapshot [--force]`
+Snapshot every discovered contract, computing a semantic version bump (PATCH additive / MINOR tightened / MAJOR breaking).
+
+| Option | Description |
+|---|---|
+| `--force` | Accept a breaking change and write the MAJOR version |
+
+Without `--force`, a snapshot that would introduce a breaking (MAJOR) change is **blocked** with `PK-DC-011` and the existing version is preserved; the command exits 1. The warning block lists removed columns and any dbt models that reference them.
+
+### `pipelinekit contract check-breaking`
+Compare current contracts against their latest snapshots without writing anything. No options. Exits 1 if any breaking change is detected; contracts with no baseline are reported as needing a first `snapshot`.
+
+---
+
+## Quality Commands (QM-4 / QM-6)
+
+Measure test coverage and detect volume anomalies. Coverage is a read-only scan of blueprint files; row counts are stored in `state.db`.
+
+### `pipelinekit quality coverage [--blueprint <name>] [--format <table|json>]`
+Report dbt test and Soda check coverage for installed blueprints.
+
+| Option | Description |
+|---|---|
+| `--blueprint` | Filter to a single blueprint |
+| `--format` | `table` (default) or `json` |
+
+Reports per-model column coverage %, untested columns, and the Soda check inventory. Fails with `PK-QM-001` if no blueprints are installed.
+
+### `pipelinekit quality record-counts --blueprint <name> --table <table>:<count> [...]`
+Record row-count snapshots for one or more tables.
+
+| Option | Description |
+|---|---|
+| `--blueprint` (required) | Blueprint name |
+| `--table` (required, repeatable) | `table:count` pair, e.g. `charges:45231` |
+
+After recording, each table shows either `establishing — N/3 snapshots` or its baseline status.
+
+### `pipelinekit quality check-anomalies --blueprint <name> [--threshold <pct>]`
+Compare the latest recorded counts against the rolling baseline.
+
+| Option | Description |
+|---|---|
+| `--blueprint` (required) | Blueprint name |
+| `--threshold` | Deviation threshold percent (default `20.0`) |
+
+Fewer than 3 snapshots for a table yields `ESTABLISHING`. Exits 1 (with `PK-QM-003` in the output) if any table is flagged `ANOMALY`.
+
+### `pipelinekit quality row-count-history --blueprint <name> --table <name> [--limit <n>]`
+Show recorded row counts for one table, newest first, with each snapshot's deviation from the mean.
+
+| Option | Description |
+|---|---|
+| `--blueprint` (required) | Blueprint name |
+| `--table` (required) | Table name |
+| `--limit` | Number of snapshots to show (default `10`) |
+
+---
+
+## Governance Commands (GM-1)
+
+Assign ownership to installed blueprints. Ownership is stored in `state.db`; missing ownership surfaces as a warning in `pipelinekit health --strict`.
+
+### `pipelinekit governance owner set <blueprint> --name <name> --email <email> [--team] [--notes]`
+Assign or update the owner of a blueprint.
+
+| Argument / Option | Description |
+|---|---|
+| `blueprint` (required) | Blueprint to assign an owner |
+| `--name` (required) | Owner name |
+| `--email` (required) | Owner email (validated) |
+| `--team` | Team name |
+| `--notes` | Free-form notes |
+
+Fails with `PK-GM-001` if the blueprint is not installed, or `PK-GM-002` for an invalid email.
+
+### `pipelinekit governance owner get <blueprint>`
+Show the owner of a blueprint, or a message if none is set.
+
+### `pipelinekit governance owner list`
+List every installed blueprint with its ownership status; warns about any unowned blueprints.
+
+### `pipelinekit governance owner remove <blueprint>`
+Remove the owner from a blueprint.
+
+---
+
+## Observability Commands (OM-4)
+
+Define and evaluate Service Level Objectives. SLOs are stored in `state.db` and evaluated against existing DC (freshness), QM (row count), and coverage data — no warehouse connection.
+
+### `pipelinekit observability slo set <blueprint> --table <name> --type <type> --threshold <n> [--unit]`
+Assign or update an SLO for a blueprint/table.
+
+| Argument / Option | Description |
+|---|---|
+| `blueprint` (required) | Blueprint name |
+| `--table` (required) | Table or dbt model name |
+| `--type` (required) | `freshness` \| `row_count` \| `coverage` |
+| `--threshold` (required) | Target value (hours / rows / percent) |
+| `--unit` | `hours` \| `rows` \| `percent` |
+
+Fails with `PK-OM-002` for an invalid SLO type.
+
+### `pipelinekit observability slo list`
+List all defined SLOs as a table: Blueprint, Table, Type, Threshold, Unit.
+
+### `pipelinekit observability slo check <blueprint>`
+Evaluate every SLO for a blueprint against current `state.db` data. Each SLO is `OK`, `VIOLATED`, or `NO_DATA` (insufficient history — not a failure). Exits 1 (with `PK-OM-001` in the output) if any SLO is `VIOLATED`.
+
+### `pipelinekit observability slo remove <blueprint> --table <name> --type <type>`
+Remove an SLO. Prints a message if no matching SLO exists.
+
 ---
 
 ## Health Commands
@@ -184,6 +384,9 @@ Health is non-blocking by default so it is safe in scripts and CI.
 | `pipelinekit health blueprints` | Validate all installed blueprints against their schemas |
 | `pipelinekit health specs [--fix]` | Check SPEC status headers for drift; `--fix` rewrites drifted headers to Implemented |
 | `pipelinekit health tests` | Report the last test run's coverage |
+| `pipelinekit health ownership` | Check that every installed blueprint has an owner (GM-1) |
+
+The `ownership` check (added in Phase 2, GM-1) is the sixth check; an unowned blueprint is a warning, so `--strict` exits 1 while the default run still exits 0.
 
 ---
 
@@ -271,3 +474,16 @@ Every error carries a stable `PK-[AREA]-[NUMBER]` code. The table below is the o
 | `PK-MIGRATE-003` | Blocking gaps exist — use `--write-draft` to write anyway | Resolve gaps or pass `--write-draft` |
 | `PK-MIGRATE-004` | AI analysis failed (invalid response) | Retry; try another provider |
 | `PK-MIGRATE-005` | Python file parsing failed (syntax error) | Fix the Python syntax |
+| `PK-DC-008` | Contract version not found (`--diff`) | Run `contract version --history` for valid versions |
+| `PK-DC-009` | Version format invalid (not MAJOR.MINOR.PATCH) | Use e.g. `v1.0.0` |
+| `PK-DC-010` | State write failed during contract snapshot | Check disk/permissions on `state.db` |
+| `PK-DC-011` | Breaking change blocked (MAJOR bump) | Review changes, re-run `snapshot --force` |
+| `PK-QM-001` | No blueprints found for coverage scan | Install a blueprint first |
+| `PK-QM-002` | `schema.yml` parse error | Fix the YAML syntax |
+| `PK-QM-003` | Volume anomaly detected | Investigate the affected table's pipeline run |
+| `PK-GM-001` | Blueprint not found | Run `pipelinekit blueprint list` |
+| `PK-GM-002` | Invalid owner email | Provide a valid `name@domain.tld` address |
+| `PK-OM-001` | SLO violated | Investigate freshness / row count / coverage |
+| `PK-OM-002` | Invalid SLO type | Use `freshness`, `row_count`, or `coverage` |
+| `PK-AM-001` | Blueprint not found (dependency) | Run `pipelinekit blueprint list` |
+| `PK-AM-002` | Invalid dependency type | Use `contract`, `dbt_source`, or `manual` |

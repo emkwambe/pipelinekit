@@ -1,4 +1,8 @@
-"""Tests for ADRReader (SPEC-011). Reads real docs/decisions/ and tmp dirs."""
+"""Tests for ADRReader (SPEC-011).
+
+Reads a committed fixture directory (``tests/fixtures/decisions/``) rather than
+the real ``docs/decisions/``, which is gitignored and absent from CI checkouts.
+"""
 
 from __future__ import annotations
 
@@ -6,12 +10,12 @@ from pathlib import Path
 
 from pipelinekit.ai.adr_reader import ADRReader
 
-_REPO_DECISIONS = Path(__file__).resolve().parents[2] / "docs" / "decisions"
+_FIXTURE_DECISIONS = Path(__file__).resolve().parents[1] / "fixtures" / "decisions"
 
 
 def test_read_all_returns_summaries():
-    """read_all() returns structured ADR summaries from docs/decisions/."""
-    reader = ADRReader(_REPO_DECISIONS)
+    """read_all() returns structured ADR summaries from the fixture directory."""
+    reader = ADRReader(_FIXTURE_DECISIONS)
     adrs = reader.read_all()
     assert len(adrs) > 0
     assert all(a["adr_id"].startswith("ADR-") for a in adrs)

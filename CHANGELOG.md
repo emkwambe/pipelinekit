@@ -4,6 +4,17 @@ All notable changes to PipelineKit are documented in this file.
 
 ## [Unreleased]
 
+### Added — Phase 2 Sprint 8 (DC-10 Consumer Notification)
+- `pipelinekit contract consumer add` — register consumer for contract table
+- `pipelinekit contract consumer list` — list all registered consumers
+- `pipelinekit contract consumer remove` — remove consumer
+- `pipelinekit contract notifications` — view pending notifications
+- `pipelinekit contract notifications --clear` — mark notifications as read
+- Breaking changes (--force) create notification records for watching consumers
+- New error code: PK-DC-012 (informational)
+- New state.db tables: dc_consumers, dc_notifications
+
+
 ### Added — Phase 2 Sprint 7 (AM-4 Dependency Analysis)
 - `pipelinekit architect dependency scan` — auto-detect blueprint dependencies
 - `pipelinekit architect dependency list` — list all dependencies

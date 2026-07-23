@@ -4,6 +4,16 @@ All notable changes to PipelineKit are documented in this file.
 
 ## [Unreleased]
 
+### Added — Phase 2 Sprint 5 (QM-6 Volume Anomaly Detection)
+- `pipelinekit quality record-counts` — record row counts for pipeline tables
+- `pipelinekit quality check-anomalies` — detect volume anomalies vs rolling baseline
+- `pipelinekit quality row-count-history` — show row count history per table
+- Rolling baseline: 20% default threshold, 7-snapshot window, 3-snapshot minimum
+- ESTABLISHING status shown when fewer than 3 snapshots exist
+- New error code: PK-QM-003
+- New state.db table: qm_row_counts
+
+
 ### Added — Phase 2 Sprint 4 (GM-1 Ownership Assignment)
 - `pipelinekit governance owner set` — assign owner to a blueprint
 - `pipelinekit governance owner get` — view owner details

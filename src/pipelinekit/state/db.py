@@ -25,6 +25,7 @@ from pipelinekit.core.errors import StateError
 if TYPE_CHECKING:
     from pipelinekit.contracts.versioning import ContractVersion
     from pipelinekit.governance.ownership import BlueprintOwner
+    from pipelinekit.observability.slo import SLODefinition
 
 STATE_DIR = ".pipelinekit"
 STATE_DB = "state.db"
@@ -175,6 +176,18 @@ CREATE TABLE IF NOT EXISTS qm_row_counts (
 
 CREATE INDEX IF NOT EXISTS idx_qm_row_counts_blueprint_table
     ON qm_row_counts(blueprint_name, table_name, recorded_at);
+
+CREATE TABLE IF NOT EXISTS om_slos (
+    id TEXT PRIMARY KEY,
+    blueprint_name TEXT NOT NULL,
+    table_name TEXT NOT NULL,
+    slo_type TEXT NOT NULL,
+    threshold REAL NOT NULL,
+    unit TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(blueprint_name, table_name, slo_type)
+);
 """
 
 
@@ -872,6 +885,36 @@ def get_contract_version_by_semver(
     return dict(row) if row is not None else None
 
 
+def get_latest_contract_version_for_blueprint(
+    blueprint_name: str, db_path: str | Path
+) -> dict | None:
+    """Return the most recent contract snapshot for a blueprint, or None.
+
+    Unlike ``get_latest_contract_version`` (which is scoped to one
+    ``contract_file``), this returns the newest snapshot across every contract
+    of the blueprint. Used by OM-4 freshness SLO evaluation (SPEC-025).
+    """
+    try:
+        with _connect_versions(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                """
+                SELECT * FROM dc_contract_versions
+                WHERE blueprint_name = ?
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (blueprint_name,),
+            ).fetchone()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            f"Cannot read latest contract version for {blueprint_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return dict(row) if row is not None else None
+
+
 _GM_OWNERS_DDL = """
 CREATE TABLE IF NOT EXISTS gm_owners (
     id TEXT PRIMARY KEY,
@@ -1110,6 +1153,140 @@ def get_all_tables_for_blueprint(
             {"path": str(db_path), "detail": str(exc)},
         ) from exc
     return [row[0] for row in rows]
+
+
+_OM_SLOS_DDL = """
+CREATE TABLE IF NOT EXISTS om_slos (
+    id TEXT PRIMARY KEY,
+    blueprint_name TEXT NOT NULL,
+    table_name TEXT NOT NULL,
+    slo_type TEXT NOT NULL,
+    threshold REAL NOT NULL,
+    unit TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(blueprint_name, table_name, slo_type)
+);
+"""
+
+
+def _connect_slos(db_path: str | Path) -> sqlite3.Connection:
+    """Open ``db_path`` and ensure the ``om_slos`` table exists.
+
+    OM-4 (SPEC-025) threads an explicit ``db_path`` rather than ``cwd`` so the
+    SLO layer is testable against a ``tmp_path`` database. The table DDL is
+    idempotent, so a raw path with no prior ``initialize`` still works.
+    """
+    conn = sqlite3.connect(db_path)
+    conn.executescript(_OM_SLOS_DDL)
+    return conn
+
+
+def upsert_slo(slo: SLODefinition, db_path: str | Path) -> None:
+    """Insert or replace an SLO definition (OM-4, SPEC-025).
+
+    The ``UNIQUE(blueprint_name, table_name, slo_type)`` constraint means a
+    matching triple is replaced in place. The ``slo`` layer preserves ``id`` and
+    ``created_at`` on update.
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the SLO cannot be written.
+    """
+    try:
+        with _connect_slos(db_path) as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO om_slos (
+                    id, blueprint_name, table_name, slo_type,
+                    threshold, unit, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    slo.id,
+                    slo.blueprint_name,
+                    slo.table_name,
+                    slo.slo_type,
+                    slo.threshold,
+                    slo.unit,
+                    slo.created_at,
+                    slo.updated_at,
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot write SLO for {slo.blueprint_name}/{slo.table_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def get_slos(blueprint_name: str, db_path: str | Path) -> list[dict]:
+    """Return every SLO for a blueprint, sorted by table then type (OM-4)."""
+    try:
+        with _connect_slos(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT * FROM om_slos
+                WHERE blueprint_name = ?
+                ORDER BY table_name, slo_type
+                """,
+                (blueprint_name,),
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            f"Cannot read SLOs for blueprint {blueprint_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return [dict(row) for row in rows]
+
+
+def get_all_slos(db_path: str | Path) -> list[dict]:
+    """Return every stored SLO, sorted by blueprint, table, then type (OM-4)."""
+    try:
+        with _connect_slos(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT * FROM om_slos ORDER BY blueprint_name, table_name, slo_type"
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            "Cannot read SLOs from state database",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return [dict(row) for row in rows]
+
+
+def delete_slo(
+    blueprint_name: str,
+    table_name: str,
+    slo_type: str,
+    db_path: str | Path,
+) -> bool:
+    """Delete one SLO. Return True if a row was removed (OM-4).
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the delete cannot be executed.
+    """
+    try:
+        with _connect_slos(db_path) as conn:
+            cursor = conn.execute(
+                """
+                DELETE FROM om_slos
+                WHERE blueprint_name = ? AND table_name = ? AND slo_type = ?
+                """,
+                (blueprint_name, table_name, slo_type),
+            )
+            return cursor.rowcount > 0
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot delete SLO for {blueprint_name}/{table_name}/{slo_type}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
 
 
 def ensure_gitignore_entry(cwd: Path | None = None) -> None:

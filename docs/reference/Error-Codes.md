@@ -100,6 +100,20 @@ GM-1 governance codes are carried by `GovernanceError`. Ownership is stored in
 the `gm_owners` table; missing ownership is surfaced as a warning (never a
 failure) by the `ownership` health check.
 
+### OM — Observability Management (OM-4, SPEC-025)
+
+| Code | Meaning |
+|---|---|
+| PK-OM-001 | SLO violated — a pipeline Service Level Objective threshold was not met during evaluation. Fix: investigate the pipeline — check freshness, row counts, or coverage for the affected table. |
+| PK-OM-002 | Invalid SLO type — the SLO type must be one of: `freshness`, `row_count`, `coverage`. Fix: use a valid SLO type. |
+
+OM-4 defines SLOs in the `om_slos` table and evaluates them against existing DC
+(freshness), QM (row count), and coverage data. `PK-OM-002` is carried by
+`ObservabilityError` (raised for an invalid type). `PK-OM-001` is **never
+raised** — it is surfaced as warning text by `pipelinekit observability slo
+check` (which exits 1 on any violation) and in `pipelinekit health --strict`.
+A missing data source yields `NO_DATA`, never a failure.
+
 ---
 
 ## Phase 3 Registry — Trust Layer

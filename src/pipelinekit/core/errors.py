@@ -88,3 +88,9 @@ class QualityError(PipelineKitError):
 class GovernanceError(PipelineKitError):
     """Raised when a governance operation fails — blueprint not installed or an
     invalid owner email (ADR-024, SPEC-023). Carries ``PK-GM-*`` codes."""
+
+
+class ObservabilityError(PipelineKitError):
+    """Raised when an observability operation fails — an invalid SLO type
+    (ADR-026, SPEC-025). Carries ``PK-OM-*`` codes. SLO violations are surfaced
+    as warnings, never raised."""

@@ -10,6 +10,7 @@ Public-facing status of PipelineKit's EMS (Engineering Management System) capabi
 | Contract definition and validation | DC-1..7 | ✅ v0.1.0 |
 | Schema versioning | DC-8 | ✅ Phase 2 |
 | Breaking change detection | DC-9 | ✅ Phase 2 |
+| Consumer notification | DC-10 | ✅ Phase 2 |
 
 ### QM — Quality Management
 | Capability | Code | Status |
@@ -22,6 +23,7 @@ Public-facing status of PipelineKit's EMS (Engineering Management System) capabi
 | Capability | Code | Status |
 |---|---|---|
 | Ownership assignment | GM-1 | ✅ Phase 2 |
+| Naming convention enforcement | GM-2 | ✅ Phase 2 |
 
 ### OM — Observability Management
 | Capability | Code | Status |
@@ -46,10 +48,8 @@ Public-facing status of PipelineKit's EMS (Engineering Management System) capabi
 | Release coordination | RM-1..3 | ✅ v0.1.0 |
 
 ## Roadmap (Phase 2 continuing)
-- DC-10: Consumer notification
 - QM-7: Schema drift detection
 - QM-8: Quality scorecard
-- GM-2: Naming convention enforcement
 - GM-3: Approval workflow
 - OM-5: SLO dashboard
 - AM-5+: Architecture drift detection

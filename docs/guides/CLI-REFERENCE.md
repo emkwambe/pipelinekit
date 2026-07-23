@@ -236,7 +236,7 @@ If postgres-to-snowflake changes, these blueprints may be affected:
 
 ---
 
-## Contract Commands (DC-8 / DC-9)
+## Contract Commands (DC-8 / DC-9 / DC-10)
 
 Version data contracts and detect breaking schema changes. Contracts are discovered under `blueprints/<name>/contracts/*.yaml`; version snapshots are stored in `state.db`.
 
@@ -260,8 +260,60 @@ Snapshot every discovered contract, computing a semantic version bump (PATCH add
 
 Without `--force`, a snapshot that would introduce a breaking (MAJOR) change is **blocked** with `PK-DC-011` and the existing version is preserved; the command exits 1. The warning block lists removed columns and any dbt models that reference them.
 
+When a breaking change is accepted with `--force` (DC-10), a change notification record is created for every consumer registered against the affected table, and the command prints `✉ N consumer(s) notified`. If no consumers are registered for that table, no notification line is shown (this is normal, not an error — see `PK-DC-012`).
+
 ### `pipelinekit contract check-breaking`
 Compare current contracts against their latest snapshots without writing anything. No options. Exits 1 if any breaking change is detected; contracts with no baseline are reported as needing a first `snapshot`.
+
+### `pipelinekit contract consumer` (DC-10)
+Register downstream consumers who watch a contract table, so they receive a notification record when a breaking change is accepted. Consumers and notifications are stored in `state.db` (`dc_consumers`, `dc_notifications`) — this is the audit-trail layer only; **no email is sent** (delivery via the OM alerting system is a future integration).
+
+#### `pipelinekit contract consumer add <blueprint> --email <email> --table <table>`
+Register a consumer to watch one contract table. Re-registering the same blueprint/table/email is idempotent.
+
+| Argument / Option | Description |
+|---|---|
+| `blueprint` (required) | Blueprint to watch |
+| `--email` (required) | Consumer email |
+| `--table` (required) | Contract table to watch |
+
+```
+✓ Consumer registered: analyst@company.com watching charges (stripe-to-snowflake)
+```
+
+#### `pipelinekit contract consumer list`
+List every registered consumer across all installed blueprints as a table: Blueprint, Table, Consumer Email, Registered At. Prints `No consumers registered.` when empty. No options.
+
+#### `pipelinekit contract consumer remove <blueprint> --email <email> --table <table>`
+Remove a registered consumer.
+
+| Argument / Option | Description |
+|---|---|
+| `blueprint` (required) | Blueprint to stop watching |
+| `--email` (required) | Consumer email |
+| `--table` (required) | Contract table |
+
+Prints `✓ Consumer removed`, or `No consumer found for {blueprint}/{table}/{email}` if there was no match.
+
+### `pipelinekit contract notifications [--clear]` (DC-10)
+View or clear pending contract-change notifications.
+
+| Option | Description |
+|---|---|
+| `--clear` | Mark all pending notifications as read |
+
+Without `--clear`, prints a table of unread notifications (Blueprint, Table, Change, Consumer, Created) and a count, or `No pending notifications.` when empty. With `--clear`, prints `✓ N notification(s) marked as read`.
+
+```
+Pending Notifications
+──────────────────────────────────────────────────────────────────────
+┌─────────────────────┬─────────┬───────────────┬─────────────────────┐
+│ Blueprint           │ Table   │ Change        │ Consumer            │
+├─────────────────────┼─────────┼───────────────┼─────────────────────┤
+│ stripe-to-snowflake │ charges │ v1.0.0→v2.0.0 │ analyst@company.com │
+└─────────────────────┴─────────┴───────────────┴─────────────────────┘
+1 pending notification(s). Run with --clear to mark as read.
+```
 
 ---
 
@@ -310,7 +362,7 @@ Show recorded row counts for one table, newest first, with each snapshot's devia
 
 ---
 
-## Governance Commands (GM-1)
+## Governance Commands (GM-1 / GM-2)
 
 Assign ownership to installed blueprints. Ownership is stored in `state.db`; missing ownership surfaces as a warning in `pipelinekit health --strict`.
 
@@ -335,6 +387,42 @@ List every installed blueprint with its ownership status; warns about any unowne
 
 ### `pipelinekit governance owner remove <blueprint>`
 Remove the owner from a blueprint.
+
+### `pipelinekit governance convention` (GM-2)
+Define regex-based naming conventions and check installed blueprints against them. Conventions are stored in `state.db` (`gm_conventions`). Checking is read-only — **violations are warnings only and never block pipeline execution**. Valid scopes: `blueprint`, `table`, `column`, `contract_file`. A name passes a scope if it matches at least one registered convention for that scope (`re.fullmatch`).
+
+#### `pipelinekit governance convention add --scope <scope> --pattern <regex> [--description <text>]`
+Add a naming convention.
+
+| Option | Description |
+|---|---|
+| `--scope` (required) | `blueprint` \| `table` \| `column` \| `contract_file` |
+| `--pattern` (required) | Regex pattern the name must match |
+| `--description` | Human-readable description |
+
+Fails with `PK-GM-003` for an invalid scope, or `PK-GM-004` if the pattern is not valid Python regex.
+
+```
+✓ Convention added: table → ^(stg|fct|dim|raw)_[a-z_]+
+```
+
+#### `pipelinekit governance convention list`
+List all conventions as a table: ID, Scope, Pattern, Description. Prints `No naming conventions defined.` when empty. No options.
+
+#### `pipelinekit governance convention check <blueprint>`
+Check a blueprint's names against registered conventions. For each scope with a convention, the relevant names are extracted (blueprint name; dbt model names and column names via `schema.yml`; `contracts/*.yaml` filenames) and validated. Exits 1 if any violation is found, 0 if all comply or no conventions are defined.
+
+```
+Convention Check — stripe-to-snowflake
+───────────────────────────────────────────────────────
+
+✓ All 4 name(s) comply with 1 convention(s)
+```
+
+A non-compliant name is reported as `⚠ {name}  {scope}  does NOT match {pattern}`.
+
+#### `pipelinekit governance convention remove <id>`
+Remove a convention by its ID (from `convention list`). Prints `✓ Convention removed`, or `No convention found with ID {id}` if the ID does not exist.
 
 ---
 
@@ -478,11 +566,14 @@ Every error carries a stable `PK-[AREA]-[NUMBER]` code. The table below is the o
 | `PK-DC-009` | Version format invalid (not MAJOR.MINOR.PATCH) | Use e.g. `v1.0.0` |
 | `PK-DC-010` | State write failed during contract snapshot | Check disk/permissions on `state.db` |
 | `PK-DC-011` | Breaking change blocked (MAJOR bump) | Review changes, re-run `snapshot --force` |
+| `PK-DC-012` | No consumers registered (informational) | Register consumers with `contract consumer add` |
 | `PK-QM-001` | No blueprints found for coverage scan | Install a blueprint first |
 | `PK-QM-002` | `schema.yml` parse error | Fix the YAML syntax |
 | `PK-QM-003` | Volume anomaly detected | Investigate the affected table's pipeline run |
 | `PK-GM-001` | Blueprint not found | Run `pipelinekit blueprint list` |
 | `PK-GM-002` | Invalid owner email | Provide a valid `name@domain.tld` address |
+| `PK-GM-003` | Invalid convention scope | Use `blueprint`, `table`, `column`, or `contract_file` |
+| `PK-GM-004` | Invalid regex pattern | Fix the regex before adding the convention |
 | `PK-OM-001` | SLO violated | Investigate freshness / row count / coverage |
 | `PK-OM-002` | Invalid SLO type | Use `freshness`, `row_count`, or `coverage` |
 | `PK-AM-001` | Blueprint not found (dependency) | Run `pipelinekit blueprint list` |

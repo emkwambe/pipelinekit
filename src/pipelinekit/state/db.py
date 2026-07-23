@@ -24,6 +24,10 @@ from pipelinekit.core.errors import StateError
 
 if TYPE_CHECKING:
     from pipelinekit.architecture.dependency import BlueprintDependency
+    from pipelinekit.contracts.notification import (
+        ContractConsumer,
+        ContractNotification,
+    )
     from pipelinekit.contracts.versioning import ContractVersion
     from pipelinekit.governance.ownership import BlueprintOwner
     from pipelinekit.observability.slo import SLODefinition
@@ -198,6 +202,28 @@ CREATE TABLE IF NOT EXISTS am_dependencies (
     reason TEXT,
     detected_at TEXT NOT NULL,
     UNIQUE(from_blueprint, to_blueprint, dependency_type)
+);
+
+CREATE TABLE IF NOT EXISTS dc_consumers (
+    id TEXT PRIMARY KEY,
+    blueprint_name TEXT NOT NULL,
+    table_name TEXT NOT NULL,
+    consumer_email TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(blueprint_name, table_name, consumer_email)
+);
+
+CREATE TABLE IF NOT EXISTS dc_notifications (
+    id TEXT PRIMARY KEY,
+    blueprint_name TEXT NOT NULL,
+    contract_file TEXT NOT NULL,
+    table_name TEXT NOT NULL,
+    consumer_email TEXT NOT NULL,
+    old_version TEXT NOT NULL,
+    new_version TEXT NOT NULL,
+    change_type TEXT NOT NULL,
+    is_read INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
 );
 """
 
@@ -1434,6 +1460,232 @@ def delete_dependency(
         raise StateError(
             "PK-STATE-002",
             f"Cannot delete dependency {from_blueprint} -> {to_blueprint}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+_DC_NOTIFY_DDL = """
+CREATE TABLE IF NOT EXISTS dc_consumers (
+    id TEXT PRIMARY KEY,
+    blueprint_name TEXT NOT NULL,
+    table_name TEXT NOT NULL,
+    consumer_email TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(blueprint_name, table_name, consumer_email)
+);
+
+CREATE TABLE IF NOT EXISTS dc_notifications (
+    id TEXT PRIMARY KEY,
+    blueprint_name TEXT NOT NULL,
+    contract_file TEXT NOT NULL,
+    table_name TEXT NOT NULL,
+    consumer_email TEXT NOT NULL,
+    old_version TEXT NOT NULL,
+    new_version TEXT NOT NULL,
+    change_type TEXT NOT NULL,
+    is_read INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+"""
+
+
+def _connect_dc_notify(db_path: str | Path) -> sqlite3.Connection:
+    """Open ``db_path`` and ensure the DC-10 tables exist.
+
+    DC-10 (SPEC-027) threads an explicit ``db_path`` rather than ``cwd`` so the
+    consumer/notification layer is testable against a ``tmp_path`` database. The
+    DDL is idempotent, so a raw path with no prior ``initialize`` still works.
+    """
+    conn = sqlite3.connect(db_path)
+    conn.executescript(_DC_NOTIFY_DDL)
+    return conn
+
+
+def insert_consumer(consumer: ContractConsumer, db_path: str | Path) -> None:
+    """Insert or replace a contract consumer (DC-10, SPEC-027).
+
+    The ``UNIQUE(blueprint_name, table_name, consumer_email)`` constraint makes
+    re-registering the same triple idempotent (INSERT OR IGNORE preserves the
+    original row and id).
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the consumer cannot be written.
+    """
+    try:
+        with _connect_dc_notify(db_path) as conn:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO dc_consumers (
+                    id, blueprint_name, table_name, consumer_email, created_at
+                )
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    consumer.id,
+                    consumer.blueprint_name,
+                    consumer.table_name,
+                    consumer.consumer_email,
+                    consumer.created_at,
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot write consumer for {consumer.blueprint_name}/"
+            f"{consumer.table_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def get_consumers(blueprint_name: str, db_path: str | Path) -> list[dict]:
+    """Return every consumer for a blueprint, sorted by table then email (DC-10)."""
+    try:
+        with _connect_dc_notify(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT * FROM dc_consumers
+                WHERE blueprint_name = ?
+                ORDER BY table_name, consumer_email
+                """,
+                (blueprint_name,),
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            f"Cannot read consumers for blueprint {blueprint_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return [dict(row) for row in rows]
+
+
+def get_consumers_for_table(
+    blueprint_name: str, table_name: str, db_path: str | Path
+) -> list[dict]:
+    """Return consumers watching a specific blueprint/table, by email (DC-10)."""
+    try:
+        with _connect_dc_notify(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT * FROM dc_consumers
+                WHERE blueprint_name = ? AND table_name = ?
+                ORDER BY consumer_email
+                """,
+                (blueprint_name, table_name),
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            f"Cannot read consumers for {blueprint_name}/{table_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return [dict(row) for row in rows]
+
+
+def delete_consumer(
+    blueprint_name: str, table_name: str, email: str, db_path: str | Path
+) -> bool:
+    """Delete one consumer. Return True if a row was removed (DC-10).
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the delete cannot be executed.
+    """
+    try:
+        with _connect_dc_notify(db_path) as conn:
+            cursor = conn.execute(
+                """
+                DELETE FROM dc_consumers
+                WHERE blueprint_name = ? AND table_name = ? AND consumer_email = ?
+                """,
+                (blueprint_name, table_name, email),
+            )
+            return cursor.rowcount > 0
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot delete consumer {email} for {blueprint_name}/{table_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def insert_notification(
+    notification: ContractNotification, db_path: str | Path
+) -> None:
+    """Insert a contract-change notification record (DC-10, SPEC-027).
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the notification cannot be written.
+    """
+    try:
+        with _connect_dc_notify(db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO dc_notifications (
+                    id, blueprint_name, contract_file, table_name,
+                    consumer_email, old_version, new_version, change_type,
+                    is_read, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    notification.id,
+                    notification.blueprint_name,
+                    notification.contract_file,
+                    notification.table_name,
+                    notification.consumer_email,
+                    notification.old_version,
+                    notification.new_version,
+                    notification.change_type,
+                    1 if notification.is_read else 0,
+                    notification.created_at,
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot write notification for {notification.consumer_email}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def get_pending_notifications(db_path: str | Path) -> list[dict]:
+    """Return all unread notifications, oldest first (DC-10)."""
+    try:
+        with _connect_dc_notify(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT * FROM dc_notifications
+                WHERE is_read = 0
+                ORDER BY created_at, blueprint_name, table_name, consumer_email
+                """
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            "Cannot read pending notifications from state database",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return [dict(row) for row in rows]
+
+
+def mark_notifications_read(db_path: str | Path) -> int:
+    """Mark every unread notification as read. Return the count updated (DC-10).
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the update cannot be executed.
+    """
+    try:
+        with _connect_dc_notify(db_path) as conn:
+            cursor = conn.execute(
+                "UPDATE dc_notifications SET is_read = 1 WHERE is_read = 0"
+            )
+            return cursor.rowcount
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            "Cannot mark notifications read in state database",
             {"path": str(db_path), "detail": str(exc)},
         ) from exc
 

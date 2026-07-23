@@ -18,6 +18,14 @@ from rich.console import Console
 from rich.table import Table
 
 from pipelinekit.blueprints.registry import BlueprintRegistry
+from pipelinekit.contracts.notification import (
+    create_notifications,
+    get_consumers,
+    get_pending_notifications,
+    mark_all_read,
+    register_consumer,
+    remove_consumer,
+)
 from pipelinekit.contracts.versioning import (
     BreakingChange,
     detect_breaking_changes,
@@ -257,7 +265,7 @@ def snapshot_command(
         raise typer.Exit(0)
 
     written: list[tuple[str, str, str]] = []
-    forced: list[tuple[str, str]] = []
+    forced: list[tuple[str, str, int]] = []
     blocked: list[BreakingChange] = []
 
     for name, contract_file, content in contracts:
@@ -270,7 +278,19 @@ def snapshot_command(
         before_version = before.version if before is not None else None
         version = snapshot_contract(name, contract_file, content, db_path)
         if breaking is not None and force:
-            forced.append((contract_file, version.version))
+            # DC-10: a forced MAJOR change is real breaking change — notify any
+            # consumers watching the affected table. No consumers → empty list.
+            table_name = content.get("table", "") if isinstance(content, dict) else ""
+            notifications = create_notifications(
+                blueprint_name=name,
+                contract_file=contract_file,
+                table_name=table_name,
+                old_version=before_version or "",
+                new_version=version.version,
+                change_type="MAJOR",
+                db_path=db_path,
+            )
+            forced.append((contract_file, version.version, len(notifications)))
         written.append(
             (contract_file, version.version, _label(before_version, version.version))
         )
@@ -284,11 +304,13 @@ def snapshot_command(
                 style="dim",
             )
 
-    for contract_file, version_str in forced:
+    for contract_file, version_str, notified in forced:
         console.print(
             f"⚠ Breaking change accepted (--force). Wrote v{version_str}.",
             style="yellow",
         )
+        if notified:
+            console.print(f"  ✉ {notified} consumer(s) notified", style="dim")
 
     for breaking in blocked:
         _render_breaking(breaking)
@@ -339,4 +361,115 @@ def check_breaking_command() -> None:
             style="dim",
         )
         raise typer.Exit(1)
+    raise typer.Exit(0)
+
+
+# --- DC-10: consumer registration + change notifications ------------------
+
+consumer_app = typer.Typer(
+    help="Contract consumer management.",
+    no_args_is_help=True,
+    add_completion=False,
+)
+contract_app.add_typer(consumer_app, name="consumer")
+
+
+@consumer_app.command("add")
+def consumer_add_command(
+    blueprint_name: str = typer.Argument(..., help="Blueprint to watch."),
+    email: str = typer.Option(..., "--email", help="Consumer email."),
+    table: str = typer.Option(..., "--table", help="Contract table to watch."),
+) -> None:
+    """Register a consumer to watch a contract table."""
+    consumer = register_consumer(blueprint_name, table, email, _db_path())
+    console.print(
+        f"✓ Consumer registered: {consumer.consumer_email} watching "
+        f"{consumer.table_name} ({consumer.blueprint_name})",
+        style="green",
+    )
+    raise typer.Exit(0)
+
+
+@consumer_app.command("list")
+def consumer_list_command() -> None:
+    """List all registered contract consumers."""
+    registry = BlueprintRegistry()
+    db_path = _db_path()
+    consumers = [c for bp in registry.list() for c in get_consumers(bp.name, db_path)]
+    if not consumers:
+        console.print("No consumers registered.")
+        raise typer.Exit(0)
+
+    console.print("Contract Consumers", style="bold")
+    console.print("─" * 61)
+    table = Table()
+    table.add_column("Blueprint", style="cyan", no_wrap=True)
+    table.add_column("Table")
+    table.add_column("Consumer Email")
+    table.add_column("Registered At")
+    for consumer in consumers:
+        table.add_row(
+            consumer.blueprint_name,
+            consumer.table_name,
+            consumer.consumer_email,
+            consumer.created_at,
+        )
+    console.print(table)
+    raise typer.Exit(0)
+
+
+@consumer_app.command("remove")
+def consumer_remove_command(
+    blueprint_name: str = typer.Argument(..., help="Blueprint to stop watching."),
+    email: str = typer.Option(..., "--email", help="Consumer email."),
+    table: str = typer.Option(..., "--table", help="Contract table."),
+) -> None:
+    """Remove a registered consumer."""
+    removed = remove_consumer(blueprint_name, table, email, _db_path())
+    if removed:
+        console.print("✓ Consumer removed", style="green")
+    else:
+        console.print(f"No consumer found for {blueprint_name}/{table}/{email}")
+    raise typer.Exit(0)
+
+
+@contract_app.command("notifications")
+def notifications_command(
+    clear: bool = typer.Option(
+        False, "--clear", help="Mark all pending notifications as read."
+    ),
+) -> None:
+    """View pending contract change notifications."""
+    db_path = _db_path()
+
+    if clear:
+        count = mark_all_read(db_path)
+        console.print(f"✓ {count} notification(s) marked as read", style="green")
+        raise typer.Exit(0)
+
+    pending = get_pending_notifications(db_path)
+    if not pending:
+        console.print("No pending notifications.")
+        raise typer.Exit(0)
+
+    console.print("Pending Notifications", style="bold")
+    console.print("─" * 70)
+    table = Table()
+    table.add_column("Blueprint", style="cyan", no_wrap=True)
+    table.add_column("Table")
+    table.add_column("Change")
+    table.add_column("Consumer")
+    table.add_column("Created")
+    for note in pending:
+        table.add_row(
+            note.blueprint_name,
+            note.table_name,
+            f"v{note.old_version}→v{note.new_version}",
+            note.consumer_email,
+            note.created_at,
+        )
+    console.print(table)
+    console.print(
+        f"{len(pending)} pending notification(s). Run with --clear to mark as read."
+    )
     raise typer.Exit(0)

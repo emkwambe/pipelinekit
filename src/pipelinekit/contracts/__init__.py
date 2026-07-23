@@ -6,10 +6,21 @@ diagnosis (SPEC-004, Principle 4 — Contracts Define Truth).
 
 DC-8 (SPEC-020) adds deterministic schema versioning on top of validation.
 DC-9 (SPEC-021) adds deterministic breaking-change detection with dbt impact.
+DC-10 (SPEC-027) adds consumer registration and contract change notifications.
 """
 
 from __future__ import annotations
 
+from pipelinekit.contracts.notification import (
+    ContractConsumer,
+    ContractNotification,
+    create_notifications,
+    get_consumers,
+    get_pending_notifications,
+    mark_all_read,
+    register_consumer,
+    remove_consumer,
+)
 from pipelinekit.contracts.versioning import (
     BreakingChange,
     ContractDiff,
@@ -34,4 +45,13 @@ __all__ = [
     "diff_contract_versions",
     "detect_breaking_changes",
     "scan_dbt_impact",
+    # DC-10 — consumer notification (SPEC-027)
+    "ContractConsumer",
+    "ContractNotification",
+    "register_consumer",
+    "get_consumers",
+    "remove_consumer",
+    "create_notifications",
+    "get_pending_notifications",
+    "mark_all_read",
 ]

@@ -70,10 +70,15 @@ CONFIG · CONTRACT · RUNTIME · ADAPTER · AI · STATE · BLUEPRINT · NOTIFY
 | PK-DC-009 | Version format invalid — version string does not match MAJOR.MINOR.PATCH. Fix: use semantic version format, e.g. `v1.0.0` or `1.0.0`. |
 | PK-DC-010 | State database error during snapshot — `state.db` write failed during contract snapshot. Fix: check disk space and `state.db` file permissions. |
 | PK-DC-011 | Breaking change blocked — contract snapshot would produce a MAJOR version bump. The snapshot was blocked to prevent unacknowledged breaking changes. Fix: review the breaking changes listed above, then re-run with `--force`. |
+| PK-DC-012 | No consumers registered — no consumers are watching this blueprint/table combination. This is informational, not an error, when no consumers have been set up yet. Fix: run `pipelinekit contract consumer add` to register consumers. |
 
 DC-8 versioning codes are carried by `ContractError` (PK-DC-008/009) and
 `StateError` (PK-DC-010). DC-9 (SPEC-021) surfaces `PK-DC-011` in the
 `contract snapshot` warning block when a MAJOR bump is blocked without `--force`.
+DC-10 (SPEC-027) registers contract consumers (`dc_consumers`) and records change
+notifications (`dc_notifications`) when a breaking change is accepted with
+`--force`. `PK-DC-012` is informational only — `create_notifications` returning
+no records (no consumers watching the table) is never raised as an error.
 
 ### QM — Quality Management (QM-4, SPEC-022)
 

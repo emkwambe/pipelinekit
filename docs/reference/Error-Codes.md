@@ -81,9 +81,13 @@ DC-8 versioning codes are carried by `ContractError` (PK-DC-008/009) and
 |---|---|
 | PK-QM-001 | No blueprints found for coverage scan — no installed blueprints were found in the blueprints directory. Fix: run `pipelinekit blueprint install <name>` first. |
 | PK-QM-002 | Schema file parse error — a `schema.yml` file could not be parsed as valid YAML. Fix: check the file for YAML syntax errors. |
+| PK-QM-003 | Volume anomaly detected — row count deviates significantly from the established baseline. Possible causes: missing partition, failed extraction, truncated load, duplicate rows loaded, or source data issue. Fix: investigate the pipeline run logs for the affected table. |
 
 QM-4 quality-coverage codes are carried by `QualityError` (read-only scanning;
-no `state.db` writes).
+no `state.db` writes). QM-6 (SPEC-024) adds `PK-QM-003`, surfaced by
+`pipelinekit quality check-anomalies` when a recorded row count deviates beyond
+the threshold; the command exits 1 so it is script-detectable. Row-count
+snapshots are stored in the `qm_row_counts` table (`state.db`).
 
 ### GM — Governance Management (GM-1, SPEC-023)
 

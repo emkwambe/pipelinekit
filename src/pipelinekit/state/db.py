@@ -164,6 +164,17 @@ CREATE TABLE IF NOT EXISTS gm_owners (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS qm_row_counts (
+    id TEXT PRIMARY KEY,
+    blueprint_name TEXT NOT NULL,
+    table_name TEXT NOT NULL,
+    row_count INTEGER NOT NULL,
+    recorded_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_qm_row_counts_blueprint_table
+    ON qm_row_counts(blueprint_name, table_name, recorded_at);
 """
 
 
@@ -976,6 +987,129 @@ def delete_owner(blueprint_name: str, db_path: str | Path) -> bool:
             f"Cannot delete owner for blueprint {blueprint_name}",
             {"path": str(db_path), "detail": str(exc)},
         ) from exc
+
+
+_QM_ROW_COUNTS_DDL = """
+CREATE TABLE IF NOT EXISTS qm_row_counts (
+    id TEXT PRIMARY KEY,
+    blueprint_name TEXT NOT NULL,
+    table_name TEXT NOT NULL,
+    row_count INTEGER NOT NULL,
+    recorded_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_qm_row_counts_blueprint_table
+    ON qm_row_counts(blueprint_name, table_name, recorded_at);
+"""
+
+
+def _connect_row_counts(db_path: str | Path) -> sqlite3.Connection:
+    """Open ``db_path`` and ensure the ``qm_row_counts`` table exists.
+
+    QM-6 (SPEC-024) threads an explicit ``db_path`` rather than ``cwd`` so the
+    anomaly layer is testable against a ``tmp_path`` database. The table DDL is
+    idempotent, so a raw path with no prior ``initialize`` still works.
+    """
+    conn = sqlite3.connect(db_path)
+    conn.executescript(_QM_ROW_COUNTS_DDL)
+    return conn
+
+
+def insert_row_count(
+    blueprint_name: str,
+    table_name: str,
+    row_count: int,
+    db_path: str,
+) -> None:
+    """Insert a new row count snapshot (QM-6, SPEC-024).
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the snapshot cannot be written.
+    """
+    try:
+        with _connect_row_counts(db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO qm_row_counts (
+                    id, blueprint_name, table_name, row_count, recorded_at
+                )
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    str(uuid.uuid4()),
+                    blueprint_name,
+                    table_name,
+                    row_count,
+                    datetime.now(timezone.utc).isoformat(),
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot write row count for {blueprint_name}/{table_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def get_row_count_history(
+    blueprint_name: str,
+    table_name: str,
+    limit: int,
+    db_path: str,
+) -> list[dict]:
+    """Return the last ``limit`` row count snapshots, newest first (QM-6).
+
+    The implicit ``rowid`` breaks ties so snapshots recorded within the same
+    timestamp resolution still order by insertion (newest first).
+    """
+    try:
+        with _connect_row_counts(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT id, blueprint_name, table_name, row_count, recorded_at
+                FROM qm_row_counts
+                WHERE blueprint_name = ? AND table_name = ?
+                ORDER BY recorded_at DESC, rowid DESC
+                LIMIT ?
+                """,
+                (blueprint_name, table_name, limit),
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            f"Cannot read row count history for {blueprint_name}/{table_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return [dict(row) for row in rows]
+
+
+def get_all_tables_for_blueprint(
+    blueprint_name: str,
+    db_path: str,
+) -> list[str]:
+    """Return every table name with row count history for a blueprint (QM-6).
+
+    Returns a sorted, de-duplicated list; empty when the blueprint has no
+    recorded snapshots.
+    """
+    try:
+        with _connect_row_counts(db_path) as conn:
+            rows = conn.execute(
+                """
+                SELECT DISTINCT table_name FROM qm_row_counts
+                WHERE blueprint_name = ?
+                ORDER BY table_name
+                """,
+                (blueprint_name,),
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            f"Cannot read tables for blueprint {blueprint_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return [row[0] for row in rows]
 
 
 def ensure_gitignore_entry(cwd: Path | None = None) -> None:

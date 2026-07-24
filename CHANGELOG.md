@@ -4,6 +4,16 @@ All notable changes to PipelineKit are documented in this file.
 
 ## [Unreleased]
 
+### Added — Sprint 22 (AI-9 EMS-Aware Confidence Recalibration)
+- Confidence scores now adjusted based on EMS operational signals
+- Healthy environment (score >= 80, all SLOs OK): +0.08 boost
+- Unhealthy environment (Poor score + violations + drift): -0.13 penalty
+- No EMS data: confidence unchanged
+- Healthy pipelines now hit the 0.90 engineer trust threshold
+- Graceful degradation: no adjustment when EMS data unavailable
+- New module: src/pipelinekit/ai/confidence.py
+
+
 ### Added — Sprint 20 (AM-5 Architecture Drift Detection)
 - `pipelinekit architect drift` — detect when blueprint dependencies no longer hold
 - Drift types: DEPENDENCY_BROKEN | BLUEPRINT_MISSING

@@ -4,6 +4,17 @@ All notable changes to PipelineKit are documented in this file.
 
 ## [Unreleased]
 
+### Added — Phase 2 Sprint 11 (QM-7 Schema Drift Detection)
+- `pipelinekit quality check-drift` — detect schema drift between contracts and schema.yml
+- `pipelinekit quality check-drift --blueprint <name>` — filter by blueprint
+- `pipelinekit quality check-drift --table <name>` — filter by table
+- Status values: CLEAN | DRIFTED | NO_BASELINE
+- Cross-domain: reads DC-8 contract snapshots + QM-4 schema.yml data
+- NO_BASELINE when contract snapshot not yet created
+- New error code: PK-QM-004
+- No new state.db tables — read-only capability
+
+
 ### Added — Phase 2 Sprint 9 (GM-2 Naming Convention Enforcement)
 - `pipelinekit governance convention add` — define naming convention with regex pattern
 - `pipelinekit governance convention list` — list all conventions

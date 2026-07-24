@@ -4,6 +4,16 @@ All notable changes to PipelineKit are documented in this file.
 
 ## [Unreleased]
 
+### Added — Sprint 14 (Provider Cascade with Ordered Fallbacks)
+- Configure primary AI provider with ordered fallbacks
+- Automatic fallback on rate limit, network error, or auth failure
+- Context-aware routing: large prompts auto-route to providers with sufficient context
+- Kimi moonshot-v1-128k available for EMS-enriched prompts (131k tokens)
+- Configure via pipelinekit.yaml: ai.primary + ai.fallbacks
+- Configure via env: PIPELINEKIT_AI_PRIMARY + PIPELINEKIT_AI_FALLBACKS
+- New error codes: PK-AI-001 (all providers exhausted), PK-AI-002 (context exceeded)
+
+
 ### Added — Sprint 13 (Kimi Provider — Moonshot AI)
 - Kimi (Moonshot AI) added as sixth AI provider
 - OpenAI-compatible API at api.moonshot.cn/v1

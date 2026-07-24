@@ -464,7 +464,7 @@ def _render_scorecard(report: ScorecardReport) -> None:
 
 
 def _render_narratives(report: ScorecardReport, db_path: str) -> None:
-    """Render an AI narrative section per blueprint (AI-8, opt-in).
+    """Render an AI narrative section per blueprint (AI-14, opt-in).
 
     Loads a provider and, for each blueprint, prints an "AI Analysis" section.
     Fully defensive — a missing provider or a failed call degrades to a note,
@@ -533,7 +533,7 @@ def scorecard(
         raise typer.Exit(0)
 
     _render_scorecard(report)
-    # AI-8: narrative is opt-in — the default path above makes no AI call.
+    # AI-14: narrative is opt-in — the default path above makes no AI call.
     if narrative:
         _render_narratives(report, db_path)
     raise typer.Exit(0)

@@ -21,7 +21,7 @@ Reality notes (this codebase, not the generic ADR template):
 * ``provider_factory`` is normally ``pipelinekit.ai.providers.get_provider``.
 * Providers are invoked through a ``complete(prompt)`` callable — this is the
   generic cascade primitive; wiring it into the existing ``diagnose``/
-  ``architect`` call sites is deferred to the AI-7+ work that consumes it.
+  ``architect`` call sites is deferred to the AI-13+ work that consumes it.
 """
 
 from __future__ import annotations

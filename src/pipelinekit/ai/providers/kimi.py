@@ -48,7 +48,7 @@ if TYPE_CHECKING:
 _ENV_KEY = "MOONSHOT_API_KEY"
 DEFAULT_BASE_URL = "https://api.moonshot.cn/v1"
 DEFAULT_MODEL = "moonshot-v1-32k"
-# The 128k model is the primary reason for adding Kimi (AI-7 EMS injection).
+# The 128k model is the primary reason for adding Kimi (AI-13 EMS injection).
 KIMI_MODELS = [
     "moonshot-v1-8k",
     "moonshot-v1-32k",

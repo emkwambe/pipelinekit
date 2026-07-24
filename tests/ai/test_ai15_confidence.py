@@ -1,4 +1,4 @@
-"""Tests for AI-9 EMS-aware confidence recalibration (SPEC-039).
+"""Tests for AI-15 EMS-aware confidence recalibration (SPEC-039, ADR-043).
 
 Deterministic, no AI, no state.db. ``EMSContext`` is constructed directly so each
 adjustment rule can be exercised in isolation.
@@ -37,7 +37,7 @@ def _ctx(
     )
 
 
-def test_ai9_high_quality_score_boosts_confidence() -> None:
+def test_ai15_high_quality_score_boosts_confidence() -> None:
     """Quality score >= 80 (plus SLO compliance) raises confidence."""
     ctx = _ctx(quality_score=85.0, quality_rating="Good")
 
@@ -49,7 +49,7 @@ def test_ai9_high_quality_score_boosts_confidence() -> None:
     assert any("Quality score" in r for r in result.reasons)
 
 
-def test_ai9_poor_quality_score_penalizes_confidence() -> None:
+def test_ai15_poor_quality_score_penalizes_confidence() -> None:
     """Quality score < 50 lowers confidence relative to the base."""
     ctx = _ctx(quality_score=32.0, quality_rating="Poor")
 
@@ -59,7 +59,7 @@ def test_ai9_poor_quality_score_penalizes_confidence() -> None:
     assert any("Quality score" in r and "-0.05" in r for r in result.reasons)
 
 
-def test_ai9_slo_violations_penalize_confidence() -> None:
+def test_ai15_slo_violations_penalize_confidence() -> None:
     """Each SLO violation subtracts 0.03, capped at -0.10 total."""
     two = _ctx(slo_violations=[{"table": "a"}, {"table": "b"}])
     five = _ctx(slo_violations=[{"table": str(i)} for i in range(5)])
@@ -71,7 +71,7 @@ def test_ai9_slo_violations_penalize_confidence() -> None:
     assert adj_five == pytest.approx(-0.10)  # capped, not -0.15
 
 
-def test_ai9_schema_drift_penalizes_confidence() -> None:
+def test_ai15_schema_drift_penalizes_confidence() -> None:
     """Schema drift lowers confidence and is reported as a reason."""
     ctx = _ctx(schema_drift=[{"table": "charges", "drift_items": []}])
 
@@ -81,7 +81,7 @@ def test_ai9_schema_drift_penalizes_confidence() -> None:
     assert any("schema drift" in r for r in result.reasons)
 
 
-def test_ai9_all_slos_compliant_boosts_confidence() -> None:
+def test_ai15_all_slos_compliant_boosts_confidence() -> None:
     """Having EMS data with no SLO violations adds +0.03."""
     ctx = _ctx()  # has_data=True, no violations, no quality signal
 
@@ -91,7 +91,7 @@ def test_ai9_all_slos_compliant_boosts_confidence() -> None:
     assert any("All SLOs compliant" in r for r in reasons)
 
 
-def test_ai9_confidence_clamped_to_zero_minimum() -> None:
+def test_ai15_confidence_clamped_to_zero_minimum() -> None:
     """A very low base with heavy penalties never drops below 0.0."""
     ctx = _ctx(
         quality_score=32.0,
@@ -105,7 +105,7 @@ def test_ai9_confidence_clamped_to_zero_minimum() -> None:
     assert result.adjusted_confidence == 0.0
 
 
-def test_ai9_confidence_clamped_to_one_maximum() -> None:
+def test_ai15_confidence_clamped_to_one_maximum() -> None:
     """A very high base with boosts never exceeds 1.0."""
     ctx = _ctx(quality_score=90.0, quality_rating="Excellent")
 
@@ -114,7 +114,7 @@ def test_ai9_confidence_clamped_to_one_maximum() -> None:
     assert result.adjusted_confidence == 1.0
 
 
-def test_ai9_no_ems_data_returns_unchanged_confidence() -> None:
+def test_ai15_no_ems_data_returns_unchanged_confidence() -> None:
     """has_data=False returns the base confidence unchanged, no adjustment."""
     ctx = _ctx(has_data=False)
 

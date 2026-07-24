@@ -7,9 +7,9 @@ against ``schemas/diagnostic.schema.json`` before reaching the user.
 
 See: SPEC-005, ADR-007, ADR-014, docs/ai/PIPELINEKIT-AI & Model Strategy Standard.
 
-AI-7 (SPEC-032) adds EMS context injection: the diagnostics engine enriches its
+AI-13 (SPEC-032) adds EMS context injection: the diagnostics engine enriches its
 evidence with quality, SLO, volume, drift, and contract signals from ``state.db``
-so the AI can correlate them with a failure. AI-9 (SPEC-039) reuses those same
+so the AI can correlate them with a failure. AI-15 (SPEC-039) reuses those same
 signals to recalibrate the confidence score up or down based on how healthy the
 target environment is.
 """
@@ -35,10 +35,10 @@ __all__ = [
     "EMSContext",
     "assemble_ems_context",
     "format_ems_context_for_prompt",
-    # AI-8 — quality scorecard narrative (SPEC-033)
+    # AI-14 — quality scorecard narrative (SPEC-033)
     "build_narrative_prompt",
     "generate_scorecard_narrative",
-    # AI-9 — EMS-aware confidence recalibration (SPEC-039)
+    # AI-15 — EMS-aware confidence recalibration (SPEC-039)
     "ConfidenceAdjustment",
     "adjust_confidence",
     "compute_ems_adjustment",

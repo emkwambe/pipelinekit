@@ -4,7 +4,7 @@ All notable changes to PipelineKit are documented in this file.
 
 ## [Unreleased]
 
-### Added — Sprint 22 (AI-9 EMS-Aware Confidence Recalibration)
+### Added — Sprint 22 (AI-15 EMS-Aware Confidence Recalibration)
 - Confidence scores now adjusted based on EMS operational signals
 - Healthy environment (score >= 80, all SLOs OK): +0.08 boost
 - Unhealthy environment (Poor score + violations + drift): -0.13 penalty
@@ -61,7 +61,7 @@ All notable changes to PipelineKit are documented in this file.
 - New state.db table: qm_freshness_requirements
 
 
-### Added — Sprint 16 (AI-8 Quality Scorecard Narrative)
+### Added — Sprint 16 (AI-14 Quality Scorecard Narrative)
 - `pipelinekit quality scorecard --narrative` — AI-generated explanation of quality score
 - Narrative explains root cause, priority fix, and expected score impact
 - Opt-in only — default scorecard behavior unchanged, no AI call without --narrative
@@ -69,7 +69,7 @@ All notable changes to PipelineKit are documented in this file.
 - Graceful degradation — skips narrative if no AI provider configured
 
 
-### Added — Sprint 15 (AI-7 EMS Context Injection)
+### Added — Sprint 15 (AI-13 EMS Context Injection)
 - DiagnosticsEngine now reads EMS operational state before diagnosing failures
 - Injects quality score, SLO violations, volume anomalies, schema drift into AI prompt
 - Cross-domain: reads QM-8 + OM-4 + QM-6 + QM-7 + DC-10 signals

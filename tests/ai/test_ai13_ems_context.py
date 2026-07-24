@@ -1,4 +1,4 @@
-"""Tests for AI-7 EMS context injection (SPEC-032).
+"""Tests for AI-13 EMS context injection (SPEC-032, ADR-043).
 
 Deterministic, no AI, read-only. Every test uses a ``tmp_path`` SQLite database
 and ``monkeypatch.chdir`` so ``blueprints/`` resolution is isolated — the real
@@ -32,7 +32,7 @@ def _seed_slo_violation(db_path: str) -> None:
     record_row_counts("test-bp", {"charges": 500}, db_path)
 
 
-def test_ai7_assemble_ems_context_returns_empty_when_no_data(
+def test_ai13_assemble_ems_context_returns_empty_when_no_data(
     env: tuple[Path, str],
 ) -> None:
     """assemble_ems_context has_data=False when state.db has no EMS signals."""
@@ -46,7 +46,7 @@ def test_ai7_assemble_ems_context_returns_empty_when_no_data(
     assert ctx.summary == "No EMS data available for this blueprint"
 
 
-def test_ai7_assemble_ems_context_captures_slo_violations(
+def test_ai13_assemble_ems_context_captures_slo_violations(
     env: tuple[Path, str],
 ) -> None:
     """SLO violations are captured in EMSContext when OM-4 data shows one."""
@@ -62,7 +62,7 @@ def test_ai7_assemble_ems_context_captures_slo_violations(
     assert ctx.slo_violations[0]["status"] == "VIOLATED"
 
 
-def test_ai7_assemble_ems_context_captures_volume_anomalies(
+def test_ai13_assemble_ems_context_captures_volume_anomalies(
     env: tuple[Path, str],
 ) -> None:
     """Volume anomalies are captured when the latest count deviates sharply."""
@@ -79,7 +79,7 @@ def test_ai7_assemble_ems_context_captures_volume_anomalies(
     assert ctx.volume_anomalies[0]["current"] == 500
 
 
-def test_ai7_assemble_ems_context_never_raises(env: tuple[Path, str]) -> None:
+def test_ai13_assemble_ems_context_never_raises(env: tuple[Path, str]) -> None:
     """assemble_ems_context returns a valid EMSContext even on a broken db_path."""
     tmp_path, _ = env
     broken_db = str(tmp_path / "no_such_dir" / "state.db")
@@ -90,7 +90,7 @@ def test_ai7_assemble_ems_context_never_raises(env: tuple[Path, str]) -> None:
     assert ctx.has_data is False
 
 
-def test_ai7_format_ems_context_returns_empty_when_no_data() -> None:
+def test_ai13_format_ems_context_returns_empty_when_no_data() -> None:
     """format_ems_context_for_prompt returns '' when has_data is False."""
     ctx = EMSContext(
         blueprint_name="test-bp",
@@ -103,7 +103,7 @@ def test_ai7_format_ems_context_returns_empty_when_no_data() -> None:
     assert format_ems_context_for_prompt(ctx) == ""
 
 
-def test_ai7_format_ems_context_includes_slo_violations() -> None:
+def test_ai13_format_ems_context_includes_slo_violations() -> None:
     """Formatted context includes the SLO violation section and details."""
     ctx = EMSContext(
         blueprint_name="test-bp",
@@ -130,7 +130,7 @@ def test_ai7_format_ems_context_includes_slo_violations() -> None:
     assert "VIOLATED" in out
 
 
-def test_ai7_format_ems_context_includes_volume_anomalies() -> None:
+def test_ai13_format_ems_context_includes_volume_anomalies() -> None:
     """Formatted context includes the volume anomaly section and numbers."""
     ctx = EMSContext(
         blueprint_name="test-bp",
@@ -156,7 +156,7 @@ def test_ai7_format_ems_context_includes_volume_anomalies() -> None:
     assert "45,000" in out
 
 
-def test_ai7_ems_summary_describes_issues(env: tuple[Path, str]) -> None:
+def test_ai13_ems_summary_describes_issues(env: tuple[Path, str]) -> None:
     """The summary field describes active EMS issues in one line."""
     _, db_path = env
     _seed_slo_violation(db_path)

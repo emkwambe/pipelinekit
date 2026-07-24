@@ -53,15 +53,15 @@ class DiagnosticsEngine:
         """Run the full diagnostic cycle for ``run_id``.
 
         Never executes recommendations. Always persists the result. When EMS
-        signals are available for the affected blueprint (AI-7), they are
+        signals are available for the affected blueprint (AI-13), they are
         attached to the evidence so the provider prompt can correlate them with
-        the failure, and (AI-9) they recalibrate the confidence score; both are
+        the failure, and (AI-15) they recalibrate the confidence score; both are
         best-effort and never block diagnosis.
         """
         evidence = self.collector.collect(run_id, cwd=cwd)
         evidence.config_snapshot = self.config.model_dump()
-        # Assemble EMS state once; reuse for prompt injection (AI-7) and
-        # confidence recalibration (AI-9) so state.db is read a single time.
+        # Assemble EMS state once; reuse for prompt injection (AI-13) and
+        # confidence recalibration (AI-15) so state.db is read a single time.
         ems_ctx = self._assemble_ems_context(evidence, blueprint_name, cwd)
         if ems_ctx is not None and ems_ctx.has_data:
             from dataclasses import asdict
@@ -76,7 +76,7 @@ class DiagnosticsEngine:
         # Phase 4 invariant: AI never auto-fixes (ADR-007, Smell 13).
         result.can_auto_fix = False
 
-        # AI-9: recalibrate the base confidence with EMS operational signals.
+        # AI-15: recalibrate the base confidence with EMS operational signals.
         # No-op when there is no EMS data; never raises.
         if ems_ctx is not None:
             result.confidence = adjust_confidence(
@@ -104,7 +104,7 @@ class DiagnosticsEngine:
         blueprint_name: str | None,
         cwd: Path | None,
     ) -> EMSContext | None:
-        """Assemble EMS operational context for the run (AI-7). Never raises.
+        """Assemble EMS operational context for the run (AI-13). Never raises.
 
         Uses ``blueprint_name`` when given, else the run's pipeline name as a
         best-effort candidate. Returns ``None`` when no candidate is available or

@@ -9,11 +9,18 @@ See: SPEC-005, ADR-007, ADR-014, docs/ai/PIPELINEKIT-AI & Model Strategy Standar
 
 AI-7 (SPEC-032) adds EMS context injection: the diagnostics engine enriches its
 evidence with quality, SLO, volume, drift, and contract signals from ``state.db``
-so the AI can correlate them with a failure.
+so the AI can correlate them with a failure. AI-9 (SPEC-039) reuses those same
+signals to recalibrate the confidence score up or down based on how healthy the
+target environment is.
 """
 
 from __future__ import annotations
 
+from pipelinekit.ai.confidence import (
+    ConfidenceAdjustment,
+    adjust_confidence,
+    compute_ems_adjustment,
+)
 from pipelinekit.ai.ems_context import (
     EMSContext,
     assemble_ems_context,
@@ -31,4 +38,8 @@ __all__ = [
     # AI-8 — quality scorecard narrative (SPEC-033)
     "build_narrative_prompt",
     "generate_scorecard_narrative",
+    # AI-9 — EMS-aware confidence recalibration (SPEC-039)
+    "ConfidenceAdjustment",
+    "adjust_confidence",
+    "compute_ems_adjustment",
 ]

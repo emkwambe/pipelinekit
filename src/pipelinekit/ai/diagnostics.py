@@ -18,6 +18,8 @@ from pathlib import Path
 
 import jsonschema
 
+from pipelinekit.ai.confidence import adjust_confidence
+from pipelinekit.ai.ems_context import EMSContext
 from pipelinekit.ai.evidence import EvidenceCollector
 from pipelinekit.ai.models import DiagnosticResult
 from pipelinekit.ai.provider import LLMProvider
@@ -53,11 +55,18 @@ class DiagnosticsEngine:
         Never executes recommendations. Always persists the result. When EMS
         signals are available for the affected blueprint (AI-7), they are
         attached to the evidence so the provider prompt can correlate them with
-        the failure; injection is best-effort and never blocks diagnosis.
+        the failure, and (AI-9) they recalibrate the confidence score; both are
+        best-effort and never block diagnosis.
         """
         evidence = self.collector.collect(run_id, cwd=cwd)
         evidence.config_snapshot = self.config.model_dump()
-        self._inject_ems_context(evidence, blueprint_name, cwd)
+        # Assemble EMS state once; reuse for prompt injection (AI-7) and
+        # confidence recalibration (AI-9) so state.db is read a single time.
+        ems_ctx = self._assemble_ems_context(evidence, blueprint_name, cwd)
+        if ems_ctx is not None and ems_ctx.has_data:
+            from dataclasses import asdict
+
+            evidence.ems_context = asdict(ems_ctx)  # type: ignore[attr-defined]
 
         result = self.provider.diagnose(evidence)
 
@@ -66,6 +75,13 @@ class DiagnosticsEngine:
 
         # Phase 4 invariant: AI never auto-fixes (ADR-007, Smell 13).
         result.can_auto_fix = False
+
+        # AI-9: recalibrate the base confidence with EMS operational signals.
+        # No-op when there is no EMS data; never raises.
+        if ems_ctx is not None:
+            result.confidence = adjust_confidence(
+                result.confidence, ems_ctx
+            ).adjusted_confidence
 
         # Honest confidence: low-confidence results are shown as inconclusive,
         # never suppressed.
@@ -82,33 +98,29 @@ class DiagnosticsEngine:
         )
         return result
 
-    def _inject_ems_context(
+    def _assemble_ems_context(
         self,
         evidence: object,
         blueprint_name: str | None,
         cwd: Path | None,
-    ) -> None:
-        """Attach EMS operational context to ``evidence`` (AI-7). Never raises.
+    ) -> EMSContext | None:
+        """Assemble EMS operational context for the run (AI-7). Never raises.
 
         Uses ``blueprint_name`` when given, else the run's pipeline name as a
-        best-effort candidate. If no EMS signal is available the evidence is left
-        unchanged, so single-provider/no-EMS behavior is exactly as before.
+        best-effort candidate. Returns ``None`` when no candidate is available or
+        assembly fails, so single-provider/no-EMS behavior is exactly as before.
         """
         candidate = blueprint_name or getattr(evidence, "pipeline_name", None)
         if not candidate:
-            return
+            return None
         try:
             from pipelinekit.ai.ems_context import assemble_ems_context
 
             db_path = str(db.get_db_path(cwd))
-            ctx = assemble_ems_context(candidate, db_path)
-            if ctx.has_data:
-                from dataclasses import asdict
-
-                evidence.ems_context = asdict(ctx)  # type: ignore[attr-defined]
+            return assemble_ems_context(candidate, db_path)
         except Exception:
             # Graceful degradation: EMS enrichment must never break diagnosis.
-            pass
+            return None
 
     def _validate_against_schema(self, result: DiagnosticResult) -> None:
         """Validate the result against ``diagnostic.schema.json``.

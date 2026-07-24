@@ -106,3 +106,52 @@ SOC 2 CC8 evidence: the `dc_contract_lifecycle` table records the current state
 plus the `changed_by`, `change_reason`, and `updated_at` of the latest transition.
 For a full per-transition audit trail, pair lifecycle changes with the GM-3 approval
 workflow (`gm_approval_requests`), which retains every request and decision.
+
+## QM-9 — Quality Regression Testing
+
+Implemented in: `src/pipelinekit/quality/regression.py`
+
+Regression detection requires at least 2 scorecard snapshots. Snapshots are saved
+automatically (best-effort) by `compute_blueprint_score()` (QM-8) into the
+`qm_scorecard_snapshots` table — a state-write failure degrades to one fewer
+baseline rather than breaking scoring.
+
+Detection logic:
+- Read the last `window + 1` snapshots, newest first (need N+1 to compare the
+  latest against N baseline snapshots).
+- `baseline_avg` = per-component mean of the previous `window` snapshots.
+- `latest` = the most recent snapshot.
+- Flag a regression when the latest drops below the baseline by more than the
+  threshold (magnitude checks) or below it at all (presence checks).
+
+Regression types:
+- `coverage_drop`: coverage score decreased by > `threshold` points
+- `score_drop`: composite score decreased by > `threshold` points
+- `drift_introduced`: drift score dropped (new schema drift appeared)
+- `ownership_lost`: ownership score dropped (owner was removed)
+
+`volume_degraded` is described in ADR-039 but not yet implemented. The volume
+score is already persisted in `qm_scorecard_snapshots`, so adding it needs no
+schema change — only a new check in `check_regression()`.
+
+## AI-9 — EMS-Aware Confidence Recalibration
+
+Implemented in: `src/pipelinekit/ai/confidence.py`
+
+The adjustment is applied in `diagnostics.py` after the base confidence is produced
+by the LLM provider, and before the inconclusive-threshold check — so the
+EMS-adjusted score (not the raw LLM score) drives the inconclusive decision.
+
+Key design choices:
+- `no_owner_penalty` is defined in `ADJUSTMENT_RULES` but **not applied** —
+  ownership already feeds QM-8's quality score at 10% weight, and `EMSContext`
+  exposes no direct ownership signal, so applying it would double-count.
+- Total adjustment is clamped to `[-0.15, +0.10]`; SLO penalties are separately
+  capped at `-0.10`; final confidence is clamped to `[0.0, 1.0]`.
+- `has_data=False` → zero adjustment (no false signals from missing data).
+- `adjust_confidence()` never raises — any error degrades to the unchanged base.
+- EMS state is assembled **once** per diagnosis and shared between AI-7 (prompt
+  injection) and AI-9 (confidence), avoiding a duplicate scorecard snapshot write.
+
+The 0.82 → 0.90 lift for healthy environments directly addresses the research
+finding that engineers trust AI proposals at ≥ 0.90.

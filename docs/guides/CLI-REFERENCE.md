@@ -190,6 +190,19 @@ PIPELINEKIT_AI_FALLBACKS=kimi,ollama
 
 Cascade is opt-in: with no fallbacks set, behavior is a single provider — unchanged from before. If every provider fails or is skipped, the cascade raises `PK-AI-001` (all providers exhausted).
 
+### Confidence score recalibration (AI-9)
+AI confidence scores are automatically adjusted using the EMS operational state of the target blueprint (the same signals AI-7 injects into the prompt). No configuration is required — recalibration happens on every diagnosis that has EMS data, before the inconclusive-threshold check.
+
+| Condition | Adjustment |
+|---|---|
+| Quality score ≥ 80 (Good/Excellent) | +0.05 |
+| Quality score < 50 (Poor) | -0.05 |
+| All SLOs compliant (has data, no violations) | +0.03 |
+| SLO violation (per violation, capped at -0.10 total) | -0.03 |
+| Schema drift detected | -0.05 |
+
+The total adjustment is clamped to `[-0.15, +0.10]` and the final confidence to `[0.0, 1.0]`. When no EMS data is available, confidence is left unchanged. Example: a healthy pipeline (score 85, all SLOs compliant) lifts base confidence from 0.82 to **0.90** — reaching the engineer trust threshold.
+
 ---
 
 ## Diagnose Commands
@@ -271,6 +284,26 @@ Impact Analysis — postgres-to-snowflake
 If postgres-to-snowflake changes, these blueprints may be affected:
   → stripe-to-snowflake (manual: orders feed stripe reconciliation)
 1 blueprint(s) depend on postgres-to-snowflake
+```
+
+### `pipelinekit architect drift` (AM-5)
+Detect when documented dependencies (AM-4) no longer hold against the blueprint files on disk. Read-only — reports drift, never repairs it. Takes no options. Reads every edge from `am_dependencies` and verifies it, printing a status line per dependency and a `N clean, N drifted` summary. Exits 1 if any drift is detected; exits 0 when clean or when no dependencies are defined.
+
+Drift is reported by type:
+
+| Drift type | Meaning |
+|---|---|
+| `BLUEPRINT_MISSING` | An endpoint of a non-manual edge is no longer installed (its `blueprints/<name>/` directory is gone) |
+| `DEPENDENCY_BROKEN` | Both blueprints are installed but the upstream producer table is no longer referenced downstream |
+
+A `contract` edge holds while the upstream's produced table still appears in the downstream's `blueprint.json` ingestion; a `dbt_source` edge holds while it is still referenced by the downstream's `sources.yml`. **Manual dependencies are always considered valid** (human-declared) and never flagged.
+
+```
+Architecture Drift Check
+─────────────────────────────────────────────────
+✓ postgres-to-snowflake → stripe-to-snowflake (manual) — valid
+
+1 clean, 0 drifted
 ```
 
 ---
@@ -403,7 +436,7 @@ List all recorded contract lifecycle states as a table: Blueprint, Contract, Sta
 
 ---
 
-## Quality Commands (QM-4 / QM-5 / QM-6 / QM-7 / QM-8)
+## Quality Commands (QM-4 / QM-5 / QM-6 / QM-7 / QM-8 / QM-9)
 
 Measure test coverage and detect volume anomalies. Coverage is a read-only scan of blueprint files; row counts are stored in `state.db`.
 
@@ -465,9 +498,38 @@ Show a composite quality score (0–100) per blueprint, weighting coverage 40%, 
 
 `--narrative` is strictly opt-in: the default scorecard makes **no** AI call and its output is unchanged. When no provider or API key is available, the AI Analysis section degrades to a note rather than failing.
 
+Snapshots are automatically saved after each run (`qm_scorecard_snapshots`), enabling regression detection with `pipelinekit quality check-regression`.
+
 ```bash
 pipelinekit quality scorecard --narrative
 pipelinekit quality scorecard --blueprint stripe-to-snowflake --narrative
+```
+
+### `pipelinekit quality check-regression [--blueprint <name>] [--window <n>] [--threshold <n>]` (QM-9)
+Detect when a blueprint's quality metrics have regressed against their recent history. Compares the most recent scorecard snapshot against the average of the previous `window` snapshots (from `qm_scorecard_snapshots`), flagging any component that has dropped meaningfully. With no `--blueprint`, every installed blueprint is checked. Exits 1 if any regression is detected, 0 if clean.
+
+| Option | Description |
+|---|---|
+| `--blueprint` | Check a single blueprint (default: all installed) |
+| `--window` | Number of previous snapshots to average as the baseline (default `7`) |
+| `--threshold` | Point drop that counts as a regression (default `5.0`) |
+
+Regression requires at least **2 snapshots** (a baseline plus the latest); fewer means no baseline yet and the blueprint is reported clean. Build history by running `pipelinekit quality scorecard`, which saves a snapshot each run.
+
+Regression types:
+
+| Type | Trigger |
+|---|---|
+| `coverage_drop` | Coverage score fell by more than `threshold` points |
+| `score_drop` | Composite score fell by more than `threshold` points |
+| `drift_introduced` | Drift score fell (new schema drift appeared) |
+| `ownership_lost` | Ownership score fell (owner removed) |
+
+```
+Quality Regression Check
+─────────────────────────────────────────────────
+stripe-to-snowflake: ⚠ REGRESSION DETECTED
+  coverage_drop: 90 → 70 (dropped 20 points) — coverage 90.0 → 70.0 (threshold 5)
 ```
 
 ### `pipelinekit quality freshness` (QM-5)

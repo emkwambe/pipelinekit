@@ -22,6 +22,7 @@ Public-facing status of PipelineKit's EMS (Engineering Management System) capabi
 | Volume anomaly detection | QM-6 | ✅ Phase 2 |
 | Schema drift detection | QM-7 | ✅ Phase 2 |
 | Quality scorecard | QM-8 | ✅ Phase 2 |
+| Quality regression testing | QM-9 | ✅ Phase 3 |
 
 ### GM — Governance Management
 | Capability | Code | Status |
@@ -42,6 +43,7 @@ Public-facing status of PipelineKit's EMS (Engineering Management System) capabi
 |---|---|---|
 | ADR templates, blueprint validation | AM-1..3 | ✅ v0.1.0 |
 | Dependency analysis | AM-4 | ✅ Phase 2 |
+| Architecture drift detection | AM-5 | ✅ Phase 3 |
 
 ### AI — AI Management
 | Capability | Code | Status |
@@ -49,6 +51,7 @@ Public-facing status of PipelineKit's EMS (Engineering Management System) capabi
 | Blueprint generation, diagnostics | AI-1..6 | ✅ v0.1.0 |
 | EMS context injection | AI-7 | ✅ Phase 3 |
 | Scorecard narrative | AI-8 | ✅ Phase 3 |
+| Confidence score recalibration | AI-9 | ✅ Phase 3 |
 
 Six AI providers are supported — Anthropic, OpenAI, Kimi (Moonshot AI), DeepSeek, Mistral, and Ollama (local) — with an ordered provider cascade (primary + fallbacks) for resilience and large-context routing.
 
@@ -58,6 +61,6 @@ Six AI providers are supported — Anthropic, OpenAI, Kimi (Moonshot AI), DeepSe
 | Release coordination | RM-1..3 | ✅ v0.1.0 |
 
 ## Roadmap
-- AM-5: Architecture drift detection
-- QM-9: Quality regression testing
-- AI-9: Planned AI-management capability
+Phase 3 capabilities (QM-9, OM-5, DC-11, AM-5, AI-7/8/9) are complete; no
+capability is currently queued. New capabilities enter through the ADR process
+(Constitution → ADR → SPEC → Contract → Schema), not this list.

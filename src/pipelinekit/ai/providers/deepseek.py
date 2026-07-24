@@ -61,6 +61,7 @@ class DeepSeekProvider:
     """
 
     name = "deepseek"
+    MAX_CONTEXT_TOKENS = 65_536
 
     def __init__(self, model: str = "deepseek-chat") -> None:
         self.model = model

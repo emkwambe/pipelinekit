@@ -184,9 +184,15 @@ the code, and a broken channel never blocks pipeline state recording (SPEC-008).
 
 | Code | Meaning |
 |---|---|
-| PK-AI-001 | AI provider unavailable (missing key / unreachable) |
+| PK-AI-001 | AI provider unavailable (missing key / unreachable). Also raised by the provider cascade as **all providers exhausted** — every provider in the cascade failed or was skipped. Fix: check API keys and network; run `pipelinekit health --strict`. |
 | PK-AI-002 | AI response failed schema validation |
 | PK-AI-003 | AI confidence below threshold |
+
+The provider cascade (AI-6 update, ADR-042) reuses `PK-AI-001` for exhaustion via
+`CascadeExhaustedError` (a subclass of `LLMError`) — including the case where the
+prompt exceeds every configured provider's context window (add a larger-context
+provider such as `kimi`/`moonshot-v1-128k`). No new AI error code is introduced;
+`PK-AI-002` keeps its existing "response failed schema validation" meaning.
 
 ### DIAG
 

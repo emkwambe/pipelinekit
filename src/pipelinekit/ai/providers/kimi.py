@@ -73,6 +73,7 @@ class KimiProvider:
     """
 
     name = "kimi"
+    MAX_CONTEXT_TOKENS = 131_072
 
     def __init__(self, model: str = DEFAULT_MODEL) -> None:
         self.model = model

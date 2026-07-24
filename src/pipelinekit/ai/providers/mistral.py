@@ -52,6 +52,7 @@ class MistralProvider:
     """
 
     name = "mistral"
+    MAX_CONTEXT_TOKENS = 32_768
 
     def __init__(self, model: str = "mistral-large-latest") -> None:
         self.model = model

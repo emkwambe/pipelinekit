@@ -46,6 +46,7 @@ class OllamaProvider:
     """Ollama local provider implementing the ``LLMProvider`` protocol."""
 
     name = "ollama"
+    MAX_CONTEXT_TOKENS = 8_192
 
     def __init__(self, model: str = "llama3") -> None:
         self.model = model

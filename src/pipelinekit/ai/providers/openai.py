@@ -44,6 +44,7 @@ class OpenAIProvider:
     """OpenAI provider implementing the ``LLMProvider`` protocol."""
 
     name = "openai"
+    MAX_CONTEXT_TOKENS = 128_000
 
     def __init__(self, model: str = "gpt-4o") -> None:
         self.model = model

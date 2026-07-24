@@ -46,6 +46,7 @@ class AnthropicProvider:
     """Anthropic Claude provider implementing the ``LLMProvider`` protocol."""
 
     name = "anthropic"
+    MAX_CONTEXT_TOKENS = 200_000
 
     def __init__(self, model: str = "claude-sonnet-4-6") -> None:
         self.model = model

@@ -27,6 +27,7 @@ from pipelinekit.architecture.dependency import (
     remove_dependency,
     scan_dependencies,
 )
+from pipelinekit.architecture.drift import detect_architecture_drift
 from pipelinekit.blueprints.registry import BlueprintRegistry
 from pipelinekit.config.loader import load_config
 from pipelinekit.core.errors import ArchitectureError, ConfigurationError, LLMError
@@ -335,3 +336,49 @@ def impact_command(
         console.print(f"  → {dep.to_blueprint} ({dep.dependency_type}{reason})")
     console.print(f"{report.total_affected} blueprint(s) depend on {blueprint_name}")
     raise typer.Exit(0)
+
+
+# --- AM-5: architecture drift detection ------------------------------------
+
+
+@architect_app.command("drift")
+def drift_command() -> None:
+    """Detect documented dependencies that no longer hold (AM-5)."""
+    report = detect_architecture_drift(_blueprints_dir(), _db_path())
+
+    console.print("Architecture Drift Check", style="bold")
+    console.print("─" * 49)
+
+    if report.total_dependencies == 0:
+        console.print(
+            "No dependencies defined — nothing to check.\n"
+            "  Run 'pipelinekit architect dependency scan' first.",
+            style="dim",
+        )
+        raise typer.Exit(0)
+
+    drifted = {
+        (d.from_blueprint, d.to_blueprint): d for d in report.drifted_dependencies
+    }
+    for dep in get_dependencies(_db_path()):
+        key = (dep.from_blueprint, dep.to_blueprint)
+        drift = drifted.get(key)
+        if drift is None:
+            console.print(
+                f"✓ {dep.from_blueprint} → {dep.to_blueprint} "
+                f"({dep.dependency_type}) — valid",
+                style="green",
+            )
+        else:
+            console.print(
+                f"⚠ {drift.from_blueprint} → {drift.to_blueprint} "
+                f"({drift.dependency_type}) — {drift.drift_type}",
+                style="yellow",
+            )
+            console.print(f"    {drift.detail}", style="dim")
+
+    console.print(
+        f"\n{report.clean_dependencies} clean, "
+        f"{len(report.drifted_dependencies)} drifted"
+    )
+    raise typer.Exit(1 if report.drifted_dependencies else 0)

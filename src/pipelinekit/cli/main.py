@@ -25,6 +25,7 @@ from pipelinekit.cli.architect import architect_app  # noqa: E402
 from pipelinekit.cli.blueprint import blueprint_app  # noqa: E402
 from pipelinekit.cli.contract import contract_app  # noqa: E402
 from pipelinekit.cli.diagnose import diagnose_command  # noqa: E402
+from pipelinekit.cli.ems import ems_app  # noqa: E402
 from pipelinekit.cli.generate import apply_app, generate_app  # noqa: E402
 from pipelinekit.cli.governance import governance_app  # noqa: E402
 from pipelinekit.cli.health import health_app  # noqa: E402
@@ -80,3 +81,4 @@ app.add_typer(contract_app, name="contract")
 app.add_typer(quality_app, name="quality")
 app.add_typer(governance_app, name="governance")
 app.add_typer(observability_app, name="observability")
+app.add_typer(ems_app, name="ems")

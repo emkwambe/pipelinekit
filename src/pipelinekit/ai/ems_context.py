@@ -1,4 +1,4 @@
-"""AI-7 — EMS operational context for AI diagnosis (SPEC-032, ADR-033).
+"""AI-13 — EMS Context Injection for AI diagnosis (SPEC-032, ADR-033, ADR-043).
 
 Assembles the current Engineering Management System (EMS) state for a blueprint
 from ``state.db`` and formats it for inclusion in the diagnosis prompt, so the AI

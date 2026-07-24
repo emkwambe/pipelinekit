@@ -1,6 +1,6 @@
-"""AI-8 — AI-assisted quality scorecard narrative (SPEC-033, ADR-034).
+"""AI-14 — Quality Scorecard Narrative (SPEC-033, ADR-034, ADR-043).
 
-Turns a QM-8 ``BlueprintScore`` plus AI-7 ``EMSContext`` into a one-paragraph,
+Turns a QM-8 ``BlueprintScore`` plus AI-13 ``EMSContext`` into a one-paragraph,
 actionable narrative: root cause of the score, the single highest-priority fix,
 and the expected score impact. Opt-in via ``pipelinekit quality scorecard
 --narrative`` — the default scorecard makes no AI call.
@@ -10,7 +10,7 @@ unchanged — nothing is executed). Generation is fully defensive: any provider
 failure yields an empty string; ``generate_scorecard_narrative`` never raises.
 
 Provider call: all concrete providers share a ``_complete(system, user) -> str``
-text primitive. AI-8 uses it directly because the narrative is free prose — the
+text primitive. AI-14 uses it directly because the narrative is free prose — the
 JSON-returning ``diagnose``/``architect`` methods would reject a prose response.
 """
 

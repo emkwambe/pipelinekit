@@ -1,14 +1,14 @@
-"""AI-9 — EMS-aware confidence score recalibration (SPEC-039, ADR-040).
+"""AI-15 — EMS-Aware Confidence Recalibration (SPEC-039, ADR-040, ADR-043).
 
 Recalibrates the base AI confidence score (AI-4) using the operational signals
-already assembled by AI-7 (``EMSContext``). A proposal targeting a healthy
+already assembled by AI-13 (``EMSContext``). A proposal targeting a healthy
 environment (high quality score, no SLO violations) earns a small confidence
 boost; one targeting an unreliable environment (Poor quality, active drift, SLO
 violations) earns a penalty. The base score is never recomputed — the adjustment
 is additive and the final value is clamped to ``[0.0, 1.0]``.
 
 Fully deterministic and defensive: ``has_data=False`` yields no adjustment, and
-any error degrades to the unchanged base confidence. AI-9 never raises.
+any error degrades to the unchanged base confidence. AI-15 never raises.
 """
 
 from __future__ import annotations

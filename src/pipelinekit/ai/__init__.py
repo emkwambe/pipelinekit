@@ -19,9 +19,16 @@ from pipelinekit.ai.ems_context import (
     assemble_ems_context,
     format_ems_context_for_prompt,
 )
+from pipelinekit.ai.narrative import (
+    build_narrative_prompt,
+    generate_scorecard_narrative,
+)
 
 __all__ = [
     "EMSContext",
     "assemble_ems_context",
     "format_ems_context_for_prompt",
+    # AI-8 — quality scorecard narrative (SPEC-033)
+    "build_narrative_prompt",
+    "generate_scorecard_narrative",
 ]

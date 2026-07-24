@@ -20,7 +20,11 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from pipelinekit.ai.ems_context import assemble_ems_context
+from pipelinekit.ai.narrative import generate_scorecard_narrative
+from pipelinekit.ai.providers import create_provider
 from pipelinekit.blueprints.registry import BlueprintRegistry
+from pipelinekit.config.loader import load_config
 from pipelinekit.core.errors import QualityError
 from pipelinekit.quality.anomaly import (
     check_volume_anomalies,
@@ -445,12 +449,46 @@ def _render_scorecard(report: ScorecardReport) -> None:
     )
 
 
+def _render_narratives(report: ScorecardReport, db_path: str) -> None:
+    """Render an AI narrative section per blueprint (AI-8, opt-in).
+
+    Loads a provider and, for each blueprint, prints an "AI Analysis" section.
+    Fully defensive — a missing provider or a failed call degrades to a note,
+    never an error.
+    """
+    try:
+        config = load_config()
+        provider = create_provider(config)
+    except Exception:
+        console.print(
+            "\n⚠ AI narrative unavailable: configure diagnostics.provider "
+            "(and its API key) in pipelinekit.yaml.",
+            style="yellow",
+        )
+        return
+
+    for score in report.blueprints:
+        ems_ctx = assemble_ems_context(score.blueprint_name, db_path)
+        text = generate_scorecard_narrative(score, ems_ctx, provider, db_path)
+        console.print(f"\nAI Analysis — {score.blueprint_name}", style="bold")
+        console.print("─" * 50)
+        if text:
+            console.print(text)
+        else:
+            console.print(
+                "(narrative unavailable — AI provider call failed)", style="dim"
+            )
+
+
 @quality_app.command("scorecard")
 def scorecard(
     blueprint: Optional[str] = typer.Option(
         None, "--blueprint", help="Score a single blueprint."
     ),
     format: str = typer.Option("table", "--format", help="Output: table or json."),
+    narrative: bool = typer.Option(
+        False, "--narrative", help="Generate an AI narrative per blueprint (opt-in)."
+    ),
 ) -> None:
     """Show a composite quality score per blueprint (QM-8)."""
     if format not in ("table", "json"):
@@ -481,4 +519,7 @@ def scorecard(
         raise typer.Exit(0)
 
     _render_scorecard(report)
+    # AI-8: narrative is opt-in — the default path above makes no AI call.
+    if narrative:
+        _render_narratives(report, db_path)
     raise typer.Exit(0)

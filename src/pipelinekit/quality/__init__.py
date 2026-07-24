@@ -2,7 +2,8 @@
 
 QM-4 (SPEC-022) adds deterministic, read-only quality coverage monitoring over
 dbt ``schema.yml`` and Soda ``checks.yaml`` files. QM-6 (SPEC-024) adds volume
-anomaly detection over recorded row counts in ``state.db``. Both are fully
+anomaly detection over recorded row counts in ``state.db``. QM-7 (SPEC-029) adds
+schema drift detection between contracts and ``schema.yml``. All are fully
 deterministic — no AI, no warehouse connection.
 """
 
@@ -28,6 +29,14 @@ from pipelinekit.quality.coverage import (
     scan_dbt_coverage,
     scan_soda_coverage,
 )
+from pipelinekit.quality.drift import (
+    DriftItem,
+    DriftReport,
+    DriftType,
+    TableDriftResult,
+    check_all_drift,
+    check_blueprint_drift,
+)
 
 __all__ = [
     "ColumnCoverage",
@@ -47,4 +56,11 @@ __all__ = [
     "get_row_count_history",
     "compute_baseline",
     "compute_deviation_pct",
+    # QM-7 — schema drift detection (SPEC-029)
+    "DriftType",
+    "DriftItem",
+    "TableDriftResult",
+    "DriftReport",
+    "check_blueprint_drift",
+    "check_all_drift",
 ]

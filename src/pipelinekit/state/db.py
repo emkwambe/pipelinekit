@@ -984,6 +984,42 @@ def get_latest_contract_version_for_blueprint(
     return dict(row) if row is not None else None
 
 
+def get_latest_contracts_for_blueprint(
+    blueprint_name: str, db_path: str | Path
+) -> list[dict]:
+    """Return the latest snapshot of *each* contract file for a blueprint.
+
+    One row per ``contract_file`` (the newest by creation, then semver). Used by
+    QM-7 schema drift detection (SPEC-029) to compare every contract against the
+    current ``schema.yml``. Returns an empty list when the blueprint has no
+    snapshots.
+    """
+    try:
+        with _connect_versions(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT * FROM dc_contract_versions
+                WHERE blueprint_name = ?
+                ORDER BY created_at DESC, version_major DESC,
+                         version_minor DESC, version_patch DESC
+                """,
+                (blueprint_name,),
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            f"Cannot read contracts for blueprint {blueprint_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    latest: dict[str, dict] = {}
+    for row in rows:
+        contract_file = row["contract_file"]
+        if contract_file not in latest:  # rows are newest-first
+            latest[contract_file] = dict(row)
+    return list(latest.values())
+
+
 _GM_OWNERS_DDL = """
 CREATE TABLE IF NOT EXISTS gm_owners (
     id TEXT PRIMARY KEY,

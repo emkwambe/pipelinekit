@@ -1,10 +1,11 @@
-"""``pipelinekit quality`` — Quality Management System commands (QM-4, QM-6).
+"""``pipelinekit quality`` — Quality Management System commands (QM-4, QM-6, QM-7).
 
-Orchestration only: delegates coverage scanning to ``quality.coverage`` and
-volume anomaly detection to ``quality.anomaly``, rendering results with Rich.
-Coverage is read-only; QM-6 records row-count snapshots in ``state.db`` but the
-CLI resolves the path and never issues SQL itself (SPEC-022, SPEC-024, ADR-023,
-ADR-025, ADR-003 CLI-first).
+Orchestration only: delegates coverage scanning to ``quality.coverage``, volume
+anomaly detection to ``quality.anomaly``, and schema drift detection to
+``quality.drift``, rendering results with Rich. Coverage and drift are read-only;
+QM-6 records row-count snapshots in ``state.db`` but the CLI resolves the path
+and never issues SQL itself (SPEC-022, SPEC-024, SPEC-029, ADR-023, ADR-025,
+ADR-030, ADR-003 CLI-first).
 """
 
 from __future__ import annotations
@@ -31,6 +32,11 @@ from pipelinekit.quality.coverage import (
     BlueprintCoverage,
     CoverageReport,
     compute_coverage_report,
+)
+from pipelinekit.quality.drift import (
+    TableDriftResult,
+    check_all_drift,
+    check_blueprint_drift,
 )
 from pipelinekit.state import db
 
@@ -306,4 +312,88 @@ def row_count_history(
         )
     console.print(render)
     console.print(f"  Mean over shown snapshots: {mean:,.0f}", style="dim")
+    raise typer.Exit(0)
+
+
+# --- QM-7: schema drift detection ------------------------------------------
+
+_STATUS_MARK = {"CLEAN": "✓", "DRIFTED": "⚠", "NO_BASELINE": "—"}
+
+
+def _render_drift_table(results: list[TableDriftResult]) -> None:
+    """Render one blueprint's drift results and their items."""
+    for result in results:
+        mark = _STATUS_MARK.get(result.status, "·")
+        if result.status == "CLEAN":
+            console.print(
+                f"  {mark} {result.table_name} — no drift "
+                f"(contract v{result.contract_version} matches schema.yml)",
+                style="green",
+            )
+        elif result.status == "NO_BASELINE":
+            console.print(
+                f"  {mark} {result.table_name} — NO_BASELINE "
+                "(run 'pipelinekit contract snapshot' first)",
+                style="dim",
+            )
+        else:  # DRIFTED
+            console.print(
+                f"  {mark} {result.table_name} — "
+                f"{len(result.drift_items)} drift item(s) detected [PK-QM-004]",
+                style="yellow",
+            )
+            for item in result.drift_items:
+                console.print(
+                    f"      {item.drift_type.value}:  {item.detail}", style="dim"
+                )
+
+
+@quality_app.command("check-drift")
+def check_drift(
+    blueprint: Optional[str] = typer.Option(
+        None, "--blueprint", help="Check a single blueprint."
+    ),
+    table: Optional[str] = typer.Option(
+        None, "--table", help="Check a single table (dbt model) name."
+    ),
+) -> None:
+    """Detect schema drift between contracts and schema.yml (QM-7)."""
+    db_path = _db_path()
+
+    console.print("Schema Drift Check", style="bold")
+    console.print("─" * 50)
+
+    if blueprint is not None:
+        blueprint_dir = str(BlueprintRegistry().blueprints_dir / blueprint)
+        grouped = {blueprint: check_blueprint_drift(blueprint, blueprint_dir, db_path)}
+    else:
+        report = check_all_drift(_blueprints_dir(), db_path)
+        grouped = {name: [] for name in report.blueprints}
+        for result in report.results:
+            grouped[result.blueprint_name].append(result)
+
+    any_drift = False
+    any_results = False
+    for name, results in grouped.items():
+        if table is not None:
+            results = [r for r in results if r.table_name == table]
+        if not results:
+            continue
+        any_results = True
+        console.print(f"\n{name}", style="bold cyan")
+        _render_drift_table(results)
+        any_drift = any_drift or any(r.status == "DRIFTED" for r in results)
+
+    if not any_results:
+        console.print("\nNo tables to check.", style="dim")
+        raise typer.Exit(0)
+
+    if any_drift:
+        console.print(
+            "\nRun 'pipelinekit contract snapshot' to update the contract version.",
+            style="dim",
+        )
+        raise typer.Exit(1)
+
+    console.print("\n✓ No schema drift detected.", style="green")
     raise typer.Exit(0)

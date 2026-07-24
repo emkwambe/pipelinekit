@@ -4,6 +4,17 @@ All notable changes to PipelineKit are documented in this file.
 
 ## [Unreleased]
 
+### Added — Sprint 17 (QM-5 Freshness SLA Enforcement)
+- `pipelinekit quality freshness set` — define freshness requirement per table
+- `pipelinekit quality freshness list` — list all freshness requirements
+- `pipelinekit quality freshness check` — evaluate freshness against contract snapshots
+- `pipelinekit quality freshness remove` — remove a freshness requirement
+- Status values: FRESH | STALE | NO_SNAPSHOT
+- Reads DC-8 contract snapshot timestamps for freshness evaluation
+- New error code: PK-QM-005
+- New state.db table: qm_freshness_requirements
+
+
 ### Added — Sprint 16 (AI-8 Quality Scorecard Narrative)
 - `pipelinekit quality scorecard --narrative` — AI-generated explanation of quality score
 - Narrative explains root cause, priority fix, and expected score impact

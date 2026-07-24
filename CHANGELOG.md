@@ -4,6 +4,14 @@ All notable changes to PipelineKit are documented in this file.
 
 ## [Unreleased]
 
+### Added — Sprint 20 (AM-5 Architecture Drift Detection)
+- `pipelinekit architect drift` — detect when blueprint dependencies no longer hold
+- Drift types: DEPENDENCY_BROKEN | BLUEPRINT_MISSING
+- Manual dependencies always considered valid
+- Reads am_dependencies table (AM-4) and verifies against blueprint files
+- New architecture module: src/pipelinekit/architecture/drift.py
+
+
 ### Added — Sprint 18 (OM-5 SLO Compliance Dashboard)
 - `pipelinekit observability dashboard` — SLO compliance trends over time
 - `pipelinekit observability dashboard --blueprint <name>` — filter by blueprint

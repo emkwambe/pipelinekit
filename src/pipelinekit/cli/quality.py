@@ -43,6 +43,12 @@ from pipelinekit.quality.drift import (
     check_all_drift,
     check_blueprint_drift,
 )
+from pipelinekit.quality.freshness import (
+    check_freshness,
+    get_freshness_requirements,
+    remove_freshness_requirement,
+    set_freshness_requirement,
+)
 from pipelinekit.quality.scorecard import (
     BlueprintScore,
     ScorecardReport,
@@ -59,6 +65,13 @@ quality_app = typer.Typer(
     no_args_is_help=True,
     add_completion=False,
 )
+
+freshness_app = typer.Typer(
+    help="Data freshness requirement management.",
+    no_args_is_help=True,
+    add_completion=False,
+)
+quality_app.add_typer(freshness_app, name="freshness")
 
 
 def _blueprints_dir() -> str:
@@ -522,4 +535,108 @@ def scorecard(
     # AI-8: narrative is opt-in — the default path above makes no AI call.
     if narrative:
         _render_narratives(report, db_path)
+    raise typer.Exit(0)
+
+
+# --- QM-5: freshness SLA enforcement ---------------------------------------
+
+
+@freshness_app.command("set")
+def freshness_set_command(
+    blueprint_name: str = typer.Argument(..., help="Blueprint name."),
+    table: str = typer.Option(..., "--table", help="Table name."),
+    hours: float = typer.Option(..., "--hours", help="Maximum data age in hours."),
+) -> None:
+    """Set or update a table's freshness requirement."""
+    req = set_freshness_requirement(blueprint_name, table, hours, _db_path())
+    console.print(
+        f"✓ Freshness requirement set: {req.blueprint_name} / {req.table_name} "
+        f"≤ {req.max_hours:g}h",
+        style="green",
+    )
+    raise typer.Exit(0)
+
+
+@freshness_app.command("list")
+def freshness_list_command() -> None:
+    """List all freshness requirements."""
+    registry = BlueprintRegistry()
+    db_path = _db_path()
+    reqs = [
+        r
+        for bp in registry.list()
+        for r in get_freshness_requirements(bp.name, db_path)
+    ]
+    if not reqs:
+        console.print("No freshness requirements defined.")
+        raise typer.Exit(0)
+
+    console.print("Freshness Requirements", style="bold")
+    console.print("─" * 49)
+    table = Table()
+    table.add_column("Blueprint", style="cyan", no_wrap=True)
+    table.add_column("Table")
+    table.add_column("Max Hours", justify="right")
+    for req in reqs:
+        table.add_row(req.blueprint_name, req.table_name, f"{req.max_hours:g}")
+    console.print(table)
+    raise typer.Exit(0)
+
+
+@freshness_app.command("check")
+def freshness_check_command(
+    blueprint_name: str = typer.Argument(..., help="Blueprint to check."),
+) -> None:
+    """Check a blueprint's tables against their freshness requirements."""
+    results = check_freshness(blueprint_name, _db_path())
+    if not results:
+        console.print(f"No freshness requirements defined for {blueprint_name}.")
+        console.print(
+            "  Add one with 'pipelinekit quality freshness set'.", style="dim"
+        )
+        raise typer.Exit(0)
+
+    console.print(f"Freshness Check — {blueprint_name}", style="bold")
+    console.print("─" * 49)
+    stale = False
+    for result in results:
+        if result.status == "FRESH":
+            console.print(
+                f"✓ {result.table_name}  last updated: "
+                f"{result.hours_since_update:.1f}h ago  "
+                f"threshold: {result.max_hours:g}h  FRESH",
+                style="green",
+            )
+        elif result.status == "STALE":
+            stale = True
+            console.print(
+                f"⚠ {result.table_name}  last updated: "
+                f"{result.hours_since_update:.1f}h ago  "
+                f"threshold: {result.max_hours:g}h  STALE [PK-QM-005]",
+                style="yellow",
+            )
+        else:  # NO_DATA
+            console.print(
+                f"— {result.table_name}  no contract snapshot  "
+                f"threshold: {result.max_hours:g}h  NO_DATA",
+                style="dim",
+            )
+
+    raise typer.Exit(1 if stale else 0)
+
+
+@freshness_app.command("remove")
+def freshness_remove_command(
+    blueprint_name: str = typer.Argument(..., help="Blueprint name."),
+    table: str = typer.Option(..., "--table", help="Table name."),
+) -> None:
+    """Remove a table's freshness requirement."""
+    removed = remove_freshness_requirement(blueprint_name, table, _db_path())
+    if removed:
+        console.print(
+            f"✓ Freshness requirement removed: {blueprint_name} / {table}",
+            style="green",
+        )
+    else:
+        console.print(f"No freshness requirement found for {blueprint_name} / {table}")
     raise typer.Exit(0)

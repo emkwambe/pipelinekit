@@ -33,6 +33,7 @@ if TYPE_CHECKING:
     from pipelinekit.governance.convention import NamingConvention
     from pipelinekit.governance.ownership import BlueprintOwner
     from pipelinekit.observability.slo import SLODefinition
+    from pipelinekit.quality.freshness import FreshnessRequirement
 
 STATE_DIR = ".pipelinekit"
 STATE_DB = "state.db"
@@ -183,6 +184,16 @@ CREATE TABLE IF NOT EXISTS qm_row_counts (
 
 CREATE INDEX IF NOT EXISTS idx_qm_row_counts_blueprint_table
     ON qm_row_counts(blueprint_name, table_name, recorded_at);
+
+CREATE TABLE IF NOT EXISTS qm_freshness_requirements (
+    id TEXT PRIMARY KEY,
+    blueprint_name TEXT NOT NULL,
+    table_name TEXT NOT NULL,
+    max_hours REAL NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(blueprint_name, table_name)
+);
 
 CREATE TABLE IF NOT EXISTS om_slos (
     id TEXT PRIMARY KEY,
@@ -2083,6 +2094,137 @@ def get_request_by_code(request_code: str, db_path: str | Path) -> dict | None:
             {"path": str(db_path), "detail": str(exc)},
         ) from exc
     return dict(row) if row is not None else None
+
+
+_QM_FRESHNESS_DDL = """
+CREATE TABLE IF NOT EXISTS qm_freshness_requirements (
+    id TEXT PRIMARY KEY,
+    blueprint_name TEXT NOT NULL,
+    table_name TEXT NOT NULL,
+    max_hours REAL NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(blueprint_name, table_name)
+);
+"""
+
+
+def _connect_freshness(db_path: str | Path) -> sqlite3.Connection:
+    """Open ``db_path`` and ensure the ``qm_freshness_requirements`` table exists.
+
+    QM-5 (SPEC-034) threads an explicit ``db_path`` rather than ``cwd`` so the
+    freshness layer is testable against a ``tmp_path`` database. The table DDL is
+    idempotent, so a raw path with no prior ``initialize`` still works.
+    """
+    conn = sqlite3.connect(db_path)
+    conn.executescript(_QM_FRESHNESS_DDL)
+    return conn
+
+
+def upsert_freshness_req(req: FreshnessRequirement, db_path: str | Path) -> None:
+    """Insert or replace a freshness requirement (QM-5, SPEC-034).
+
+    The ``UNIQUE(blueprint_name, table_name)`` constraint means a matching pair
+    is replaced in place; the ``freshness`` layer preserves ``id``/``created_at``.
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the requirement cannot be written.
+    """
+    try:
+        with _connect_freshness(db_path) as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO qm_freshness_requirements (
+                    id, blueprint_name, table_name, max_hours,
+                    created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    req.id,
+                    req.blueprint_name,
+                    req.table_name,
+                    req.max_hours,
+                    req.created_at,
+                    req.updated_at,
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot write freshness requirement for {req.blueprint_name}/"
+            f"{req.table_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def get_freshness_req(
+    blueprint_name: str, table_name: str, db_path: str | Path
+) -> dict | None:
+    """Return the freshness requirement for a blueprint/table, or None (QM-5)."""
+    try:
+        with _connect_freshness(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                """
+                SELECT * FROM qm_freshness_requirements
+                WHERE blueprint_name = ? AND table_name = ?
+                """,
+                (blueprint_name, table_name),
+            ).fetchone()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            f"Cannot read freshness requirement for {blueprint_name}/{table_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return dict(row) if row is not None else None
+
+
+def get_all_freshness_reqs(db_path: str | Path) -> list[dict]:
+    """Return every freshness requirement, sorted by blueprint then table (QM-5)."""
+    try:
+        with _connect_freshness(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT * FROM qm_freshness_requirements
+                ORDER BY blueprint_name, table_name
+                """
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            "Cannot read freshness requirements from state database",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return [dict(row) for row in rows]
+
+
+def delete_freshness_req(
+    blueprint_name: str, table_name: str, db_path: str | Path
+) -> bool:
+    """Delete one freshness requirement. Return True if a row was removed (QM-5).
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the delete cannot be executed.
+    """
+    try:
+        with _connect_freshness(db_path) as conn:
+            cursor = conn.execute(
+                """
+                DELETE FROM qm_freshness_requirements
+                WHERE blueprint_name = ? AND table_name = ?
+                """,
+                (blueprint_name, table_name),
+            )
+            return cursor.rowcount > 0
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot delete freshness requirement for {blueprint_name}/{table_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
 
 
 def ensure_gitignore_entry(cwd: Path | None = None) -> None:

@@ -88,6 +88,7 @@ no records (no consumers watching the table) is never raised as an error.
 | PK-QM-002 | Schema file parse error — a `schema.yml` file could not be parsed as valid YAML. Fix: check the file for YAML syntax errors. |
 | PK-QM-003 | Volume anomaly detected — row count deviates significantly from the established baseline. Possible causes: missing partition, failed extraction, truncated load, duplicate rows loaded, or source data issue. Fix: investigate the pipeline run logs for the affected table. |
 | PK-QM-004 | Schema drift detected — the `schema.yml` column definitions diverge from the contract snapshot. Fix: run `pipelinekit contract snapshot` to update the contract, or update the `schema.yml` to match the contract. |
+| PK-QM-005 | Freshness requirement violated — data has not been updated within the required time window. Fix: investigate the extraction pipeline for the affected table. |
 
 QM-4 quality-coverage codes are carried by `QualityError` (read-only scanning;
 no `state.db` writes). QM-6 (SPEC-024) adds `PK-QM-003`, surfaced by
@@ -97,7 +98,11 @@ snapshots are stored in the `qm_row_counts` table (`state.db`). QM-7 (SPEC-029)
 adds `PK-QM-004`, surfaced by `pipelinekit quality check-drift` when a dbt
 `schema.yml` model's columns diverge from its contract snapshot; the command
 exits 1 on drift. Drift detection is read-only — it adds no `state.db` tables and
-reports `NO_BASELINE` (never an error) when no contract snapshot exists.
+reports `NO_BASELINE` (never an error) when no contract snapshot exists. QM-5
+(SPEC-034) adds `PK-QM-005`, surfaced by `pipelinekit quality freshness check`
+when a table's newest contract snapshot is older than its required window
+(`qm_freshness_requirements` table); the command exits 1 on any `STALE` table and
+reports `NO_DATA` (never an error) when no contract snapshot exists.
 
 ### GM — Governance Management (GM-1, SPEC-023)
 

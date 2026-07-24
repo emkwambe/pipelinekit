@@ -37,6 +37,14 @@ from pipelinekit.quality.drift import (
     check_all_drift,
     check_blueprint_drift,
 )
+from pipelinekit.quality.freshness import (
+    FreshnessCheckResult,
+    FreshnessRequirement,
+    check_freshness,
+    get_freshness_requirements,
+    remove_freshness_requirement,
+    set_freshness_requirement,
+)
 from pipelinekit.quality.scorecard import (
     BlueprintScore,
     ComponentScore,
@@ -78,4 +86,11 @@ __all__ = [
     "compute_blueprint_score",
     "compute_scorecard",
     "get_rating",
+    # QM-5 — freshness SLA enforcement (SPEC-034)
+    "FreshnessRequirement",
+    "FreshnessCheckResult",
+    "set_freshness_requirement",
+    "check_freshness",
+    "get_freshness_requirements",
+    "remove_freshness_requirement",
 ]

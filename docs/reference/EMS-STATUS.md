@@ -17,7 +17,10 @@ Public-facing status of PipelineKit's EMS (Engineering Management System) capabi
 |---|---|---|
 | Source and transform quality checks | QM-1..3 | ✅ v0.1.0 |
 | Coverage monitoring | QM-4 | ✅ Phase 2 |
+| Freshness SLA enforcement | QM-5 | ✅ Phase 3 |
 | Volume anomaly detection | QM-6 | ✅ Phase 2 |
+| Schema drift detection | QM-7 | ✅ Phase 2 |
+| Quality scorecard | QM-8 | ✅ Phase 2 |
 
 ### GM — Governance Management
 | Capability | Code | Status |
@@ -42,14 +45,19 @@ Public-facing status of PipelineKit's EMS (Engineering Management System) capabi
 | Capability | Code | Status |
 |---|---|---|
 | Blueprint generation, diagnostics | AI-1..6 | ✅ v0.1.0 |
+| EMS context injection | AI-7 | ✅ Phase 3 |
+| Scorecard narrative | AI-8 | ✅ Phase 3 |
+
+Six AI providers are supported — Anthropic, OpenAI, Kimi (Moonshot AI), DeepSeek, Mistral, and Ollama (local) — with an ordered provider cascade (primary + fallbacks) for resilience and large-context routing.
 
 ### RM — Release Management
 | Capability | Code | Status |
 |---|---|---|
 | Release coordination | RM-1..3 | ✅ v0.1.0 |
 
-## Roadmap (Phase 2 continuing)
-- QM-7: Schema drift detection
-- QM-8: Quality scorecard
+## Roadmap
 - OM-5: SLO dashboard
-- AM-5+: Architecture drift detection
+- DC-11: Consumer notification delivery
+- AM-5: Architecture drift detection
+- QM-9: Quality regression testing
+- AI-9: Planned AI-management capability

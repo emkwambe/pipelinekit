@@ -153,6 +153,45 @@ Without `--interactive`, only assets already approved in a prior `generate bluep
 
 ---
 
+## AI Provider Configuration
+
+PipelineKit's AI features (`diagnose`, `architect`, `generate blueprint`, `migrate analyze`, and `quality scorecard --narrative`) use a pluggable AI provider. BYOK — set the provider's API key in your environment.
+
+### Available providers
+| Provider | Config name | API key variable | Context window |
+|---|---|---|---|
+| Anthropic | `anthropic` | `ANTHROPIC_API_KEY` | 200,000 tokens |
+| OpenAI | `openai` | `OPENAI_API_KEY` | 128,000 tokens |
+| Kimi (Moonshot AI) | `kimi` | `MOONSHOT_API_KEY` | 131,072 tokens |
+| DeepSeek | `deepseek` | `DEEPSEEK_API_KEY` | 65,536 tokens |
+| Mistral | `mistral` | `MISTRAL_API_KEY` | 32,768 tokens |
+| Ollama (local) | `ollama` | none required | 8,192 tokens |
+
+Kimi (Moonshot AI) is OpenAI-compatible (`https://api.moonshot.cn/v1`); its `moonshot-v1-128k` model (default `moonshot-v1-32k`) provides the largest usable context for EMS-enriched prompts.
+
+### Single provider
+Set the active provider in `pipelinekit.yaml`:
+
+```yaml
+diagnostics:
+  enabled: true
+  provider: anthropic
+```
+
+Or override per command with `--provider`, e.g. `pipelinekit diagnose --provider kimi`.
+
+### Provider cascade with ordered fallbacks
+The cascade (AI-6 update) tries a primary provider, then ordered fallbacks — on rate limit, network/auth failure, or when a prompt is estimated to exceed a provider's context window (large EMS-enriched prompts auto-route to a 128k provider such as `kimi`). Configure via environment variables:
+
+```bash
+PIPELINEKIT_AI_PRIMARY=anthropic
+PIPELINEKIT_AI_FALLBACKS=kimi,ollama
+```
+
+Cascade is opt-in: with no fallbacks set, behavior is a single provider — unchanged from before. If every provider fails or is skipped, the cascade raises `PK-AI-001` (all providers exhausted).
+
+---
+
 ## Diagnose Commands
 
 ### `pipelinekit diagnose [run-id] [--provider] [--approve]`
@@ -317,7 +356,7 @@ Pending Notifications
 
 ---
 
-## Quality Commands (QM-4 / QM-6)
+## Quality Commands (QM-4 / QM-5 / QM-6 / QM-7 / QM-8)
 
 Measure test coverage and detect volume anomalies. Coverage is a read-only scan of blueprint files; row counts are stored in `state.db`.
 
@@ -359,6 +398,57 @@ Show recorded row counts for one table, newest first, with each snapshot's devia
 | `--blueprint` (required) | Blueprint name |
 | `--table` (required) | Table name |
 | `--limit` | Number of snapshots to show (default `10`) |
+
+### `pipelinekit quality check-drift [--blueprint <name>] [--table <name>]` (QM-7)
+Detect schema drift between a blueprint's dbt models and its contract snapshots. For each model, compares columns against the matching contract and reports `CLEAN`, `DRIFTED`, or `NO_BASELINE` (no contract snapshot yet). Exits 1 if any model is `DRIFTED` (with `PK-QM-004` in the output).
+
+| Option | Description |
+|---|---|
+| `--blueprint` | Check a single blueprint (default: all installed) |
+| `--table` | Check a single dbt model name |
+
+### `pipelinekit quality scorecard [--blueprint <name>] [--format <table|json>] [--narrative]` (QM-8 / AI-8)
+Show a composite quality score (0–100) per blueprint, weighting coverage 40%, volume 30%, drift 20%, ownership 10%. Ratings: 90+ Excellent, 75+ Good, 50+ Fair, else Poor.
+
+| Option | Description |
+|---|---|
+| `--blueprint` | Score a single blueprint (default: all installed) |
+| `--format` | `table` (default) or `json` |
+| `--narrative` | Generate an AI explanation of the score (opt-in; AI-8). Requires a configured AI provider. Each blueprint gets an "AI Analysis" section covering the root cause, the highest-priority fix, and the expected score impact. |
+
+`--narrative` is strictly opt-in: the default scorecard makes **no** AI call and its output is unchanged. When no provider or API key is available, the AI Analysis section degrades to a note rather than failing.
+
+```bash
+pipelinekit quality scorecard --narrative
+pipelinekit quality scorecard --blueprint stripe-to-snowflake --narrative
+```
+
+### `pipelinekit quality freshness` (QM-5)
+Define and enforce per-table data-freshness requirements (maximum data age), evaluated against DC-8 contract snapshot timestamps (`dc_contract_versions`). Requirements are stored in `state.db` (`qm_freshness_requirements`). Unlike OM-4 freshness SLOs (organizational targets), these are quality gates suitable for CI.
+
+#### `pipelinekit quality freshness set <blueprint> --table <table> --hours <n>`
+Set or update a table's maximum data age, in hours.
+
+| Argument / Option | Description |
+|---|---|
+| `blueprint` (required) | Blueprint name |
+| `--table` (required) | Table name |
+| `--hours` (required) | Maximum data age in hours |
+
+#### `pipelinekit quality freshness list`
+List all defined freshness requirements as a table: Blueprint, Table, Max Hours.
+
+#### `pipelinekit quality freshness check <blueprint>`
+Check each table's newest matching contract snapshot against its requirement. Per table the status is `FRESH`, `STALE` (surfaced with `PK-QM-005`), or `NO_DATA` — meaning no contract snapshot exists yet (run `pipelinekit contract snapshot` first). Exits 1 if any table is `STALE`.
+
+```
+Freshness Check — stripe-to-snowflake
+─────────────────────────────────────────────────
+⚠ charges  last updated: 8.0h ago  threshold: 6h  STALE [PK-QM-005]
+```
+
+#### `pipelinekit quality freshness remove <blueprint> --table <table>`
+Remove a table's freshness requirement.
 
 ---
 
@@ -596,7 +686,7 @@ Every error carries a stable `PK-[AREA]-[NUMBER]` code. The table below is the o
 | `PK-NOTIFY-002` | Notification delivery failed | Inspect provider response |
 | `PK-NOTIFY-003` | Invalid recipient address | Fix the recipient |
 | `PK-NOTIFY-004` | API key missing or invalid | Set `RESEND_API_KEY` |
-| `PK-AI-001` | AI provider unavailable (missing key / unreachable) | Set the provider's API key |
+| `PK-AI-001` | AI provider unavailable — or, in the provider cascade, all providers exhausted | Set the provider's API key; check connectivity / fallbacks |
 | `PK-AI-002` | AI response failed schema validation | Retry; try another provider |
 | `PK-AI-003` | AI confidence below threshold | Treat the result as advisory |
 | `PK-DIAG-001` | Run ID not found in `state.db` | Run `pipelinekit status` for valid IDs |
@@ -635,6 +725,8 @@ Every error carries a stable `PK-[AREA]-[NUMBER]` code. The table below is the o
 | `PK-QM-001` | No blueprints found for coverage scan | Install a blueprint first |
 | `PK-QM-002` | `schema.yml` parse error | Fix the YAML syntax |
 | `PK-QM-003` | Volume anomaly detected | Investigate the affected table's pipeline run |
+| `PK-QM-004` | Schema drift detected (schema.yml vs contract) | Run `contract snapshot`, or reconcile the `schema.yml` |
+| `PK-QM-005` | Freshness requirement violated (STALE) | Investigate the extraction job for the affected table |
 | `PK-GM-001` | Blueprint not found | Run `pipelinekit blueprint list` |
 | `PK-GM-002` | Invalid owner email | Provide a valid `name@domain.tld` address |
 | `PK-GM-003` | Invalid convention scope | Use `blueprint`, `table`, `column`, or `contract_file` |

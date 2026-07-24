@@ -51,6 +51,5 @@ Public-facing status of PipelineKit's EMS (Engineering Management System) capabi
 ## Roadmap (Phase 2 continuing)
 - QM-7: Schema drift detection
 - QM-8: Quality scorecard
-- GM-6: Policy enforcement (hard gates on approval workflow)
 - OM-5: SLO dashboard
 - AM-5+: Architecture drift detection

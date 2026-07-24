@@ -49,6 +49,7 @@ from pipelinekit.quality.freshness import (
     remove_freshness_requirement,
     set_freshness_requirement,
 )
+from pipelinekit.quality.regression import RegressionReport, check_regression
 from pipelinekit.quality.scorecard import (
     BlueprintScore,
     ScorecardReport,
@@ -536,6 +537,60 @@ def scorecard(
     if narrative:
         _render_narratives(report, db_path)
     raise typer.Exit(0)
+
+
+# --- QM-9: quality regression testing --------------------------------------
+
+
+def _render_regression(report: RegressionReport) -> None:
+    """Print one blueprint's regression outcome."""
+    if not report.is_regression:
+        console.print(f"{report.blueprint_name}: ✓ no regression", style="green")
+        return
+    console.print(
+        f"{report.blueprint_name}: ⚠ REGRESSION DETECTED", style="bold yellow"
+    )
+    for reg in report.regressions:
+        console.print(
+            f"  {reg.regression_type}: {reg.previous_value:g} → "
+            f"{reg.current_value:g} (dropped {reg.drop_amount:g} points) — "
+            f"{reg.detail}",
+            style="yellow",
+        )
+
+
+@quality_app.command("check-regression")
+def check_regression_command(
+    blueprint: Optional[str] = typer.Option(
+        None, "--blueprint", help="Check a single blueprint."
+    ),
+    window: int = typer.Option(
+        7, "--window", help="Number of previous snapshots to average as baseline."
+    ),
+    threshold: float = typer.Option(
+        5.0, "--threshold", help="Point drop that counts as a regression."
+    ),
+) -> None:
+    """Detect quality regressions against historical scorecard baselines (QM-9)."""
+    db_path = _db_path()
+    if blueprint is not None:
+        names = [blueprint]
+    else:
+        names = [bp.name for bp in BlueprintRegistry().list()]
+
+    if not names:
+        console.print("No blueprints installed.")
+        raise typer.Exit(0)
+
+    console.print("Quality Regression Check", style="bold")
+    console.print("─" * 49)
+    any_regression = False
+    for name in names:
+        report = check_regression(name, db_path, window=window, threshold=threshold)
+        _render_regression(report)
+        any_regression = any_regression or report.is_regression
+
+    raise typer.Exit(1 if any_regression else 0)
 
 
 # --- QM-5: freshness SLA enforcement ---------------------------------------

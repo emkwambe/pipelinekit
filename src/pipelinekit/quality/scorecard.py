@@ -7,11 +7,16 @@ Combines four existing signals into a single 0-100 score per blueprint:
 * drift    (20%) — schema drift status (QM-7 ``check_blueprint_drift``)
 * ownership(10%) — owner assigned (GM-1 ``get_owner``)
 
-Read-only and deterministic — no AI, no new ``state.db`` tables. Every signal is
-gathered defensively: any failure or missing data yields a component score of 0
-(volume/drift use 50 when there is simply no baseline yet). QM-8 never crashes.
+Deterministic — no AI. Every signal is gathered defensively: any failure or
+missing data yields a component score of 0 (volume/drift use 50 when there is
+simply no baseline yet). QM-8 never crashes.
 
-See: SPEC-030, ADR-031.
+QM-9 (SPEC-038) adds a best-effort snapshot write to ``qm_scorecard_snapshots``
+on each ``compute_blueprint_score`` call, providing the historical baselines that
+``quality.regression`` compares against. The write is best-effort, so scoring
+still never crashes if state is unavailable.
+
+See: SPEC-030, ADR-031, SPEC-038, ADR-039.
 """
 
 from __future__ import annotations
@@ -154,12 +159,36 @@ def compute_blueprint_score(
     ]
     composite = sum(c.score * WEIGHTS[c.name] for c in components)
     composite = round(composite, 2)
-    return BlueprintScore(
+    score = BlueprintScore(
         blueprint_name=blueprint_name,
         composite_score=composite,
         rating=get_rating(composite),
         components=components,
     )
+    _save_snapshot(score, db_path)
+    return score
+
+
+def _save_snapshot(score: BlueprintScore, db_path: str) -> None:
+    """Persist a scorecard snapshot for regression baselines (QM-9).
+
+    Best-effort — a state write failure must never break scoring, matching QM-8's
+    "never crashes" contract. Regression detection simply has one fewer baseline.
+    """
+    by_name = {c.name: c.score for c in score.components}
+    try:
+        db.insert_scorecard_snapshot(
+            score.blueprint_name,
+            score.composite_score,
+            by_name.get("coverage", 0.0),
+            by_name.get("volume", 0.0),
+            by_name.get("drift", 0.0),
+            by_name.get("ownership", 0.0),
+            score.rating,
+            db_path,
+        )
+    except Exception:
+        pass
 
 
 def compute_scorecard(blueprints_dir: str, db_path: str) -> ScorecardReport:

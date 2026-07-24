@@ -295,6 +295,21 @@ CREATE TABLE IF NOT EXISTS dc_contract_lifecycle (
     updated_at TEXT NOT NULL,
     UNIQUE(blueprint_name, contract_file)
 );
+
+CREATE TABLE IF NOT EXISTS qm_scorecard_snapshots (
+    id TEXT PRIMARY KEY,
+    blueprint_name TEXT NOT NULL,
+    composite_score REAL NOT NULL,
+    coverage_score REAL NOT NULL,
+    volume_score REAL NOT NULL,
+    drift_score REAL NOT NULL,
+    ownership_score REAL NOT NULL,
+    rating TEXT NOT NULL,
+    recorded_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_qm_scorecard_snapshots
+    ON qm_scorecard_snapshots(blueprint_name, recorded_at);
 """
 
 
@@ -2459,6 +2474,112 @@ def get_all_lifecycle_states(db_path: str | Path) -> list[dict]:
         raise StateError(
             "PK-STATE-001",
             "Cannot read lifecycle states from state database",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return [dict(row) for row in rows]
+
+
+_QM_SCORECARD_SNAPSHOTS_DDL = """
+CREATE TABLE IF NOT EXISTS qm_scorecard_snapshots (
+    id TEXT PRIMARY KEY,
+    blueprint_name TEXT NOT NULL,
+    composite_score REAL NOT NULL,
+    coverage_score REAL NOT NULL,
+    volume_score REAL NOT NULL,
+    drift_score REAL NOT NULL,
+    ownership_score REAL NOT NULL,
+    rating TEXT NOT NULL,
+    recorded_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_qm_scorecard_snapshots
+    ON qm_scorecard_snapshots(blueprint_name, recorded_at);
+"""
+
+
+def _connect_scorecard_snapshots(db_path: str | Path) -> sqlite3.Connection:
+    """Open ``db_path`` and ensure the ``qm_scorecard_snapshots`` table exists.
+
+    QM-9 (SPEC-038) threads an explicit ``db_path`` rather than ``cwd`` so the
+    regression layer is testable against a ``tmp_path`` database. The DDL is
+    idempotent, so a raw path with no prior ``initialize`` still works.
+    """
+    conn = sqlite3.connect(db_path)
+    conn.executescript(_QM_SCORECARD_SNAPSHOTS_DDL)
+    return conn
+
+
+def insert_scorecard_snapshot(
+    blueprint_name: str,
+    composite_score: float,
+    coverage_score: float,
+    volume_score: float,
+    drift_score: float,
+    ownership_score: float,
+    rating: str,
+    db_path: str | Path,
+) -> None:
+    """Persist one quality scorecard snapshot for regression baselines (QM-9).
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the snapshot cannot be written.
+    """
+    try:
+        with _connect_scorecard_snapshots(db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO qm_scorecard_snapshots (
+                    id, blueprint_name, composite_score, coverage_score,
+                    volume_score, drift_score, ownership_score, rating, recorded_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    str(uuid.uuid4()),
+                    blueprint_name,
+                    composite_score,
+                    coverage_score,
+                    volume_score,
+                    drift_score,
+                    ownership_score,
+                    rating,
+                    datetime.now(timezone.utc).isoformat(),
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot write scorecard snapshot for {blueprint_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def get_scorecard_history(
+    blueprint_name: str, db_path: str | Path, limit: int | None = None
+) -> list[dict]:
+    """Return a blueprint's scorecard snapshots, newest first (QM-9).
+
+    The implicit ``rowid`` breaks ties so snapshots recorded within the same
+    timestamp resolution still order by insertion (newest first). ``limit``
+    caps the number of rows returned when set.
+    """
+    query = """
+        SELECT * FROM qm_scorecard_snapshots
+        WHERE blueprint_name = ?
+        ORDER BY recorded_at DESC, rowid DESC
+    """
+    params: tuple = (blueprint_name,)
+    if limit is not None:
+        query += " LIMIT ?"
+        params = (blueprint_name, limit)
+    try:
+        with _connect_scorecard_snapshots(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(query, params).fetchall()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            f"Cannot read scorecard history for {blueprint_name}",
             {"path": str(db_path), "detail": str(exc)},
         ) from exc
     return [dict(row) for row in rows]

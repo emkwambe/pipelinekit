@@ -45,6 +45,11 @@ from pipelinekit.quality.freshness import (
     remove_freshness_requirement,
     set_freshness_requirement,
 )
+from pipelinekit.quality.regression import (
+    QualityRegression,
+    RegressionReport,
+    check_regression,
+)
 from pipelinekit.quality.scorecard import (
     BlueprintScore,
     ComponentScore,
@@ -93,4 +98,8 @@ __all__ = [
     "check_freshness",
     "get_freshness_requirements",
     "remove_freshness_requirement",
+    # QM-9 — quality regression testing (SPEC-038)
+    "QualityRegression",
+    "RegressionReport",
+    "check_regression",
 ]

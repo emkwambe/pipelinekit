@@ -14,6 +14,7 @@ from pipelinekit.observability.slo import (
     SLOResult,
     check_slos,
     get_all_slos,
+    get_slo_compliance_summary,
     get_slos,
     remove_slo,
     set_slo,
@@ -28,4 +29,6 @@ __all__ = [
     "get_all_slos",
     "remove_slo",
     "check_slos",
+    # OM-5 — SLO compliance dashboard (SPEC-035)
+    "get_slo_compliance_summary",
 ]

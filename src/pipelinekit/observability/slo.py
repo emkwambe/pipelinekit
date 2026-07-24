@@ -190,7 +190,69 @@ def check_slos(blueprint_name: str, db_path: str) -> list[SLOResult]:
         elif slo.slo_type == "coverage":
             results.append(_check_coverage(slo))
         # No else: only VALID_SLO_TYPES can be stored (set_slo validates).
+    _save_slo_runs(results, db_path)  # OM-5: persist for the compliance dashboard
     return results
+
+
+def _save_slo_runs(results: list[SLOResult], db_path: str) -> None:
+    """Persist each SLO result to ``om_slo_runs`` (OM-5). Best-effort.
+
+    A persistence failure must never break SLO evaluation, so each write is
+    isolated: the dashboard is a side benefit, not part of the check contract.
+    """
+    for result in results:
+        try:
+            db.insert_slo_run(
+                result.slo.blueprint_name,
+                result.slo.table_name,
+                result.slo.slo_type,
+                result.status,
+                result.current_value,
+                result.slo.threshold,
+                db_path,
+            )
+        except Exception:
+            pass
+
+
+def get_slo_compliance_summary(
+    blueprint_name: str, db_path: str, window: int = 7
+) -> list[dict]:
+    """Summarize SLO compliance over the last ``window`` runs (OM-5).
+
+    Groups the blueprint's saved runs by ``(table, slo_type)`` and, over the most
+    recent ``window`` runs of each group, computes the share that were ``OK``.
+    ``NO_DATA`` runs are excluded from the calculation (they cannot be
+    compliant or non-compliant). Returns one dict per group:
+    ``{blueprint, table, type, compliance_pct, run_count}``.
+    """
+    groups: dict[tuple[str, str], list[dict]] = {}
+    for run in db.get_slo_run_history(blueprint_name, db_path):  # newest first
+        key = (run["table_name"], run["slo_type"])
+        groups.setdefault(key, []).append(run)
+
+    summary: list[dict] = []
+    for (table_name, slo_type), runs in groups.items():
+        window_runs = runs[:window]
+        evaluated = [r for r in window_runs if r["status"] != "NO_DATA"]
+        if evaluated:
+            ok = sum(1 for r in evaluated if r["status"] == "OK")
+            compliance_pct = round(ok / len(evaluated) * 100, 1)
+            run_count = len(evaluated)
+        else:
+            compliance_pct = 0.0
+            run_count = 0
+        summary.append(
+            {
+                "blueprint": blueprint_name,
+                "table": table_name,
+                "type": slo_type,
+                "compliance_pct": compliance_pct,
+                "run_count": run_count,
+            }
+        )
+    summary.sort(key=lambda s: (s["table"], s["type"]))
+    return summary
 
 
 def _no_data(slo: SLODefinition, message: str) -> SLOResult:

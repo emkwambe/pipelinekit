@@ -207,6 +207,20 @@ CREATE TABLE IF NOT EXISTS om_slos (
     UNIQUE(blueprint_name, table_name, slo_type)
 );
 
+CREATE TABLE IF NOT EXISTS om_slo_runs (
+    id TEXT PRIMARY KEY,
+    blueprint_name TEXT NOT NULL,
+    table_name TEXT NOT NULL,
+    slo_type TEXT NOT NULL,
+    status TEXT NOT NULL,
+    current_value REAL,
+    threshold REAL NOT NULL,
+    recorded_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_om_slo_runs
+    ON om_slo_runs(blueprint_name, table_name, slo_type, recorded_at);
+
 CREATE TABLE IF NOT EXISTS am_dependencies (
     id TEXT PRIMARY KEY,
     from_blueprint TEXT NOT NULL,
@@ -2225,6 +2239,104 @@ def delete_freshness_req(
             f"Cannot delete freshness requirement for {blueprint_name}/{table_name}",
             {"path": str(db_path), "detail": str(exc)},
         ) from exc
+
+
+_OM_SLO_RUNS_DDL = """
+CREATE TABLE IF NOT EXISTS om_slo_runs (
+    id TEXT PRIMARY KEY,
+    blueprint_name TEXT NOT NULL,
+    table_name TEXT NOT NULL,
+    slo_type TEXT NOT NULL,
+    status TEXT NOT NULL,
+    current_value REAL,
+    threshold REAL NOT NULL,
+    recorded_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_om_slo_runs
+    ON om_slo_runs(blueprint_name, table_name, slo_type, recorded_at);
+"""
+
+
+def _connect_slo_runs(db_path: str | Path) -> sqlite3.Connection:
+    """Open ``db_path`` and ensure the ``om_slo_runs`` table exists.
+
+    OM-5 (SPEC-035) threads an explicit ``db_path`` rather than ``cwd`` so the
+    dashboard layer is testable against a ``tmp_path`` database. The DDL is
+    idempotent, so a raw path with no prior ``initialize`` still works.
+    """
+    conn = sqlite3.connect(db_path)
+    conn.executescript(_OM_SLO_RUNS_DDL)
+    return conn
+
+
+def insert_slo_run(
+    blueprint_name: str,
+    table_name: str,
+    slo_type: str,
+    status: str,
+    current_value: float | None,
+    threshold: float,
+    db_path: str | Path,
+) -> None:
+    """Persist one SLO check result for the compliance dashboard (OM-5).
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the run cannot be written.
+    """
+    try:
+        with _connect_slo_runs(db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO om_slo_runs (
+                    id, blueprint_name, table_name, slo_type,
+                    status, current_value, threshold, recorded_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    str(uuid.uuid4()),
+                    blueprint_name,
+                    table_name,
+                    slo_type,
+                    status,
+                    current_value,
+                    threshold,
+                    datetime.now(timezone.utc).isoformat(),
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot write SLO run for {blueprint_name}/{table_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def get_slo_run_history(blueprint_name: str, db_path: str | Path) -> list[dict]:
+    """Return a blueprint's SLO check history, newest first (OM-5).
+
+    The implicit ``rowid`` breaks ties so runs recorded within the same timestamp
+    resolution still order by insertion (newest first).
+    """
+    try:
+        with _connect_slo_runs(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT * FROM om_slo_runs
+                WHERE blueprint_name = ?
+                ORDER BY recorded_at DESC, rowid DESC
+                """,
+                (blueprint_name,),
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            f"Cannot read SLO run history for {blueprint_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return [dict(row) for row in rows]
 
 
 def ensure_gitignore_entry(cwd: Path | None = None) -> None:

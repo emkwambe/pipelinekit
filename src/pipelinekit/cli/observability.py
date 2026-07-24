@@ -13,10 +13,12 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from pipelinekit.blueprints.registry import BlueprintRegistry
 from pipelinekit.core.errors import ObservabilityError
 from pipelinekit.observability.slo import (
     check_slos,
     get_all_slos,
+    get_slo_compliance_summary,
     remove_slo,
     set_slo,
 )
@@ -192,4 +194,55 @@ def remove_command(
         )
     else:
         console.print(f"No SLO found for {blueprint_name}/{table}/{type}")
+    raise typer.Exit(0)
+
+
+# --- OM-5: SLO compliance dashboard ----------------------------------------
+
+
+@observability_app.command("dashboard")
+def dashboard_command(
+    blueprint: Optional[str] = typer.Option(
+        None, "--blueprint", help="Filter to a single blueprint."
+    ),
+    window: int = typer.Option(
+        7, "--window", help="Number of most-recent runs to summarize."
+    ),
+) -> None:
+    """Show SLO compliance trends from saved check history (OM-5)."""
+    db_path = _db_path()
+    if blueprint is not None:
+        summaries = get_slo_compliance_summary(blueprint, db_path, window)
+    else:
+        summaries = [
+            row
+            for bp in BlueprintRegistry().list()
+            for row in get_slo_compliance_summary(bp.name, db_path, window)
+        ]
+
+    if not summaries:
+        console.print("No SLO run history yet.")
+        console.print(
+            "  Run 'pipelinekit observability slo check <blueprint>' first.",
+            style="dim",
+        )
+        raise typer.Exit(0)
+
+    console.print(f"SLO Compliance Dashboard (last {window} runs)", style="bold")
+    console.print("─" * 61)
+    table = Table()
+    table.add_column("Blueprint", style="cyan", no_wrap=True)
+    table.add_column("Table")
+    table.add_column("Type")
+    table.add_column("Compliance", justify="right")
+    table.add_column("Runs", justify="right")
+    for row in summaries:
+        table.add_row(
+            row["blueprint"],
+            row["table"],
+            row["type"],
+            f"{row['compliance_pct']:.1f}%",
+            str(row["run_count"]),
+        )
+    console.print(table)
     raise typer.Exit(0)

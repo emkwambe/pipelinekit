@@ -4,6 +4,17 @@ All notable changes to PipelineKit are documented in this file.
 
 ## [Unreleased]
 
+### Added — Sprint 21 (QM-9 Quality Regression Testing)
+- `pipelinekit quality check-regression` — detect when quality metrics worsen
+- `pipelinekit quality check-regression --blueprint <name>` — single blueprint
+- `pipelinekit quality check-regression --window <n>` — history window (default 7)
+- `pipelinekit quality check-regression --threshold <n>` — drop threshold (default 5.0)
+- Regression types: coverage_drop | score_drop | drift_introduced | ownership_lost
+- Quality scorecard now auto-saves snapshots after each run
+- Requires 2+ snapshots to detect regression (clean when insufficient history)
+- New state.db table: qm_scorecard_snapshots
+
+
 ### Added — Sprint 20 (AM-5 Architecture Drift Detection)
 - `pipelinekit architect drift` — detect when blueprint dependencies no longer hold
 - Drift types: DEPENDENCY_BROKEN | BLUEPRINT_MISSING

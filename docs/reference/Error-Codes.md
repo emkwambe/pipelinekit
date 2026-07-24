@@ -71,6 +71,7 @@ CONFIG · CONTRACT · RUNTIME · ADAPTER · AI · STATE · BLUEPRINT · NOTIFY
 | PK-DC-010 | State database error during snapshot — `state.db` write failed during contract snapshot. Fix: check disk space and `state.db` file permissions. |
 | PK-DC-011 | Breaking change blocked — contract snapshot would produce a MAJOR version bump. The snapshot was blocked to prevent unacknowledged breaking changes. Fix: review the breaking changes listed above, then re-run with `--force`. |
 | PK-DC-012 | No consumers registered — no consumers are watching this blueprint/table combination. This is informational, not an error, when no consumers have been set up yet. Fix: run `pipelinekit contract consumer add` to register consumers. |
+| PK-DC-013 | Invalid lifecycle transition — the requested contract lifecycle transition is not allowed. Valid transitions: `DRAFT→ACTIVE`, `ACTIVE→DEPRECATED`, `DEPRECATED→RETIRED` (or straight to `RETIRED`); no going backwards. Fix: use a valid transition. |
 
 DC-8 versioning codes are carried by `ContractError` (PK-DC-008/009) and
 `StateError` (PK-DC-010). DC-9 (SPEC-021) surfaces `PK-DC-011` in the
@@ -78,7 +79,9 @@ DC-8 versioning codes are carried by `ContractError` (PK-DC-008/009) and
 DC-10 (SPEC-027) registers contract consumers (`dc_consumers`) and records change
 notifications (`dc_notifications`) when a breaking change is accepted with
 `--force`. `PK-DC-012` is informational only — `create_notifications` returning
-no records (no consumers watching the table) is never raised as an error.
+no records (no consumers watching the table) is never raised as an error. DC-11
+(SPEC-036) adds contract lifecycle states (`dc_contract_lifecycle`); `PK-DC-013`
+is raised by `contract lifecycle set` for an invalid state or transition.
 
 ### QM — Quality Management (QM-4, SPEC-022)
 

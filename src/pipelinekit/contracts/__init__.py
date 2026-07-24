@@ -11,6 +11,12 @@ DC-10 (SPEC-027) adds consumer registration and contract change notifications.
 
 from __future__ import annotations
 
+from pipelinekit.contracts.lifecycle import (
+    ContractLifecycleState,
+    get_all_lifecycle_states,
+    get_lifecycle_state,
+    set_lifecycle_state,
+)
 from pipelinekit.contracts.notification import (
     ContractConsumer,
     ContractNotification,
@@ -54,4 +60,9 @@ __all__ = [
     "create_notifications",
     "get_pending_notifications",
     "mark_all_read",
+    # DC-11 — contract lifecycle management (SPEC-036)
+    "ContractLifecycleState",
+    "set_lifecycle_state",
+    "get_lifecycle_state",
+    "get_all_lifecycle_states",
 ]

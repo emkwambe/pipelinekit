@@ -24,6 +24,7 @@ from pipelinekit.core.errors import StateError
 
 if TYPE_CHECKING:
     from pipelinekit.architecture.dependency import BlueprintDependency
+    from pipelinekit.contracts.lifecycle import ContractLifecycleState
     from pipelinekit.contracts.notification import (
         ContractConsumer,
         ContractNotification,
@@ -281,6 +282,18 @@ CREATE TABLE IF NOT EXISTS gm_approval_requests (
     decision_reason TEXT,
     created_at TEXT NOT NULL,
     decided_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS dc_contract_lifecycle (
+    id TEXT PRIMARY KEY,
+    blueprint_name TEXT NOT NULL,
+    contract_file TEXT NOT NULL,
+    state TEXT NOT NULL DEFAULT 'DRAFT',
+    changed_by TEXT,
+    change_reason TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(blueprint_name, contract_file)
 );
 """
 
@@ -2334,6 +2347,118 @@ def get_slo_run_history(blueprint_name: str, db_path: str | Path) -> list[dict]:
         raise StateError(
             "PK-STATE-001",
             f"Cannot read SLO run history for {blueprint_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return [dict(row) for row in rows]
+
+
+_DC_LIFECYCLE_DDL = """
+CREATE TABLE IF NOT EXISTS dc_contract_lifecycle (
+    id TEXT PRIMARY KEY,
+    blueprint_name TEXT NOT NULL,
+    contract_file TEXT NOT NULL,
+    state TEXT NOT NULL DEFAULT 'DRAFT',
+    changed_by TEXT,
+    change_reason TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(blueprint_name, contract_file)
+);
+"""
+
+
+def _connect_lifecycle(db_path: str | Path) -> sqlite3.Connection:
+    """Open ``db_path`` and ensure the ``dc_contract_lifecycle`` table exists.
+
+    DC-11 (SPEC-036) threads an explicit ``db_path`` rather than ``cwd`` so the
+    lifecycle layer is testable against a ``tmp_path`` database. The table DDL is
+    idempotent, so a raw path with no prior ``initialize`` still works.
+    """
+    conn = sqlite3.connect(db_path)
+    conn.executescript(_DC_LIFECYCLE_DDL)
+    return conn
+
+
+def upsert_lifecycle_state(
+    lifecycle: ContractLifecycleState, db_path: str | Path
+) -> None:
+    """Insert or replace a contract's lifecycle state (DC-11, SPEC-036).
+
+    The ``UNIQUE(blueprint_name, contract_file)`` constraint means a matching
+    contract is replaced in place; the ``lifecycle`` layer preserves ``id`` and
+    ``created_at``.
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the state cannot be written.
+    """
+    try:
+        with _connect_lifecycle(db_path) as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO dc_contract_lifecycle (
+                    id, blueprint_name, contract_file, state,
+                    changed_by, change_reason, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    lifecycle.id,
+                    lifecycle.blueprint_name,
+                    lifecycle.contract_file,
+                    lifecycle.state,
+                    lifecycle.changed_by,
+                    lifecycle.change_reason,
+                    lifecycle.created_at,
+                    lifecycle.updated_at,
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot write lifecycle state for {lifecycle.blueprint_name}/"
+            f"{lifecycle.contract_file}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def get_lifecycle_state(
+    blueprint_name: str, contract_file: str, db_path: str | Path
+) -> dict | None:
+    """Return the lifecycle state row for a contract, or None if unset (DC-11)."""
+    try:
+        with _connect_lifecycle(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                """
+                SELECT * FROM dc_contract_lifecycle
+                WHERE blueprint_name = ? AND contract_file = ?
+                """,
+                (blueprint_name, contract_file),
+            ).fetchone()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            f"Cannot read lifecycle state for {blueprint_name}/{contract_file}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return dict(row) if row is not None else None
+
+
+def get_all_lifecycle_states(db_path: str | Path) -> list[dict]:
+    """Return every lifecycle state, sorted by blueprint then contract (DC-11)."""
+    try:
+        with _connect_lifecycle(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT * FROM dc_contract_lifecycle
+                ORDER BY blueprint_name, contract_file
+                """
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            "Cannot read lifecycle states from state database",
             {"path": str(db_path), "detail": str(exc)},
         ) from exc
     return [dict(row) for row in rows]

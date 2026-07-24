@@ -18,6 +18,11 @@ from rich.console import Console
 from rich.table import Table
 
 from pipelinekit.blueprints.registry import BlueprintRegistry
+from pipelinekit.contracts.lifecycle import (
+    get_all_lifecycle_states,
+    get_lifecycle_state,
+    set_lifecycle_state,
+)
 from pipelinekit.contracts.notification import (
     create_notifications,
     get_consumers,
@@ -373,6 +378,13 @@ consumer_app = typer.Typer(
 )
 contract_app.add_typer(consumer_app, name="consumer")
 
+lifecycle_app = typer.Typer(
+    help="Contract lifecycle state management.",
+    no_args_is_help=True,
+    add_completion=False,
+)
+contract_app.add_typer(lifecycle_app, name="lifecycle")
+
 
 @consumer_app.command("add")
 def consumer_add_command(
@@ -472,4 +484,94 @@ def notifications_command(
     console.print(
         f"{len(pending)} pending notification(s). Run with --clear to mark as read."
     )
+    raise typer.Exit(0)
+
+
+# --- DC-11: contract lifecycle management ----------------------------------
+
+
+@lifecycle_app.command("set")
+def lifecycle_set_command(
+    blueprint_name: str = typer.Argument(..., help="Blueprint name."),
+    contract: str = typer.Option(
+        ..., "--contract", help="Contract file, e.g. charges.yaml."
+    ),
+    state: str = typer.Option(
+        ..., "--state", help="DRAFT | ACTIVE | DEPRECATED | RETIRED."
+    ),
+    reason: Optional[str] = typer.Option(
+        None, "--reason", help="Reason for the transition."
+    ),
+) -> None:
+    """Transition a contract to a new lifecycle state."""
+    try:
+        result = set_lifecycle_state(
+            blueprint_name, contract, state, "CLI user", reason, _db_path()
+        )
+    except ContractError as exc:
+        console.print(f"✗ [{exc.code}] {exc.message}", style="bold red")
+        raise typer.Exit(1) from exc
+
+    console.print(
+        f"✓ Lifecycle state set: {result.blueprint_name} / {result.contract_file} "
+        f"→ {result.state}",
+        style="green",
+    )
+    raise typer.Exit(0)
+
+
+@lifecycle_app.command("get")
+def lifecycle_get_command(
+    blueprint_name: str = typer.Argument(..., help="Blueprint name."),
+    contract: str = typer.Option(..., "--contract", help="Contract file."),
+) -> None:
+    """Show a contract's lifecycle state."""
+    result = get_lifecycle_state(blueprint_name, contract, _db_path())
+    if result is None:
+        console.print(f"{blueprint_name} / {contract}: DRAFT (implicit — no state set)")
+        raise typer.Exit(0)
+
+    console.print(
+        f"Lifecycle: {result.blueprint_name} / {result.contract_file}",
+        style="bold cyan",
+    )
+    console.print("─" * 45)
+    console.print(f"  State:     {result.state}")
+    console.print(f"  Changed by: {result.changed_by or '—'}")
+    console.print(f"  Reason:    {result.change_reason or '—'}")
+    console.print(f"  Updated:   {result.updated_at}")
+    raise typer.Exit(0)
+
+
+@lifecycle_app.command("list")
+def lifecycle_list_command(
+    blueprint: Optional[str] = typer.Option(
+        None, "--blueprint", help="Filter by blueprint name."
+    ),
+) -> None:
+    """List contract lifecycle states."""
+    states = get_all_lifecycle_states(_db_path())
+    if blueprint is not None:
+        states = [s for s in states if s.blueprint_name == blueprint]
+    if not states:
+        console.print("No contract lifecycle states set.")
+        raise typer.Exit(0)
+
+    console.print("Contract Lifecycle States", style="bold")
+    console.print("─" * 61)
+    table = Table()
+    table.add_column("Blueprint", style="cyan", no_wrap=True)
+    table.add_column("Contract")
+    table.add_column("State")
+    table.add_column("Reason")
+    table.add_column("Updated")
+    for s in states:
+        table.add_row(
+            s.blueprint_name,
+            s.contract_file,
+            s.state,
+            s.change_reason or "—",
+            s.updated_at,
+        )
+    console.print(table)
     raise typer.Exit(0)

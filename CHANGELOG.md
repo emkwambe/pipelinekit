@@ -4,6 +4,15 @@ All notable changes to PipelineKit are documented in this file.
 
 ## [Unreleased]
 
+### Added — Sprint 13 (Kimi Provider — Moonshot AI)
+- Kimi (Moonshot AI) added as sixth AI provider
+- OpenAI-compatible API at api.moonshot.cn/v1
+- Models: moonshot-v1-8k | moonshot-v1-32k (default) | moonshot-v1-128k
+- 128k context window available for large EMS-enriched prompts
+- Set via: MOONSHOT_API_KEY environment variable
+- Configure: ai.provider: kimi in pipelinekit.yaml
+
+
 ### Added — Phase 2 Sprint 11 (QM-7 Schema Drift Detection)
 - `pipelinekit quality check-drift` — detect schema drift between contracts and schema.yml
 - `pipelinekit quality check-drift --blueprint <name>` — filter by blueprint

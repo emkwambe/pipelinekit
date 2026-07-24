@@ -4,6 +4,14 @@ All notable changes to PipelineKit are documented in this file.
 
 ## [Unreleased]
 
+### Added — Sprint 16 (AI-8 Quality Scorecard Narrative)
+- `pipelinekit quality scorecard --narrative` — AI-generated explanation of quality score
+- Narrative explains root cause, priority fix, and expected score impact
+- Opt-in only — default scorecard behavior unchanged, no AI call without --narrative
+- Uses provider cascade — large prompts auto-route to Kimi 128k
+- Graceful degradation — skips narrative if no AI provider configured
+
+
 ### Added — Sprint 15 (AI-7 EMS Context Injection)
 - DiagnosticsEngine now reads EMS operational state before diagnosing failures
 - Injects quality score, SLO violations, volume anomalies, schema drift into AI prompt

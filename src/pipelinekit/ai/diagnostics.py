@@ -42,13 +42,22 @@ class DiagnosticsEngine:
         self.collector = EvidenceCollector()
         self.threshold = DEFAULT_CONFIDENCE_THRESHOLD
 
-    def diagnose(self, run_id: str, cwd: Path | None = None) -> DiagnosticResult:
+    def diagnose(
+        self,
+        run_id: str,
+        cwd: Path | None = None,
+        blueprint_name: str | None = None,
+    ) -> DiagnosticResult:
         """Run the full diagnostic cycle for ``run_id``.
 
-        Never executes recommendations. Always persists the result.
+        Never executes recommendations. Always persists the result. When EMS
+        signals are available for the affected blueprint (AI-7), they are
+        attached to the evidence so the provider prompt can correlate them with
+        the failure; injection is best-effort and never blocks diagnosis.
         """
         evidence = self.collector.collect(run_id, cwd=cwd)
         evidence.config_snapshot = self.config.model_dump()
+        self._inject_ems_context(evidence, blueprint_name, cwd)
 
         result = self.provider.diagnose(evidence)
 
@@ -72,6 +81,34 @@ class DiagnosticsEngine:
             run_id, result.model_dump(mode="json"), provider_name, cwd=cwd
         )
         return result
+
+    def _inject_ems_context(
+        self,
+        evidence: object,
+        blueprint_name: str | None,
+        cwd: Path | None,
+    ) -> None:
+        """Attach EMS operational context to ``evidence`` (AI-7). Never raises.
+
+        Uses ``blueprint_name`` when given, else the run's pipeline name as a
+        best-effort candidate. If no EMS signal is available the evidence is left
+        unchanged, so single-provider/no-EMS behavior is exactly as before.
+        """
+        candidate = blueprint_name or getattr(evidence, "pipeline_name", None)
+        if not candidate:
+            return
+        try:
+            from pipelinekit.ai.ems_context import assemble_ems_context
+
+            db_path = str(db.get_db_path(cwd))
+            ctx = assemble_ems_context(candidate, db_path)
+            if ctx.has_data:
+                from dataclasses import asdict
+
+                evidence.ems_context = asdict(ctx)  # type: ignore[attr-defined]
+        except Exception:
+            # Graceful degradation: EMS enrichment must never break diagnosis.
+            pass
 
     def _validate_against_schema(self, result: DiagnosticResult) -> None:
         """Validate the result against ``diagnostic.schema.json``.

@@ -35,6 +35,10 @@ class EvidencePackage:
     recent_runs: list[dict] = field(default_factory=list)
     config_snapshot: dict = field(default_factory=dict)
     error_codes: list[str] = field(default_factory=list)
+    # AI-7: EMS operational context (quality/SLO/volume/drift/contract signals).
+    # Empty unless the diagnostics engine injects it; flows into the provider
+    # prompt via ``to_dict``.
+    ems_context: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         """Return a JSON-serializable dict of the full package."""

@@ -465,38 +465,63 @@ def _coerce_mapping_status(value: object) -> MappingStatus:
         return MappingStatus.MANUAL
 
 
+# Every registered AI provider name, in a stable order (ADR-016, ADR-041).
+_PROVIDER_NAMES = ("anthropic", "openai", "ollama", "deepseek", "mistral", "kimi")
+
+
+def list_providers() -> list[str]:
+    """Return the names of every registered AI provider."""
+    return list(_PROVIDER_NAMES)
+
+
+def get_provider(name: str) -> LLMProvider:
+    """Instantiate an ``LLMProvider`` by name.
+
+    Provider SDK modules are imported lazily inside each branch so a missing
+    optional SDK never breaks the others.
+
+    Raises:
+        LLMError: ``PK-AI-001`` if the provider name is unknown.
+    """
+    key = (name or "").strip().lower()
+
+    if key == "anthropic":
+        from pipelinekit.ai.providers.anthropic import AnthropicProvider
+
+        return AnthropicProvider()
+    if key == "openai":
+        from pipelinekit.ai.providers.openai import OpenAIProvider
+
+        return OpenAIProvider()
+    if key == "ollama":
+        from pipelinekit.ai.providers.ollama import OllamaProvider
+
+        return OllamaProvider()
+    if key == "deepseek":
+        from pipelinekit.ai.providers.deepseek import DeepSeekProvider
+
+        return DeepSeekProvider()
+    if key == "mistral":
+        from pipelinekit.ai.providers.mistral import MistralProvider
+
+        return MistralProvider()
+    if key == "kimi":
+        from pipelinekit.ai.providers.kimi import KimiProvider
+
+        return KimiProvider()
+
+    raise LLMError(
+        "PK-AI-001",
+        f"Unknown or unconfigured AI provider: '{key or 'none'}'. "
+        "Set diagnostics.provider to one of: " + ", ".join(_PROVIDER_NAMES) + ".",
+        {"provider": key},
+    )
+
+
 def create_provider(config: PipelineConfig, override: str | None = None) -> LLMProvider:
     """Create an ``LLMProvider`` from config, or an explicit override string.
 
     Raises:
         LLMError: ``PK-AI-001`` if the provider name is missing or unknown.
     """
-    name = (override or config.diagnostics.provider or "").strip().lower()
-
-    if name == "anthropic":
-        from pipelinekit.ai.providers.anthropic import AnthropicProvider
-
-        return AnthropicProvider()
-    if name == "openai":
-        from pipelinekit.ai.providers.openai import OpenAIProvider
-
-        return OpenAIProvider()
-    if name == "ollama":
-        from pipelinekit.ai.providers.ollama import OllamaProvider
-
-        return OllamaProvider()
-    if name == "deepseek":
-        from pipelinekit.ai.providers.deepseek import DeepSeekProvider
-
-        return DeepSeekProvider()
-    if name == "mistral":
-        from pipelinekit.ai.providers.mistral import MistralProvider
-
-        return MistralProvider()
-
-    raise LLMError(
-        "PK-AI-001",
-        f"Unknown or unconfigured AI provider: '{name or 'none'}'. "
-        "Set diagnostics.provider to openai, anthropic, ollama, deepseek, or mistral.",
-        {"provider": name},
-    )
+    return get_provider(override or config.diagnostics.provider or "")

@@ -4,6 +4,15 @@ All notable changes to PipelineKit are documented in this file.
 
 ## [Unreleased]
 
+### Added — Sprint 18 (OM-5 SLO Compliance Dashboard)
+- `pipelinekit observability dashboard` — SLO compliance trends over time
+- `pipelinekit observability dashboard --blueprint <name>` — filter by blueprint
+- `pipelinekit observability dashboard --window <n>` — number of runs to analyze
+- SLO check results now auto-saved to state.db after each evaluation
+- Compliance shown as percentage with trend indicator
+- New state.db table: om_slo_runs
+
+
 ### Added — Sprint 17 (QM-5 Freshness SLA Enforcement)
 - `pipelinekit quality freshness set` — define freshness requirement per table
 - `pipelinekit quality freshness list` — list all freshness requirements

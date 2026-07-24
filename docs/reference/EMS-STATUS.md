@@ -11,6 +11,7 @@ Public-facing status of PipelineKit's EMS (Engineering Management System) capabi
 | Schema versioning | DC-8 | ✅ Phase 2 |
 | Breaking change detection | DC-9 | ✅ Phase 2 |
 | Consumer notification | DC-10 | ✅ Phase 2 |
+| Contract lifecycle management | DC-11 | ✅ Phase 3 |
 
 ### QM — Quality Management
 | Capability | Code | Status |
@@ -34,6 +35,7 @@ Public-facing status of PipelineKit's EMS (Engineering Management System) capabi
 |---|---|---|
 | Health check, Slack, email alerting | OM-1..3 | ✅ v0.1.0 |
 | SLO definition and evaluation | OM-4 | ✅ Phase 2 |
+| SLO compliance dashboard | OM-5 | ✅ Phase 3 |
 
 ### AM — Architecture Management
 | Capability | Code | Status |
@@ -56,8 +58,6 @@ Six AI providers are supported — Anthropic, OpenAI, Kimi (Moonshot AI), DeepSe
 | Release coordination | RM-1..3 | ✅ v0.1.0 |
 
 ## Roadmap
-- OM-5: SLO dashboard
-- DC-11: Consumer notification delivery
 - AM-5: Architecture drift detection
 - QM-9: Quality regression testing
 - AI-9: Planned AI-management capability

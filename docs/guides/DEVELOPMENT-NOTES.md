@@ -70,3 +70,39 @@ When adding a new provider:
 1. Add the `MAX_CONTEXT_TOKENS` class constant.
 2. Register it in `providers/__init__.py` (`get_provider` / `_PROVIDER_NAMES`).
 3. Add it to the cascade / provider documentation.
+
+## Contract Lifecycle State Machine (DC-11)
+
+DC-11 implements a formal state machine for contract evolution, defined in
+`src/pipelinekit/contracts/lifecycle.py`.
+
+Valid states: `DRAFT | ACTIVE | DEPRECATED | RETIRED`
+
+Transition matrix (`_TRANSITIONS`):
+
+```
+DRAFT      → ACTIVE, RETIRED
+ACTIVE     → DEPRECATED, RETIRED
+DEPRECATED → RETIRED
+RETIRED    → (terminal, no transitions)
+```
+
+Implementation notes:
+- State is stored in the `dc_contract_lifecycle` table, `UNIQUE(blueprint_name,
+  contract_file)` — **one row per contract, upserted in place**. The store holds
+  the *current* state only; the previous state is overwritten on each transition.
+  There is no separate transition-history table and no `lifecycle history` command.
+- Default when unset: a contract with no recorded row is treated as `DRAFT`
+  (`get_lifecycle_state` returns `None`, which callers interpret as implicit DRAFT).
+- `set_lifecycle_state()` validates the target against `_TRANSITIONS[current]` and
+  raises `ContractError` with code `PK-DC-013` for an unknown state name or a
+  transition that is not permitted.
+- `ACTIVE → RETIRED` and `DRAFT → RETIRED` are allowed as emergency/abandon
+  transitions; `RETIRED` is terminal, so any transition out of it raises PK-DC-013.
+- `id` and `created_at` are preserved across upserts; `changed_by`, `change_reason`,
+  and `updated_at` reflect the most recent transition.
+
+SOC 2 CC8 evidence: the `dc_contract_lifecycle` table records the current state
+plus the `changed_by`, `change_reason`, and `updated_at` of the latest transition.
+For a full per-transition audit trail, pair lifecycle changes with the GM-3 approval
+workflow (`gm_approval_requests`), which retains every request and decision.

@@ -275,7 +275,7 @@ If postgres-to-snowflake changes, these blueprints may be affected:
 
 ---
 
-## Contract Commands (DC-8 / DC-9 / DC-10)
+## Contract Commands (DC-8 / DC-9 / DC-10 / DC-11)
 
 Version data contracts and detect breaking schema changes. Contracts are discovered under `blueprints/<name>/contracts/*.yaml`; version snapshots are stored in `state.db`.
 
@@ -353,6 +353,53 @@ Pending Notifications
 └─────────────────────┴─────────┴───────────────┴─────────────────────┘
 1 pending notification(s). Run with --clear to mark as read.
 ```
+
+### `pipelinekit contract lifecycle` (DC-11)
+Manage the formal lifecycle state of a data contract. Provides SOC 2 CC8 (Change Management) evidence for controlled contract evolution. State is stored in `state.db` (`dc_contract_lifecycle`, one row per blueprint + contract file).
+
+States:
+
+| State | Meaning |
+|---|---|
+| `DRAFT` | Under development, not yet in production (also the **implicit** state when none is set) |
+| `ACTIVE` | In production use |
+| `DEPRECATED` | Being phased out; consumers should migrate |
+| `RETIRED` | No longer used — terminal state |
+
+Valid transitions:
+
+```
+DRAFT      → ACTIVE, RETIRED
+ACTIVE     → DEPRECATED, RETIRED
+DEPRECATED → RETIRED
+RETIRED    → (terminal — no transitions)
+```
+
+A contract with no recorded state is treated as `DRAFT`. An unknown state name or a transition not listed above fails with `PK-DC-013`.
+
+#### `pipelinekit contract lifecycle set <blueprint> --contract <file> --state <state> [--reason <text>]`
+Transition a contract to a new lifecycle state. `changed_by` is recorded as `CLI user`.
+
+| Argument / Option | Description |
+|---|---|
+| `blueprint` (required) | Blueprint name |
+| `--contract` (required) | Contract file, e.g. `charges.yaml` |
+| `--state` (required) | `DRAFT` \| `ACTIVE` \| `DEPRECATED` \| `RETIRED` |
+| `--reason` | Reason for the transition |
+
+```
+✓ Lifecycle state set: stripe-to-snowflake / charges.yaml → DEPRECATED
+```
+
+An invalid transition prints `✗ [PK-DC-013] …` and exits 1.
+
+#### `pipelinekit contract lifecycle get <blueprint> --contract <file>`
+Show the current lifecycle state for a contract. If none is set, prints `… : DRAFT (implicit — no state set)`. Otherwise prints State, Changed by, Reason, and Updated.
+
+#### `pipelinekit contract lifecycle list [--blueprint <name>]`
+List all recorded contract lifecycle states as a table: Blueprint, Contract, State, Reason, Updated. Prints `No contract lifecycle states set.` when empty.
+
+> **Note:** the store holds the **current** state per contract only — updating a state overwrites the previous row. There is no separate per-transition history/audit command; the recorded `changed_by`, `reason`, and `updated` fields describe the latest transition.
 
 ---
 
@@ -581,7 +628,7 @@ Prints `✓ REQ-002 rejected: {reason}` (or without the reason if none given). F
 
 ---
 
-## Observability Commands (OM-4)
+## Observability Commands (OM-4 / OM-5)
 
 Define and evaluate Service Level Objectives. SLOs are stored in `state.db` and evaluated against existing DC (freshness), QM (row count), and coverage data — no warehouse connection.
 
@@ -602,10 +649,29 @@ Fails with `PK-OM-002` for an invalid SLO type.
 List all defined SLOs as a table: Blueprint, Table, Type, Threshold, Unit.
 
 ### `pipelinekit observability slo check <blueprint>`
-Evaluate every SLO for a blueprint against current `state.db` data. Each SLO is `OK`, `VIOLATED`, or `NO_DATA` (insufficient history — not a failure). Exits 1 (with `PK-OM-001` in the output) if any SLO is `VIOLATED`.
+Evaluate every SLO for a blueprint against current `state.db` data. Each SLO is `OK`, `VIOLATED`, or `NO_DATA` (insufficient history — not a failure). Exits 1 (with `PK-OM-001` in the output) if any SLO is `VIOLATED`. Each evaluation is automatically saved to `state.db` (`om_slo_runs`) so `observability dashboard` (OM-5) can compute compliance trends over time.
 
 ### `pipelinekit observability slo remove <blueprint> --table <name> --type <type>`
 Remove an SLO. Prints a message if no matching SLO exists.
+
+### `pipelinekit observability dashboard [--blueprint <name>] [--window <n>]` (OM-5)
+Summarize SLO compliance from the saved run history (`om_slo_runs`). For each `(table, type)` it takes the most-recent runs within the window, excludes `NO_DATA` runs, and reports the percentage that were `OK`.
+
+| Option | Description |
+|---|---|
+| `--blueprint` | Filter to a single blueprint (default: all installed blueprints) |
+| `--window` | Number of most-recent runs to summarize per SLO (default `7`) |
+
+Output is a table: Blueprint, Table, Type, Compliance (percentage), Runs (number of non-`NO_DATA` runs counted). Prints `No SLO run history yet.` with a hint to run `observability slo check` first when there is nothing saved.
+
+```
+SLO Compliance Dashboard (last 7 runs)
+┌─────────────────────┬─────────┬───────────┬────────────┬──────┐
+│ Blueprint           │ Table   │ Type      │ Compliance │ Runs │
+├─────────────────────┼─────────┼───────────┼────────────┼──────┤
+│ stripe-to-snowflake │ charges │ freshness │ 85.7%      │ 7    │
+└─────────────────────┴─────────┴───────────┴────────────┴──────┘
+```
 
 ---
 
@@ -722,6 +788,7 @@ Every error carries a stable `PK-[AREA]-[NUMBER]` code. The table below is the o
 | `PK-DC-010` | State write failed during contract snapshot | Check disk/permissions on `state.db` |
 | `PK-DC-011` | Breaking change blocked (MAJOR bump) | Review changes, re-run `snapshot --force` |
 | `PK-DC-012` | No consumers registered (informational) | Register consumers with `contract consumer add` |
+| `PK-DC-013` | Invalid contract lifecycle transition | Check valid transitions in `contract lifecycle` |
 | `PK-QM-001` | No blueprints found for coverage scan | Install a blueprint first |
 | `PK-QM-002` | `schema.yml` parse error | Fix the YAML syntax |
 | `PK-QM-003` | Volume anomaly detected | Investigate the affected table's pipeline run |

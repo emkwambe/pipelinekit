@@ -37,6 +37,14 @@ from pipelinekit.quality.drift import (
     check_all_drift,
     check_blueprint_drift,
 )
+from pipelinekit.quality.scorecard import (
+    BlueprintScore,
+    ComponentScore,
+    ScorecardReport,
+    compute_blueprint_score,
+    compute_scorecard,
+    get_rating,
+)
 
 __all__ = [
     "ColumnCoverage",
@@ -63,4 +71,11 @@ __all__ = [
     "DriftReport",
     "check_blueprint_drift",
     "check_all_drift",
+    # QM-8 — composite quality scorecard (SPEC-030)
+    "ComponentScore",
+    "BlueprintScore",
+    "ScorecardReport",
+    "compute_blueprint_score",
+    "compute_scorecard",
+    "get_rating",
 ]

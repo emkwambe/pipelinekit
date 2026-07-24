@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 from collections import Counter
 from dataclasses import asdict
+from datetime import datetime, timezone
 from typing import Optional
 
 import typer
@@ -37,6 +38,13 @@ from pipelinekit.quality.drift import (
     TableDriftResult,
     check_all_drift,
     check_blueprint_drift,
+)
+from pipelinekit.quality.scorecard import (
+    BlueprintScore,
+    ScorecardReport,
+    compute_blueprint_score,
+    compute_scorecard,
+    get_rating,
 )
 from pipelinekit.state import db
 
@@ -396,4 +404,81 @@ def check_drift(
         raise typer.Exit(1)
 
     console.print("\n✓ No schema drift detected.", style="green")
+    raise typer.Exit(0)
+
+
+# --- QM-8: composite quality scorecard -------------------------------------
+
+
+def _component_cell(score: BlueprintScore, name: str) -> str:
+    """Render a component's status and symbol for the scorecard table."""
+    for component in score.components:
+        if component.name == name:
+            return f"{component.status}  {component.symbol}"
+    return "—"
+
+
+def _render_scorecard(report: ScorecardReport) -> None:
+    """Render a scorecard report as a Rich table."""
+    console.print("Quality Scorecard", style="bold")
+    console.print("─" * 74)
+    table = Table()
+    table.add_column("Blueprint", style="cyan", no_wrap=True)
+    table.add_column("Score")
+    table.add_column("Coverage")
+    table.add_column("Volume")
+    table.add_column("Drift")
+    table.add_column("Owner")
+    for score in report.blueprints:
+        table.add_row(
+            score.blueprint_name,
+            f"{round(score.composite_score):.0f} {score.rating}",
+            _component_cell(score, "coverage"),
+            _component_cell(score, "volume"),
+            _component_cell(score, "drift"),
+            _component_cell(score, "ownership"),
+        )
+    console.print(table)
+    console.print(
+        f"Average pipeline quality score: {round(report.average_score):.0f} "
+        f"({report.average_rating})"
+    )
+
+
+@quality_app.command("scorecard")
+def scorecard(
+    blueprint: Optional[str] = typer.Option(
+        None, "--blueprint", help="Score a single blueprint."
+    ),
+    format: str = typer.Option("table", "--format", help="Output: table or json."),
+) -> None:
+    """Show a composite quality score per blueprint (QM-8)."""
+    if format not in ("table", "json"):
+        console.print(
+            f"✗ Unknown format: {format}. Use 'table' or 'json'.", style="bold red"
+        )
+        raise typer.Exit(1)
+
+    db_path = _db_path()
+    if blueprint is not None:
+        blueprint_dir = str(BlueprintRegistry().blueprints_dir / blueprint)
+        score = compute_blueprint_score(blueprint, blueprint_dir, db_path)
+        report = ScorecardReport(
+            blueprints=[score],
+            average_score=score.composite_score,
+            average_rating=get_rating(score.composite_score),
+            generated_at=datetime.now(timezone.utc).isoformat(),
+        )
+    else:
+        report = compute_scorecard(_blueprints_dir(), db_path)
+
+    if format == "json":
+        typer.echo(json.dumps(asdict(report), indent=2))
+        raise typer.Exit(0)
+
+    if not report.blueprints:
+        console.print("No blueprints installed.")
+        raise typer.Exit(0)
+
+    _render_scorecard(report)
     raise typer.Exit(0)

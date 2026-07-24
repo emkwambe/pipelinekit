@@ -4,6 +4,15 @@ All notable changes to PipelineKit are documented in this file.
 
 ## [Unreleased]
 
+### Added — Sprint 15 (AI-7 EMS Context Injection)
+- DiagnosticsEngine now reads EMS operational state before diagnosing failures
+- Injects quality score, SLO violations, volume anomalies, schema drift into AI prompt
+- Cross-domain: reads QM-8 + OM-4 + QM-6 + QM-7 + DC-10 signals
+- Large EMS prompts auto-route to Kimi 128k via provider cascade
+- No new CLI commands — diagnose command becomes significantly smarter
+- New module: src/pipelinekit/ai/ems_context.py
+
+
 ### Added — Sprint 14 (Provider Cascade with Ordered Fallbacks)
 - Configure primary AI provider with ordered fallbacks
 - Automatic fallback on rate limit, network error, or auth failure

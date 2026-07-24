@@ -46,7 +46,6 @@ pipelinekit.proposed.yaml
 *_seed.sql
 
 # Internal documentation — lives in pipelinekit-internal (private repo)
-docs/decisions/
 docs/specifications/
 docs/institutional-memory/
 docs/web/

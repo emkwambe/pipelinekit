@@ -14,12 +14,17 @@ import typer
 from rich.console import Console
 
 from pipelinekit.health import ERROR, INFO, OK, WARNING, HealthCheckResult
+from pipelinekit.health.architecture_drift import ArchitectureDriftHealthChecker
 from pipelinekit.health.blueprints import BlueprintHealthChecker
 from pipelinekit.health.deps import DepsChecker
 from pipelinekit.health.ownership import OwnershipHealthChecker
+from pipelinekit.health.quality_score import QualityScoreHealthChecker
+from pipelinekit.health.schema_drift import SchemaDriftHealthChecker
 from pipelinekit.health.security import SecurityChecker
+from pipelinekit.health.slo_violations import SLOViolationsHealthChecker
 from pipelinekit.health.specs import SpecDriftChecker
 from pipelinekit.health.tests import TestsChecker
+from pipelinekit.health.volume_anomalies import VolumeAnomaliesHealthChecker
 from pipelinekit.state import db
 
 console = Console()
@@ -43,6 +48,12 @@ def _run_all() -> list[HealthCheckResult]:
         SpecDriftChecker().check(),
         TestsChecker().check(),
         OwnershipHealthChecker().check(),
+        # Phase 2/3 EMS operational checks (Sprint B).
+        QualityScoreHealthChecker().check(),
+        SLOViolationsHealthChecker().check(),
+        VolumeAnomaliesHealthChecker().check(),
+        SchemaDriftHealthChecker().check(),
+        ArchitectureDriftHealthChecker().check(),
     ]
 
 
@@ -75,7 +86,7 @@ def _render_summary(results: list[HealthCheckResult]) -> None:
     console.print("PipelineKit Health Check")
     console.print("────────────────────────\n")
     for result in results:
-        console.print(f"  {result.name:<12} {_glyph(result.status)}  {result.message}")
+        console.print(f"  {result.name:<19} {_glyph(result.status)}  {result.message}")
 
     passed = sum(1 for r in results if r.status in (OK, INFO))
     console.print(f"\n{passed}/{len(results)} checks passed")
@@ -176,4 +187,39 @@ def tests_command() -> None:
 def ownership_command() -> None:
     """Warn about installed blueprints that have no assigned owner."""
     _render_one(OwnershipHealthChecker().check())
+    raise typer.Exit(0)
+
+
+@health_app.command("quality-score")
+def quality_score_command() -> None:
+    """Flag blueprints scoring Fair or Poor on the QM-8 quality scorecard."""
+    _render_one(QualityScoreHealthChecker().check())
+    raise typer.Exit(0)
+
+
+@health_app.command("slo-violations")
+def slo_violations_command() -> None:
+    """Fail when any defined OM-4 SLO is currently violated."""
+    _render_one(SLOViolationsHealthChecker().check())
+    raise typer.Exit(0)
+
+
+@health_app.command("volume-anomalies")
+def volume_anomalies_command() -> None:
+    """Warn when any table shows an active QM-6 volume anomaly."""
+    _render_one(VolumeAnomaliesHealthChecker().check())
+    raise typer.Exit(0)
+
+
+@health_app.command("schema-drift")
+def schema_drift_command() -> None:
+    """Warn when any table has QM-7 schema drift from its contract."""
+    _render_one(SchemaDriftHealthChecker().check())
+    raise typer.Exit(0)
+
+
+@health_app.command("architecture-drift")
+def architecture_drift_command() -> None:
+    """Fail when any documented AM-5 blueprint dependency is broken."""
+    _render_one(ArchitectureDriftHealthChecker().check())
     raise typer.Exit(0)

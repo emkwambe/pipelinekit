@@ -4,6 +4,20 @@ All notable changes to PipelineKit are documented in this file.
 
 ## [Unreleased]
 
+### Added — Sprint A (CLI Integration Tests)
+- 50 new integration tests across 6 test files
+- tests/integration/test_ems_commands.py (9 tests)
+- tests/integration/test_governance_commands.py (9 tests)
+- tests/integration/test_quality_commands.py (6 tests)
+- tests/integration/test_contract_commands.py (5 tests)
+- tests/integration/test_observability_commands.py (4 tests)
+- tests/integration/test_health_commands.py (5 tests)
+- tests/integration/test_architect_commands.py (5 tests — adjusted from spec)
+- Tests use real SQLite + real CLI invocations via CliRunner
+- db_path resolved via pipelinekit.yaml in CWD (not env var)
+- No external services required — all tests run offline
+
+
 ### Added — Sprint 22 (AI-15 EMS-Aware Confidence Recalibration)
 - Confidence scores now adjusted based on EMS operational signals
 - Healthy environment (score >= 80, all SLOs OK): +0.08 boost

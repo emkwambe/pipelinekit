@@ -4,6 +4,18 @@ All notable changes to PipelineKit are documented in this file.
 
 ## [Unreleased]
 
+### Added — Sprint B (Health Command Expansion)
+- `pipelinekit health --strict` now runs 11 checks (was 6)
+- quality_score: QM-8 composite score check (fails if any blueprint < 50)
+- slo_violations: OM-4 active SLO breach check
+- volume_anomalies: QM-6 active anomaly check
+- schema_drift: QM-7 drift detection check
+- architecture_drift: AM-5 broken dependency check
+- All new checks degrade gracefully — never crash on missing EMS data
+- NO_DATA and NO_BASELINE conditions treated as PASS not FAIL
+- New test file: tests/health/test_health_expansion.py (12 tests)
+
+
 ### Added — Sprint A (CLI Integration Tests)
 - 50 new integration tests across 6 test files
 - tests/integration/test_ems_commands.py (9 tests)

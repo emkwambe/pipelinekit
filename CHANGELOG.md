@@ -4,6 +4,13 @@ All notable changes to PipelineKit are documented in this file.
 
 ## [Unreleased]
 
+### Fixed — Blueprint Best Practices
+- stripe-to-snowflake: Grade C → Grade A (Score 72.7 → 100/100)
+- BP-004: Added not_null tests to email columns (coverage 66-75% → 100%)
+- BP-005: Added accepted_values for currency column (USD/EUR/GBP/CAD/AUD)
+- Both installed blueprints now score Grade A on all 7 best practices
+
+
 ### Added — Sprint B (Health Command Expansion)
 - `pipelinekit health --strict` now runs 11 checks (was 6)
 - quality_score: QM-8 composite score check (fails if any blueprint < 50)

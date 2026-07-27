@@ -10,6 +10,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+import pytest
 from pipelinekit.architecture.dependency import (
     add_dependency,
     scan_dependencies,
@@ -157,7 +158,9 @@ def test_am5_check_dependency_holds_returns_false_for_missing_dir(
     assert check_dependency_still_holds(dep, str(tmp_path / "blueprints")) is False
 
 
-def test_am5_drift_command_exits_1_when_drift_found(tmp_path: Path) -> None:
+def test_am5_drift_command_exits_1_when_drift_found(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The CLI drift command exits 1 when any drift is detected."""
     import pipelinekit.cli.architect as architect_cli
     from typer.testing import CliRunner
@@ -165,10 +168,12 @@ def test_am5_drift_command_exits_1_when_drift_found(tmp_path: Path) -> None:
     db_path = _linked_pair(tmp_path)
     shutil.rmtree(tmp_path / "blueprints" / "bp-b")
 
-    # Point the CLI resolvers at this test's isolated fixtures.
-    architect_cli._db_path = lambda: db_path  # type: ignore[assignment]
-    architect_cli._blueprints_dir = lambda: str(  # type: ignore[assignment]
-        tmp_path / "blueprints"
+    # Point the CLI resolvers at this test's isolated fixtures. monkeypatch.setattr
+    # (not direct assignment) so these module globals are restored after the test
+    # and never leak into later tests in the session.
+    monkeypatch.setattr(architect_cli, "_db_path", lambda: db_path)
+    monkeypatch.setattr(
+        architect_cli, "_blueprints_dir", lambda: str(tmp_path / "blueprints")
     )
 
     result = CliRunner().invoke(architect_cli.architect_app, ["drift"])

@@ -19,6 +19,9 @@ models:
         description: "ISO currency code"
         tests:
           - not_null
+          - accepted_values:
+              arguments:
+                values: ['USD', 'EUR', 'GBP', 'CAD', 'AUD']
       - name: status
         description: "Charge status"
         tests:
@@ -49,6 +52,8 @@ models:
           - not_null
       - name: email
         description: "Customer email address"
+        tests:
+          - not_null
       - name: lifetime_value
         description: "Sum of all successful charge amounts for this customer"
         tests:

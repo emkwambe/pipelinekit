@@ -23,6 +23,9 @@ models:
         description: "ISO currency code (uppercased)"
         tests:
           - not_null
+          - accepted_values:
+              arguments:
+                values: ['USD', 'EUR', 'GBP', 'CAD', 'AUD']
       - name: status
         description: "Charge status"
         tests:
@@ -49,6 +52,8 @@ models:
           - not_null
       - name: email
         description: "Customer email (lowercased and trimmed)"
+        tests:
+          - not_null
       - name: created_at
         description: "Timestamp of customer creation (converted from Unix epoch)"
         tests:

@@ -1,0 +1,31 @@
+version: 2
+sources:
+  - name: postgres_raw
+    description: "Raw data extracted from PostgreSQL"
+    freshness:
+      warn_after: {count: 12, period: hour}
+      error_after: {count: 24, period: hour}
+    loaded_at_field: _loaded_at
+    tables:
+      - name: orders
+        description: "Customer orders from PostgreSQL"
+        columns:
+          - name: order_id
+            description: "Primary key"
+          - name: customer_id
+            description: "Foreign key to customers"
+          - name: status
+            description: "Order status"
+          - name: amount
+            description: "Order amount in cents"
+          - name: created_at
+            description: "Order creation timestamp"
+      - name: customers
+        description: "Customer records from PostgreSQL"
+        columns:
+          - name: customer_id
+            description: "Primary key"
+          - name: email
+            description: "Customer email address"
+          - name: created_at
+            description: "Account creation timestamp"

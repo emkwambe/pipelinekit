@@ -1,0 +1,40 @@
+{
+  "name": "postgres-to-duckdb",
+  "version": "1.0.0",
+  "status": "verified",
+  "description": "Extract from PostgreSQL, load to DuckDB. Zero cloud credentials required. Designed for local development, testing, and PipelineKit evaluation.",
+  "source": {
+    "type": "postgres",
+    "dlt_source": "sql_database",
+    "description": "PostgreSQL source database"
+  },
+  "destination": {
+    "type": "duckdb",
+    "dlt_destination": "duckdb",
+    "description": "Local DuckDB file — no cloud account required"
+  },
+  "contracts": ["contracts/orders.yaml", "contracts/customers.yaml"],
+  "tags": ["postgres", "duckdb", "local-development"],
+  "use_cases": [
+    "Local development and testing",
+    "PipelineKit evaluation without cloud credentials",
+    "RealityDB synthetic data pipelines",
+    "Rapid prototyping"
+  ],
+  "tables": ["orders", "customers"],
+  "dbt_models": 2,
+  "soda_checks": 4,
+  "best_practices": {
+    "primary_key_tests": true,
+    "source_freshness": true,
+    "model_documentation": true,
+    "column_coverage": "100%",
+    "accepted_values": true,
+    "naming_convention": "stg_{source}__{entity}",
+    "contract_coverage": true
+  },
+  "requirements": {
+    "source_credentials": "POSTGRES_HOST, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB",
+    "destination_credentials": "none — DuckDB is a local file"
+  }
+}

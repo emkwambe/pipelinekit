@@ -1,0 +1,18 @@
+table: customers
+version: "1.0.0"
+description: "Customers table contract — postgres-to-duckdb blueprint"
+columns:
+  - name: customer_id
+    type: integer
+    nullable: false
+    unique: true
+  - name: email
+    type: varchar
+    nullable: false
+    unique: true
+  - name: created_at
+    type: timestamp
+    nullable: false
+quality:
+  row_count_min: 1
+  freshness_hours: 24

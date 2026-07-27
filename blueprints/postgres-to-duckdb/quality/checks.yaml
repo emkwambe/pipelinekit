@@ -1,0 +1,19 @@
+checks for stg_postgres__orders:
+  - row_count > 0:
+      name: orders_not_empty
+  - missing_count(order_id) = 0:
+      name: orders_order_id_not_null
+  - duplicate_count(order_id) = 0:
+      name: orders_order_id_unique
+  - invalid_values(status, 'pending,processing,shipped,delivered,cancelled') = 0:
+      name: orders_status_valid
+
+checks for stg_postgres__customers:
+  - row_count > 0:
+      name: customers_not_empty
+  - missing_count(customer_id) = 0:
+      name: customers_customer_id_not_null
+  - duplicate_count(customer_id) = 0:
+      name: customers_customer_id_unique
+  - missing_count(email) = 0:
+      name: customers_email_not_null

@@ -33,6 +33,13 @@ from pipelinekit.quality.anomaly import (
     get_row_count_history,
     record_row_counts,
 )
+from pipelinekit.quality.best_practices import (
+    BEST_PRACTICES,
+    BestPracticeResult,
+    BPSeverity,
+    check_all_best_practices,
+    check_blueprint_best_practices,
+)
 from pipelinekit.quality.coverage import (
     BlueprintCoverage,
     CoverageReport,
@@ -591,6 +598,101 @@ def check_regression_command(
         any_regression = any_regression or report.is_regression
 
     raise typer.Exit(1 if any_regression else 0)
+
+
+# --- QM-10: best practices checker -----------------------------------------
+
+_BP_GLYPH = {"pass": "✓", "fail": "✗", "skip": "·"}
+
+
+def _render_best_practices(result: BestPracticeResult) -> None:
+    """Render one blueprint's best-practice result."""
+    if result.grade == "N/A":
+        console.print(
+            f"\n{result.blueprint_name}    Grade: N/A  (no dbt models to check)",
+            style="dim",
+        )
+        return
+
+    console.print(
+        f"\n{result.blueprint_name}    "
+        f"Grade: {result.grade}  Score: {result.score:g}/100",
+        style="bold",
+    )
+    by_code: dict[str, list] = {}
+    for violation in result.violations:
+        by_code.setdefault(violation.code, []).append(violation)
+
+    for code, name, severity, _src in BEST_PRACTICES:
+        if code in result.skipped:
+            console.print(
+                f"  {_BP_GLYPH['skip']} {code}  {name} (skipped)", style="dim"
+            )
+            continue
+        if code in by_code:
+            console.print(
+                f"  {_BP_GLYPH['fail']} {code}  {name}  [{severity.value}]",
+                style="yellow" if severity != BPSeverity.CRITICAL else "bold red",
+            )
+            for violation in by_code[code]:
+                console.print(f"        {violation.detail}", style="dim")
+                console.print(f"        → {violation.recommendation}", style="dim")
+        else:
+            console.print(f"  {_BP_GLYPH['pass']} {code}  {name}", style="green")
+
+
+@quality_app.command("check-best-practices")
+def check_best_practices_command(
+    blueprint: Optional[str] = typer.Option(
+        None, "--blueprint", help="Check a single blueprint (default: all)."
+    ),
+    format: str = typer.Option("table", "--format", help="Output: table or json."),
+) -> None:
+    """Check blueprints against 7 industry best practices (QM-10).
+
+    BP-001 primary key integrity, BP-002 source freshness, BP-003 model docs,
+    BP-004 column coverage >= 80%, BP-005 accepted_values on categoricals,
+    BP-006 staging naming, BP-007 contract coverage. Exits 1 if any CRITICAL
+    violation exists.
+    """
+    if format not in ("table", "json"):
+        console.print(
+            f"✗ Unknown format: {format}. Use 'table' or 'json'.", style="bold red"
+        )
+        raise typer.Exit(1)
+
+    db_path = _db_path()
+    blueprints_dir = _blueprints_dir()
+    if blueprint is not None:
+        results = [check_blueprint_best_practices(blueprint, blueprints_dir, db_path)]
+    else:
+        results = check_all_best_practices(blueprints_dir, db_path).blueprints
+
+    if format == "json":
+        typer.echo(json.dumps([asdict(r) for r in results], indent=2, default=str))
+        raise typer.Exit(0)
+
+    if not results:
+        console.print("No blueprints installed.")
+        raise typer.Exit(0)
+
+    console.print("Best Practices Check", style="bold")
+    console.print("─" * 50)
+    for result in results:
+        _render_best_practices(result)
+
+    critical = sum(
+        1 for r in results for v in r.violations if v.severity == BPSeverity.CRITICAL
+    )
+    high = sum(
+        1 for r in results for v in r.violations if v.severity == BPSeverity.HIGH
+    )
+    total = sum(len(r.violations) for r in results)
+    console.print(
+        f"\nSummary: {total} violation(s) "
+        f"({critical} CRITICAL, {high} HIGH) across {len(results)} blueprint(s)."
+    )
+    raise typer.Exit(1 if critical else 0)
 
 
 # --- QM-5: freshness SLA enforcement ---------------------------------------

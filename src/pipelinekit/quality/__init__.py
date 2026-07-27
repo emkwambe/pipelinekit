@@ -18,6 +18,16 @@ from pipelinekit.quality.anomaly import (
     get_row_count_history,
     record_row_counts,
 )
+from pipelinekit.quality.best_practices import (
+    BEST_PRACTICES,
+    BestPracticeResult,
+    BestPracticesReport,
+    BestPracticeViolation,
+    BPSeverity,
+    BPStatus,
+    check_all_best_practices,
+    check_blueprint_best_practices,
+)
 from pipelinekit.quality.coverage import (
     BlueprintCoverage,
     ColumnCoverage,
@@ -102,4 +112,13 @@ __all__ = [
     "QualityRegression",
     "RegressionReport",
     "check_regression",
+    # QM-10 — best practices checker (SPEC-040)
+    "BPSeverity",
+    "BPStatus",
+    "BestPracticeViolation",
+    "BestPracticeResult",
+    "BestPracticesReport",
+    "BEST_PRACTICES",
+    "check_blueprint_best_practices",
+    "check_all_best_practices",
 ]

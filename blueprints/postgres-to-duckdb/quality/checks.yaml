@@ -1,14 +1,15 @@
-checks for stg_postgres__orders:
+checks for pipelinekit_pipeline_raw.orders:
   - row_count > 0:
       name: orders_not_empty
   - missing_count(order_id) = 0:
       name: orders_order_id_not_null
   - duplicate_count(order_id) = 0:
       name: orders_order_id_unique
-  - invalid_values(status, 'pending,processing,shipped,delivered,cancelled') = 0:
+  - invalid_count(status) = 0:
       name: orders_status_valid
+      valid values: [pending, processing, shipped, delivered, cancelled]
 
-checks for stg_postgres__customers:
+checks for pipelinekit_pipeline_raw.customers:
   - row_count > 0:
       name: customers_not_empty
   - missing_count(customer_id) = 0:

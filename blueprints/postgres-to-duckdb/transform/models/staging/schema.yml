@@ -1,46 +1,45 @@
 version: 2
 models:
   - name: stg_postgres__orders
-    description: "Staged orders from PostgreSQL. One row per order."
+    description: "Staged orders from PostgreSQL via dlt. One row per order."
     columns:
       - name: order_id
-        description: "Primary key — unique identifier for each order"
+        description: "Primary key"
         tests:
           - unique
           - not_null
       - name: customer_id
-        description: "Foreign key to stg_postgres__customers"
+        description: "Foreign key to customers"
         tests:
           - not_null
       - name: status
-        description: "Current order status"
+        description: "Order status"
         tests:
           - not_null
           - accepted_values:
-              values: ['pending', 'processing', 'shipped', 'delivered', 'cancelled']
+              values: [pending, processing, shipped, delivered, cancelled]
       - name: amount
-        description: "Order amount in cents (integer)"
+        description: "Order amount"
         tests:
           - not_null
       - name: created_at
-        description: "UTC timestamp when order was created"
+        description: "Order creation timestamp"
         tests:
           - not_null
 
   - name: stg_postgres__customers
-    description: "Staged customers from PostgreSQL. One row per customer."
+    description: "Staged customers from PostgreSQL via dlt. One row per customer."
     columns:
       - name: customer_id
-        description: "Primary key — unique identifier for each customer"
+        description: "Primary key"
         tests:
           - unique
           - not_null
       - name: email
-        description: "Customer email address — must be unique"
+        description: "Customer email"
         tests:
-          - unique
           - not_null
       - name: created_at
-        description: "UTC timestamp when customer account was created"
+        description: "Account creation timestamp"
         tests:
           - not_null

@@ -1,5 +1,5 @@
 with source as (
-    select * from {{ source('pipelinekit_pipeline_raw', 'orders') }}
+    select * from "practice-run"."pipelinekit_pipeline_raw"."orders"
 ),
 staged as (
     select

@@ -1,0 +1,11 @@
+name: postgres_to_duckdb
+version: '1.0.0'
+config-version: 2
+profile: pipelinekit
+model-paths: ['models']
+target-path: '../target'
+clean-targets: ['../target']
+models:
+  postgres_to_duckdb:
+    staging:
+      +materialized: view

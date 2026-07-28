@@ -2,12 +2,16 @@
 
 Reports each installed blueprint's QM-8 composite quality score. A blueprint
 scoring Poor (<50) is an ``error``; Fair (<75) is a ``warning``; Good/Excellent
-(and blueprints with no data) are ``ok``. Never raises — any unexpected failure
-degrades to ``info`` (the check could not run), never a hard fault.
+(and blueprints with no data) are ``ok``. Blueprints whose ``blueprint.json``
+declares ``status: proposed`` are skipped — they have not been run yet, so a low
+score reflects a missing baseline rather than a real quality problem. Never
+raises — any unexpected failure degrades to ``info`` (the check could not run),
+never a hard fault.
 """
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from pipelinekit.blueprints.registry import BLUEPRINTS_DIR
@@ -24,6 +28,22 @@ def _blueprint_names(blueprints_dir: Path) -> list[str]:
         for entry in blueprints_dir.iterdir()
         if entry.is_dir() and not entry.name.startswith(".")
     )
+
+
+def _blueprint_status(blueprint_dir: Path) -> str:
+    """Return a blueprint's declared status, defaulting to ``verified``.
+
+    A missing ``status`` field, or an unreadable/malformed ``blueprint.json``, is
+    treated as ``verified`` so scoring behaves exactly as before for those.
+    """
+    try:
+        data = json.loads(
+            (blueprint_dir / "blueprint.json").read_text(encoding="utf-8")
+        )
+    except (OSError, json.JSONDecodeError):
+        return "verified"
+    status = data.get("status") if isinstance(data, dict) else None
+    return status if isinstance(status, str) else "verified"
 
 
 class QualityScoreHealthChecker:
@@ -47,7 +67,15 @@ class QualityScoreHealthChecker:
             poor: list[str] = []
             fair: list[str] = []
             details: list[str] = []
+            scored = 0
             for name in names:
+                if _blueprint_status(blueprints_dir / name) == "proposed":
+                    details.append(
+                        f"{name}: proposed — skipped "
+                        "(run pipeline to establish baseline)"
+                    )
+                    continue
+                scored += 1
                 try:
                     score = compute_blueprint_score(
                         name, str(blueprints_dir / name), db_path
@@ -78,10 +106,17 @@ class QualityScoreHealthChecker:
                     details=details,
                     fix_hint="Run 'pipelinekit quality scorecard' for details.",
                 )
+            if scored == 0:
+                return HealthCheckResult(
+                    self.name,
+                    OK,
+                    "No verified blueprints to score.",
+                    details=details,
+                )
             return HealthCheckResult(
                 self.name,
                 OK,
-                f"All {len(names)} blueprint(s) scoring Good or better.",
+                f"All {scored} verified blueprint(s) scoring Good or better.",
                 details=details,
             )
         except Exception as exc:

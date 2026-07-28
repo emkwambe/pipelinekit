@@ -88,6 +88,22 @@ def test_quality_score_check_fails_on_poor_score(
     assert result.status == ERROR
 
 
+def test_quality_score_skips_proposed_blueprints(tmp_path: Path) -> None:
+    """A blueprint with status 'proposed' is skipped, not flagged Poor.
+
+    The bare blueprint would score Poor (~25) if scored; declaring it 'proposed'
+    skips it, so the check stays OK instead of erroring.
+    """
+    bp = tmp_path / "blueprints" / "prop-bp"
+    bp.mkdir(parents=True)
+    (bp / "blueprint.json").write_text(
+        '{"name": "prop-bp", "status": "proposed"}', encoding="utf-8"
+    )
+    result = QualityScoreHealthChecker().check(cwd=tmp_path)
+    assert result.status == OK
+    assert any("proposed" in detail for detail in (result.details or []))
+
+
 # --- slo_violations -------------------------------------------------------
 
 

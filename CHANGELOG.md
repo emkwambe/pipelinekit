@@ -4,6 +4,19 @@ All notable changes to PipelineKit are documented in this file.
 
 ## [Unreleased]
 
+### Added — Sprint E2 (RM-5 Scheduled Pipeline Runs)
+- `pipelinekit schedule set --every <hours> --timezone <tz>` — schedule automatic runs
+- `pipelinekit schedule list` — list active schedules
+- `pipelinekit schedule history` — show run history
+- `pipelinekit schedule disable` — pause a schedule
+- `pipelinekit schedule enable` — resume a schedule
+- `pipelinekit schedule remove` — delete a schedule
+- Windows Task Scheduler XML generated automatically
+- Unix cron expression generated for Linux/macOS
+- New state.db tables: rm_schedules, rm_schedule_runs
+- New error codes: PK-RM-001, PK-RM-002
+
+
 ### Added — Sprint E1 (GM-4 Column-Level Domain Ownership)
 - `pipelinekit governance owner column set` — declare column owner by domain
 - `pipelinekit governance owner column get` — get column owner

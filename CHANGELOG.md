@@ -4,6 +4,18 @@ All notable changes to PipelineKit are documented in this file.
 
 ## [Unreleased]
 
+### Added — Sprint E3 (RM-4 Atomic Staging Promotion)
+- `pipelinekit staging promote` — atomically promote staging → production
+- `pipelinekit staging rollback` — drop staging, production untouched
+- `pipelinekit staging status` — show current staging run state
+- Zero-downtime pipeline runs: dbt builds into staging first
+- On failure: production is always untouched
+- DuckDB: transactional table-by-table copy (ALTER SCHEMA not supported in DuckDB 1.5.5)
+- Opt-in via pipelinekit.yaml: transformation.staging.enabled: true
+- New state.db table: rm_staging_runs
+- New error codes: PK-RM-003, PK-RM-004, PK-RM-005, PK-RM-006
+
+
 ### Added — Sprint E2 (RM-5 Scheduled Pipeline Runs)
 - `pipelinekit schedule set --every <hours> --timezone <tz>` — schedule automatic runs
 - `pipelinekit schedule list` — list active schedules

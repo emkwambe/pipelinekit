@@ -4,6 +4,18 @@ All notable changes to PipelineKit are documented in this file.
 
 ## [Unreleased]
 
+### Added — Sprint E1 (GM-4 Column-Level Domain Ownership)
+- `pipelinekit governance owner column set` — declare column owner by domain
+- `pipelinekit governance owner column get` — get column owner
+- `pipelinekit governance owner column list` — list column owners for a contract
+- `pipelinekit governance owner column remove` — remove column owner
+- `pipelinekit governance owner column audit` — show unowned columns
+- New state.db table: gm_column_owners
+- Health check now reports column coverage alongside blueprint ownership
+- Implements the Smartsheet Data Mesh insight: column-level accountability
+- New error codes: PK-GM-007, PK-GM-008
+
+
 ### Fixed — Blueprint Best Practices
 - stripe-to-snowflake: Grade C → Grade A (Score 72.7 → 100/100)
 - BP-004: Added not_null tests to email columns (coverage 66-75% → 100%)

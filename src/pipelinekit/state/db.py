@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from pipelinekit.governance.ownership import BlueprintOwner
     from pipelinekit.observability.slo import SLODefinition
     from pipelinekit.quality.freshness import FreshnessRequirement
+    from pipelinekit.scheduling.scheduler import PipelineSchedule, ScheduleRun
 
 STATE_DIR = ".pipelinekit"
 STATE_DB = "state.db"
@@ -191,6 +192,32 @@ CREATE TABLE IF NOT EXISTS gm_column_owners (
 
 CREATE INDEX IF NOT EXISTS idx_gm_column_owners_contract
     ON gm_column_owners(blueprint_name, contract_file);
+
+CREATE TABLE IF NOT EXISTS rm_schedules (
+    id TEXT PRIMARY KEY,
+    pipeline_name TEXT NOT NULL UNIQUE,
+    interval_hours REAL NOT NULL,
+    timezone TEXT NOT NULL DEFAULT 'UTC',
+    status TEXT NOT NULL DEFAULT 'active',
+    last_run_at TEXT,
+    next_run_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS rm_schedule_runs (
+    id TEXT PRIMARY KEY,
+    pipeline_name TEXT NOT NULL,
+    triggered_by TEXT NOT NULL DEFAULT 'scheduler',
+    started_at TEXT NOT NULL,
+    completed_at TEXT,
+    status TEXT NOT NULL,
+    rows_loaded INTEGER,
+    error TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_rm_schedule_runs_pipeline
+    ON rm_schedule_runs(pipeline_name, started_at);
 
 CREATE TABLE IF NOT EXISTS qm_row_counts (
     id TEXT PRIMARY KEY,
@@ -1378,6 +1405,215 @@ def delete_column_owner(
             f"{contract_file}:{column_name}",
             {"path": str(db_path), "detail": str(exc)},
         ) from exc
+
+
+_RM_SCHEDULES_DDL = """
+CREATE TABLE IF NOT EXISTS rm_schedules (
+    id TEXT PRIMARY KEY,
+    pipeline_name TEXT NOT NULL UNIQUE,
+    interval_hours REAL NOT NULL,
+    timezone TEXT NOT NULL DEFAULT 'UTC',
+    status TEXT NOT NULL DEFAULT 'active',
+    last_run_at TEXT,
+    next_run_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS rm_schedule_runs (
+    id TEXT PRIMARY KEY,
+    pipeline_name TEXT NOT NULL,
+    triggered_by TEXT NOT NULL DEFAULT 'scheduler',
+    started_at TEXT NOT NULL,
+    completed_at TEXT,
+    status TEXT NOT NULL,
+    rows_loaded INTEGER,
+    error TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_rm_schedule_runs_pipeline
+    ON rm_schedule_runs(pipeline_name, started_at);
+"""
+
+
+def _connect_schedules(db_path: str | Path) -> sqlite3.Connection:
+    """Open ``db_path`` and ensure the RM-5 schedule tables exist.
+
+    Threads an explicit ``db_path`` like the GM tables do, so scheduling is
+    testable against a ``tmp_path`` database. The DDL is idempotent, so a raw
+    path with no prior ``initialize`` still works.
+    """
+    conn = sqlite3.connect(db_path)
+    conn.executescript(_RM_SCHEDULES_DDL)
+    return conn
+
+
+def upsert_schedule(schedule: PipelineSchedule, db_path: str | Path) -> None:
+    """Insert or replace a pipeline's schedule (RM-5).
+
+    One schedule per pipeline: ``pipeline_name`` is unique, so re-setting a
+    schedule replaces the existing row rather than adding a second.
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the schedule cannot be written.
+    """
+    try:
+        with _connect_schedules(db_path) as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO rm_schedules (
+                    id, pipeline_name, interval_hours, timezone, status,
+                    last_run_at, next_run_at, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    schedule.id,
+                    schedule.pipeline_name,
+                    schedule.interval_hours,
+                    schedule.timezone,
+                    schedule.status,
+                    schedule.last_run_at,
+                    schedule.next_run_at,
+                    schedule.created_at,
+                    schedule.updated_at,
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot write schedule for pipeline {schedule.pipeline_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def get_schedule(pipeline_name: str, db_path: str | Path) -> dict | None:
+    """Return a pipeline's schedule row, or None if none is set (RM-5)."""
+    try:
+        with _connect_schedules(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT * FROM rm_schedules WHERE pipeline_name = ?",
+                (pipeline_name,),
+            ).fetchone()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            f"Cannot read schedule for pipeline {pipeline_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return dict(row) if row is not None else None
+
+
+def get_all_schedules(db_path: str | Path) -> list[dict]:
+    """Return every stored schedule row, sorted by pipeline name (RM-5)."""
+    try:
+        with _connect_schedules(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT * FROM rm_schedules ORDER BY pipeline_name"
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            "Cannot read schedules from state database",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return [dict(row) for row in rows]
+
+
+def delete_schedule(pipeline_name: str, db_path: str | Path) -> bool:
+    """Delete a pipeline's schedule. Return True if a row was removed (RM-5).
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the delete cannot be executed.
+    """
+    try:
+        with _connect_schedules(db_path) as conn:
+            cursor = conn.execute(
+                "DELETE FROM rm_schedules WHERE pipeline_name = ?",
+                (pipeline_name,),
+            )
+            return cursor.rowcount > 0
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot delete schedule for pipeline {pipeline_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def insert_schedule_run(run: ScheduleRun, db_path: str | Path) -> None:
+    """Record one scheduled pipeline run (RM-5).
+
+    History is append-only: runs are inserted, never replaced.
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the run cannot be written.
+    """
+    try:
+        with _connect_schedules(db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO rm_schedule_runs (
+                    id, pipeline_name, triggered_by, started_at,
+                    completed_at, status, rows_loaded, error
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run.id,
+                    run.pipeline_name,
+                    run.triggered_by,
+                    run.started_at,
+                    run.completed_at,
+                    run.status,
+                    run.rows_loaded,
+                    run.error,
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot write schedule run for pipeline {run.pipeline_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def get_schedule_history(
+    pipeline_name: str | None, limit: int, db_path: str | Path
+) -> list[dict]:
+    """Return the most recent scheduled runs, newest first (RM-5).
+
+    ``pipeline_name`` of None returns history across every pipeline.
+    """
+    try:
+        with _connect_schedules(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            if pipeline_name is None:
+                rows = conn.execute(
+                    """
+                    SELECT * FROM rm_schedule_runs
+                    ORDER BY started_at DESC LIMIT ?
+                    """,
+                    (limit,),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT * FROM rm_schedule_runs
+                    WHERE pipeline_name = ?
+                    ORDER BY started_at DESC LIMIT ?
+                    """,
+                    (pipeline_name, limit),
+                ).fetchall()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            "Cannot read schedule history from state database",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return [dict(row) for row in rows]
 
 
 _QM_ROW_COUNTS_DDL = """

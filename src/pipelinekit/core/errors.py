@@ -97,3 +97,8 @@ class ObservabilityError(PipelineKitError):
     """Raised when an observability operation fails — an invalid SLO type
     (ADR-026, SPEC-025). Carries ``PK-OM-*`` codes. SLO violations are surfaced
     as warnings, never raised."""
+
+
+class ReleaseError(PipelineKitError):
+    """Raised when a release-management operation fails — an invalid schedule
+    interval or unknown timezone (RM-5). Carries ``PK-RM-*`` codes."""

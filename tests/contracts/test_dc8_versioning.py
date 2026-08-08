@@ -42,6 +42,67 @@ def test_dc8_snapshot_creates_new_version_for_new_contract(tmp_path: Path) -> No
     assert version.content_hash
 
 
+def test_dc8_shape_b_column_removal_is_major_not_patch(tmp_path: Path) -> None:
+    """Removing a column from a columns: list-of-mappings contract is MAJOR.
+
+    Regression: the column reader understood only shape A, so a shape-B contract
+    yielded an empty column set. With nothing to compare, a removed column looked
+    like no change at all and versioned as a PATCH — a breaking change shipping
+    silently under a non-breaking version number.
+    """
+    db_path = _db(tmp_path)
+    before = {
+        "table": "frame_contracts",
+        "version": "1.0.0",
+        "columns": [
+            {"name": "contract_id", "type": "varchar", "nullable": False},
+            {"name": "status", "type": "varchar", "nullable": False},
+        ],
+    }
+    after = {
+        "table": "frame_contracts",
+        "version": "1.0.0",
+        "columns": [{"name": "contract_id", "type": "varchar", "nullable": False}],
+    }
+
+    snapshot_contract(_BLUEPRINT, "frame_contracts.yaml", before, db_path)
+    version = snapshot_contract(_BLUEPRINT, "frame_contracts.yaml", after, db_path)
+
+    assert version.version == "2.0.0", "shape-B column removal must bump MAJOR"
+
+    diff = diff_contract_versions(
+        _BLUEPRINT, "frame_contracts.yaml", "1.0.0", "2.0.0", db_path
+    )
+    assert diff.change_type == "major"
+    assert diff.removed_fields == ["status"]
+
+
+def test_dc8_shape_b_added_column_is_detected(tmp_path: Path) -> None:
+    """A column added to a shape-B contract surfaces in the diff, not silence."""
+    db_path = _db(tmp_path)
+    before = {
+        "table": "orders",
+        "columns": [{"name": "order_id", "nullable": False, "unique": True}],
+    }
+    after = {
+        "table": "orders",
+        "columns": [
+            {"name": "order_id", "nullable": False, "unique": True},
+            {"name": "amount", "nullable": False},
+        ],
+    }
+
+    snapshot_contract(_BLUEPRINT, "orders.yaml", before, db_path)
+    second = snapshot_contract(_BLUEPRINT, "orders.yaml", after, db_path)
+
+    diff = diff_contract_versions(
+        _BLUEPRINT, "orders.yaml", "1.0.0", second.version, db_path
+    )
+    assert diff.added_fields == ["amount"]
+    # Per-column constraints are visible too, not just the column list.
+    assert "not_null: +amount" in diff.changed_constraints
+
+
 def test_dc8_snapshot_is_idempotent_when_contract_unchanged(tmp_path: Path) -> None:
     """Snapshotting the same contract twice returns the same version."""
     db_path = _db(tmp_path)

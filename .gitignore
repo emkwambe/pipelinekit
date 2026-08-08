@@ -57,6 +57,15 @@ airbyte-connection.json
 inspect-pipelinekit.ps1
 logs/
 
+# Throwaway diagnostic scripts at the repo root. Scoped deliberately: these are
+# leading-slash, prefixed patterns, never a bare *.py — that would ignore the
+# whole source tree.
+/check_*.py
+/probe_*.py
+/scratch_*.py
+/tmp_*.py
+/debug_*.py
+
 # Internal AI framework — lives in pipelinekit-internal
 .claude/
 .mcp/

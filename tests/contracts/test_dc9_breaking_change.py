@@ -37,6 +37,42 @@ def _write_sql(blueprint_dir: Path, relative: str, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def test_dc9_shape_b_removed_column_is_detected_as_breaking(tmp_path: Path) -> None:
+    """DC-9 fires for a columns: list-of-mappings contract, with dbt impact.
+
+    Regression: shape-B contracts read as zero columns, so no removal was ever
+    MAJOR and detect_breaking_changes returned None — downstream dbt models
+    referencing the dropped column were never flagged.
+    """
+    db_path = _db(tmp_path)
+    baseline = {
+        "table": "frame_contracts",
+        "columns": [
+            {"name": "contract_id", "nullable": False, "unique": True},
+            {"name": "arr_value", "nullable": False},
+        ],
+    }
+    snapshot_contract(_BP, "frame_contracts.yaml", baseline, db_path)
+    _write_sql(
+        tmp_path,
+        "core/core_contracts.sql",
+        "select contract_id, arr_value from {{ ref('frame_contracts') }}\n",
+    )
+
+    removed = {
+        "table": "frame_contracts",
+        "columns": [{"name": "contract_id", "nullable": False, "unique": True}],
+    }
+    result = detect_breaking_changes(
+        _BP, "frame_contracts.yaml", baseline, removed, str(tmp_path), db_path
+    )
+
+    assert result is not None, "shape-B column removal must be detected as breaking"
+    assert result.removed_columns == ["arr_value"]
+    assert [i.column_name for i in result.dbt_impact] == ["arr_value"]
+    assert result.dbt_impact[0].model_file == "transform/models/core/core_contracts.sql"
+
+
 def test_dc9_no_breaking_change_returns_none(tmp_path: Path) -> None:
     """detect_breaking_changes returns None when diff is not MAJOR."""
     db_path = _db(tmp_path)

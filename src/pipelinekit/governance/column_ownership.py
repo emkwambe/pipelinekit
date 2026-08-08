@@ -21,11 +21,11 @@ from pathlib import Path
 
 import yaml  # type: ignore[import-untyped]
 
-# The contract "column universe" is defined once, in the contracts layer: a
-# contract names columns through ``required_columns`` and through its constraint
-# blocks. GM-4 reuses that definition rather than restating it, so an audit can
-# never disagree with contract validation about which columns exist.
-from pipelinekit.contracts.versioning import _columns as _contract_columns
+# The contract "column universe" is defined once, in the contracts layer, and
+# understands both contract shapes. GM-4 reuses that definition rather than
+# restating it, so an audit can never disagree with contract validation or drift
+# detection about which columns exist.
+from pipelinekit.contracts import columns as contract_columns
 from pipelinekit.core.errors import GovernanceError
 from pipelinekit.governance.ownership import BLUEPRINTS_DIR
 from pipelinekit.state import db
@@ -135,32 +135,7 @@ def get_contract_columns(
             {"blueprint_name": blueprint_name, "contract_file": contract_file},
         )
 
-    _required, all_columns = _contract_columns(content)
-    return sorted(all_columns | _declared_columns_block(content))
-
-
-def _declared_columns_block(content: dict) -> set[str]:
-    """Return column names from a contract's explicit ``columns:`` block.
-
-    This repo carries two contract shapes: the constraint-based shape that
-    ``contracts.versioning`` understands (``required_columns`` plus ``not_null``
-    and friends), and a ``columns:`` block listing each column. GM-4 must see
-    both, or a blueprint using the second shape would silently report zero
-    columns and appear to need no column governance at all.
-
-    Accepts either a list of names or a list of ``{name: ...}`` mappings.
-    """
-    raw = content.get("columns")
-    if not isinstance(raw, list):
-        return set()
-
-    names: set[str] = set()
-    for entry in raw:
-        if isinstance(entry, str):
-            names.add(entry)
-        elif isinstance(entry, dict) and isinstance(entry.get("name"), str):
-            names.add(entry["name"])
-    return names
+    return sorted(contract_columns.all_referenced_columns(content))
 
 
 def set_column_owner(

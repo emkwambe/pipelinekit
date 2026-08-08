@@ -23,6 +23,7 @@ from typing import Any, Optional
 import yaml  # type: ignore[import-untyped]
 from pydantic import ValidationError
 
+from pipelinekit.contracts import columns as contract_columns
 from pipelinekit.contracts.models import (
     ContractDefinition,
     ContractResult,
@@ -30,6 +31,34 @@ from pipelinekit.contracts.models import (
     ViolationType,
 )
 from pipelinekit.core.errors import ContractError
+
+
+def _normalize_contract(raw: dict) -> dict:
+    """Return contract content with shape-B columns folded into shape-A keys.
+
+    A shape-B contract declares constraints per column (``nullable: false``,
+    ``unique: true``, ``accepted_values: [...]``) under a ``columns:`` block.
+    Without this, ``ContractDefinition`` sees no ``required_columns`` at all and
+    the validator silently checks nothing — a contract that passes because it
+    asserts nothing, which is worse than one that fails.
+
+    Shape-A contracts are returned untouched: the normalized values are only
+    written where the contract did not already state them explicitly.
+    """
+    if not isinstance(raw, dict) or not isinstance(raw.get("columns"), list):
+        return raw
+
+    normalized = {key: value for key, value in raw.items() if key != "columns"}
+    derived = {
+        "required_columns": sorted(contract_columns.required_column_names(raw)),
+        "not_null": sorted(contract_columns.not_null_columns(raw)),
+        "uniqueness": sorted(contract_columns.unique_columns(raw)),
+        "accepted_values": contract_columns.accepted_values(raw),
+    }
+    for key, value in derived.items():
+        if not normalized.get(key) and value:
+            normalized[key] = value
+    return normalized
 
 
 def _utc_now() -> str:
@@ -87,7 +116,7 @@ class ContractValidator:
                 {"path": str(path), "detail": str(exc)},
             ) from exc
         try:
-            return ContractDefinition(**(raw or {}))
+            return ContractDefinition(**_normalize_contract(raw or {}))
         except (ValidationError, TypeError) as exc:
             raise ContractError(
                 "PK-CONTRACT-008",

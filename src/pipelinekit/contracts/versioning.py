@@ -37,6 +37,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from pipelinekit.contracts import columns as contract_columns
 from pipelinekit.core.errors import ContractError
 from pipelinekit.state import db
 
@@ -125,27 +126,21 @@ def _parse_semver(version: str) -> tuple[int, int, int]:
 def _columns(content: dict) -> tuple[set[str], set[str]]:
     """Return ``(required_columns, all_referenced_columns)`` for a contract.
 
-    A contract references columns through ``required_columns`` and through its
-    constraints (``not_null``, ``uniqueness``, ``accepted_values`` keys, and the
-    ``freshness`` column). The union is the contract's column universe; columns
-    in the universe but not required are treated as optional.
+    Delegates to ``contracts.columns``, which understands both contract shapes.
+    Reading only shape A here returned empty sets for a shape-B contract, which
+    made a removed column look like no change at all — versioning a breaking
+    change as a patch and silencing DC-9.
     """
-    required = set(content.get("required_columns") or [])
-    constraint_cols = (
-        set(content.get("not_null") or [])
-        | set(content.get("uniqueness") or [])
-        | set((content.get("accepted_values") or {}).keys())
+    return (
+        contract_columns.required_column_names(content),
+        contract_columns.all_referenced_columns(content),
     )
-    freshness = content.get("freshness") or {}
-    if isinstance(freshness, dict) and freshness.get("column"):
-        constraint_cols.add(freshness["column"])
-    return required, required | constraint_cols
 
 
 def _accepted_values_removed(old: dict, new: dict) -> bool:
     """True if any previously-accepted value was dropped from a column."""
-    old_av = old.get("accepted_values") or {}
-    new_av = new.get("accepted_values") or {}
+    old_av = contract_columns.accepted_values(old)
+    new_av = contract_columns.accepted_values(new)
     for col, allowed in old_av.items():
         if col in new_av and (set(allowed) - set(new_av[col])):
             return True
@@ -317,18 +312,28 @@ def diff_contract_versions(
 
 
 def _constraint_changes(old: dict, new: dict) -> list[str]:
-    """Return human-readable descriptions of constraint-level changes."""
+    """Return human-readable descriptions of constraint-level changes.
+
+    Constraints are read through ``contracts.columns`` so shape-B contracts —
+    which express them per column (``nullable: false``, ``unique: true``) rather
+    than in top-level blocks — report changes rather than appearing static.
+    """
     changes: list[str] = []
-    for key in ("not_null", "uniqueness", "required_columns"):
-        old_set = set(old.get(key) or [])
-        new_set = set(new.get(key) or [])
+    constraint_readers = (
+        ("not_null", contract_columns.not_null_columns),
+        ("uniqueness", contract_columns.unique_columns),
+        ("required_columns", contract_columns.required_column_names),
+    )
+    for key, reader in constraint_readers:
+        old_set = reader(old)
+        new_set = reader(new)
         for added in sorted(new_set - old_set):
             changes.append(f"{key}: +{added}")
         for removed in sorted(old_set - new_set):
             changes.append(f"{key}: -{removed}")
 
-    old_av = old.get("accepted_values") or {}
-    new_av = new.get("accepted_values") or {}
+    old_av = contract_columns.accepted_values(old)
+    new_av = contract_columns.accepted_values(new)
     for col in sorted(set(old_av) | set(new_av)):
         before = set(old_av.get(col) or [])
         after = set(new_av.get(col) or [])

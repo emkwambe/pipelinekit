@@ -15,7 +15,7 @@ See: SPEC-004.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
+from typing import Optional, Union
 
 from pydantic import BaseModel
 
@@ -35,9 +35,18 @@ class RowCountRule(BaseModel):
 
 
 class ContractDefinition(BaseModel):
-    """A full data contract for a single table."""
+    """A full data contract for a single table.
 
-    version: int = 1
+    Both contract shapes parse into this one model. A shape-B contract declares
+    its columns and per-column constraints under ``columns:``; those are
+    normalized into ``required_columns``/``uniqueness``/``not_null``/
+    ``accepted_values`` on load, so the validator has a single form to check.
+
+    ``version`` accepts a string because shape-B contracts version themselves
+    semantically (``"1.0.0"``) while shape A uses a plain integer.
+    """
+
+    version: Union[int, str] = 1
     table: str
     description: str = ""
     freshness: Optional[FreshnessRule] = None

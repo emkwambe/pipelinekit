@@ -17,6 +17,53 @@ required_columns:
   - order_id
 """
 
+_SHAPE_B_CONTRACT_YAML = """
+table: orders
+version: "1.0.0"
+columns:
+  - name: order_id
+    type: integer
+    nullable: false
+    unique: true
+  - name: status
+    type: varchar
+    nullable: false
+    accepted_values: [pending, shipped]
+"""
+
+
+def test_validator_loads_shape_b_columns_contract(tmp_path: Path) -> None:
+    """A columns: list-of-mappings contract loads and yields real constraints.
+
+    Regression: shape-B contracts failed to load at all (PK-CONTRACT-008) —
+    the semantic "1.0.0" version would not coerce to int, and the columns block
+    was unknown to the model. Even once loaded, an unnormalized contract states
+    no constraints, so it would pass by asserting nothing.
+    """
+    (tmp_path / "orders.yaml").write_text(_SHAPE_B_CONTRACT_YAML, encoding="utf-8")
+
+    contract = ContractValidator(tmp_path).load_contract("orders")
+
+    assert contract.table == "orders"
+    assert contract.version == "1.0.0"
+    assert set(contract.required_columns) == {"order_id", "status"}
+    assert set(contract.not_null) == {"order_id", "status"}
+    assert contract.uniqueness == ["order_id"]
+    assert contract.accepted_values == {"status": ["pending", "shipped"]}
+
+
+def test_validator_shape_a_contract_is_unchanged(tmp_path: Path) -> None:
+    """Shape-A contracts parse exactly as before — no normalization applied."""
+    (tmp_path / "orders.yaml").write_text(_VALID_CONTRACT_YAML, encoding="utf-8")
+
+    contract = ContractValidator(tmp_path).load_contract("orders")
+
+    assert contract.version == 1
+    assert contract.required_columns == ["order_id"]
+    assert contract.not_null == []
+    assert contract.uniqueness == []
+    assert contract.accepted_values == {}
+
 
 class _FakeCursor:
     def __init__(self, columns: list[str], rows: list[tuple]) -> None:

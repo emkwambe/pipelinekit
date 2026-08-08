@@ -22,20 +22,9 @@ from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 
+from pipelinekit.contracts import columns as contract_columns
 from pipelinekit.quality.coverage import scan_dbt_coverage
 from pipelinekit.state import db
-
-# Contract keys that can hold column declarations. Both are read: this repo
-# carries two contract shapes, and a contract may use either key.
-#
-#   shape A  required_columns: [order_id, amount]          (stripe-to-snowflake)
-#   shape B  columns: [{name: order_id, type: varchar}]    (postgres-to-duckdb,
-#                                                           data-mesh-contracts)
-#
-# Shape B stores mappings, not strings. Reading only strings silently yields an
-# empty column set, which makes every schema.yml column look newly added and
-# reports a clean blueprint as fully drifted.
-_COLUMN_KEYS = ("columns", "required_columns")
 
 
 class DriftType(str, Enum):
@@ -81,25 +70,11 @@ class DriftReport:
 def _extract_contract_columns(contract_content: dict) -> set[str]:
     """Return the set of column names declared by a contract.
 
-    Handles both contract shapes: a list of names (``required_columns``) and a
-    list of ``{name: ...}`` mappings (``columns``). Both keys are read and their
-    names unioned, so a contract using either — or both — is understood.
+    Delegates to ``contracts.columns`` so drift sees the same column universe as
+    contract versioning and column ownership — both contract shapes included.
     Returns an empty set for any unexpected structure.
     """
-    if not isinstance(contract_content, dict):
-        return set()
-
-    names: set[str] = set()
-    for key in _COLUMN_KEYS:
-        value = contract_content.get(key)
-        if not isinstance(value, list):
-            continue
-        for entry in value:
-            if isinstance(entry, str):
-                names.add(entry)
-            elif isinstance(entry, dict) and isinstance(entry.get("name"), str):
-                names.add(entry["name"])
-    return names
+    return contract_columns.column_names(contract_content)
 
 
 def _contract_table_name(contract_file: str, contract_content: dict) -> str:

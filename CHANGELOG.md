@@ -4,6 +4,20 @@ All notable changes to PipelineKit are documented in this file.
 
 ## [Unreleased]
 
+### Added — Sprint E4 (Data Mesh Blueprint Template)
+- New blueprint: data-mesh-contracts (Frame → Detail → Core → Utility)
+- Implements Smartsheet Data Mesh architecture exactly
+- Frame table: one row per contract_id (Engineering domain)
+- Detail tables: Finance, Sales, Product (each owns their columns)
+- Core table: wide analytics table joined from all Detail tables
+- Utility directory: scaffolded for team-specific downstream tables
+- Grade A on all 7 best practices (QM-10)
+- Column-level ownership declarations via GM-4
+- 5 contracts in shape B format (columns: list-of-mappings)
+- status: proposed — run pipeline to verify
+- docs/DATA-MESH-PATTERN.md: complete implementation guide
+
+
 ### Added — Sprint E3 (RM-4 Atomic Staging Promotion)
 - `pipelinekit staging promote` — atomically promote staging → production
 - `pipelinekit staging rollback` — drop staging, production untouched

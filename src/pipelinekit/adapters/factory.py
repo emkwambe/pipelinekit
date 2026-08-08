@@ -34,10 +34,16 @@ class AdapterFactory:
 
     @staticmethod
     def create_transformation(config: PipelineConfig) -> BaseAdapter | None:
-        """Return a dbt adapter, or None if transformation is disabled."""
+        """Return a dbt adapter, or None if transformation is disabled.
+
+        With RM-4 staging enabled the adapter targets the staging schema; with
+        staging off it is constructed exactly as before.
+        """
         if not config.transformation.enabled:
             return None
-        return DbtTransformationAdapter(config.transformation)
+        staging = config.transformation.staging
+        target_schema = staging.schema_name if staging.enabled else None
+        return DbtTransformationAdapter(config.transformation, target_schema)
 
     @staticmethod
     def create_quality(config: PipelineConfig) -> BaseAdapter | None:

@@ -62,11 +62,43 @@ class PipelineRunner:
         ]
         return [(name, a) for name, a in candidates if a is not None]
 
+    def _staging_promoter(self):  # type: ignore[no-untyped-def]
+        """Return a ``StagingPromoter`` when RM-4 staging applies, else None.
+
+        Staging is opt-in and DuckDB-only. Anything else — staging disabled, a
+        non-DuckDB destination — leaves the run path exactly as it was.
+        """
+        if not self.config.transformation.enabled:
+            return None
+        if not self.config.transformation.staging.enabled:
+            return None
+        destination = self.config.ingestion.destination
+        if destination.type != "duckdb" or not destination.path:
+            return None
+
+        from pipelinekit.staging.promoter import StagingPromoter
+
+        return StagingPromoter(destination.path, str(db.get_db_path()))
+
     def run(self) -> PipelineResult:
-        """Execute the full pipeline, always recording the run in state."""
+        """Execute the full pipeline, always recording the run in state.
+
+        With RM-4 staging enabled, transformations build into a staging schema
+        and production is updated only after the whole run succeeds; a failed
+        run rolls staging away and leaves production untouched.
+        """
         run_id = _new_run_id()
         name = self.config.pipeline.name
         db.insert_run(run_id, name)
+
+        promoter = self._staging_promoter()
+        staging_run = None
+        if promoter is not None:
+            staging_run = promoter.create_staging_schema(
+                self.config.transformation.staging.schema_name,
+                name,
+                self.config.transformation.production.schema_name,
+            )
 
         steps: list[StepResult] = []
         status = PipelineStatus.FAILED
@@ -77,6 +109,29 @@ class PipelineRunner:
             for step_name, adapter in self._adapters():
                 steps.append(execute_step(step_name, adapter))
             status = _aggregate_run_status(steps)
+            if promoter is not None and staging_run is not None:
+                if status == PipelineStatus.SUCCESS:
+                    promoter.mark_tests_passing(staging_run.id)
+                    if not promoter.promote_to_production(
+                        staging_run.staging_schema,
+                        staging_run.production_schema,
+                        staging_run.id,
+                    ):
+                        current = promoter.get_staging_status(name)
+                        status = PipelineStatus.FAILED
+                        error_code = "PK-RM-006"
+                        error_msg = (
+                            current.error
+                            if current and current.error
+                            else "staging promotion failed; production unchanged"
+                        )
+                else:
+                    # The build failed — production must never see partial data.
+                    promoter.rollback(
+                        staging_run.staging_schema,
+                        staging_run.production_schema,
+                        staging_run.id,
+                    )
             if status == PipelineStatus.SUCCESS:
                 error_code, error_msg = None, None
             else:

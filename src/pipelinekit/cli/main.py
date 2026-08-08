@@ -35,6 +35,7 @@ from pipelinekit.cli.observability import observability_app  # noqa: E402
 from pipelinekit.cli.quality import quality_app  # noqa: E402
 from pipelinekit.cli.run import run_command  # noqa: E402
 from pipelinekit.cli.schedule import schedule_app  # noqa: E402
+from pipelinekit.cli.staging import staging_app  # noqa: E402
 from pipelinekit.cli.status import status_command  # noqa: E402
 from pipelinekit.cli.validate import validate_command  # noqa: E402
 
@@ -84,3 +85,4 @@ app.add_typer(governance_app, name="governance")
 app.add_typer(observability_app, name="observability")
 app.add_typer(ems_app, name="ems")
 app.add_typer(schedule_app, name="schedule")
+app.add_typer(staging_app, name="staging")

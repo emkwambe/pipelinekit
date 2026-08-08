@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from pipelinekit.observability.slo import SLODefinition
     from pipelinekit.quality.freshness import FreshnessRequirement
     from pipelinekit.scheduling.scheduler import PipelineSchedule, ScheduleRun
+    from pipelinekit.staging.promoter import StagingRun
 
 STATE_DIR = ".pipelinekit"
 STATE_DB = "state.db"
@@ -218,6 +219,21 @@ CREATE TABLE IF NOT EXISTS rm_schedule_runs (
 
 CREATE INDEX IF NOT EXISTS idx_rm_schedule_runs_pipeline
     ON rm_schedule_runs(pipeline_name, started_at);
+
+CREATE TABLE IF NOT EXISTS rm_staging_runs (
+    id TEXT PRIMARY KEY,
+    pipeline_name TEXT NOT NULL,
+    staging_schema TEXT NOT NULL,
+    production_schema TEXT NOT NULL,
+    status TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    promoted_at TEXT,
+    rows_staged INTEGER,
+    error TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_rm_staging_runs_pipeline
+    ON rm_staging_runs(pipeline_name, started_at);
 
 CREATE TABLE IF NOT EXISTS qm_row_counts (
     id TEXT PRIMARY KEY,
@@ -1614,6 +1630,152 @@ def get_schedule_history(
             {"path": str(db_path), "detail": str(exc)},
         ) from exc
     return [dict(row) for row in rows]
+
+
+_RM_STAGING_RUNS_DDL = """
+CREATE TABLE IF NOT EXISTS rm_staging_runs (
+    id TEXT PRIMARY KEY,
+    pipeline_name TEXT NOT NULL,
+    staging_schema TEXT NOT NULL,
+    production_schema TEXT NOT NULL,
+    status TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    promoted_at TEXT,
+    rows_staged INTEGER,
+    error TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_rm_staging_runs_pipeline
+    ON rm_staging_runs(pipeline_name, started_at);
+"""
+
+
+def _connect_staging(db_path: str | Path) -> sqlite3.Connection:
+    """Open ``db_path`` and ensure the RM-4 staging table exists.
+
+    Threads an explicit ``db_path`` like the RM-5 and GM tables do. The DDL is
+    idempotent, so a raw path with no prior ``initialize`` still works.
+    """
+    conn = sqlite3.connect(db_path)
+    conn.executescript(_RM_STAGING_RUNS_DDL)
+    return conn
+
+
+def insert_staging_run(run: StagingRun, db_path: str | Path) -> None:
+    """Record the start of a staging run (RM-4).
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the run cannot be written.
+    """
+    try:
+        with _connect_staging(db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO rm_staging_runs (
+                    id, pipeline_name, staging_schema, production_schema,
+                    status, started_at, promoted_at, rows_staged, error
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run.id,
+                    run.pipeline_name,
+                    run.staging_schema,
+                    run.production_schema,
+                    run.status,
+                    run.started_at,
+                    run.promoted_at,
+                    run.rows_staged,
+                    run.error,
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot write staging run for pipeline {run.pipeline_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def update_staging_run(
+    run_id: str,
+    status: str,
+    promoted_at: str | None,
+    rows_staged: int | None,
+    error: str | None,
+    db_path: str | Path,
+) -> bool:
+    """Advance a staging run's status. Return True if the run exists (RM-4).
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the update cannot be executed.
+    """
+    try:
+        with _connect_staging(db_path) as conn:
+            cursor = conn.execute(
+                """
+                UPDATE rm_staging_runs
+                SET status = ?, promoted_at = ?, rows_staged = ?, error = ?
+                WHERE id = ?
+                """,
+                (status, promoted_at, rows_staged, error, run_id),
+            )
+            return cursor.rowcount > 0
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot update staging run {run_id}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def get_staging_run(run_id: str, db_path: str | Path) -> dict | None:
+    """Return one staging run row, or None if it does not exist (RM-4)."""
+    try:
+        with _connect_staging(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT * FROM rm_staging_runs WHERE id = ?", (run_id,)
+            ).fetchone()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            f"Cannot read staging run {run_id}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return dict(row) if row is not None else None
+
+
+def get_latest_staging_run(
+    pipeline_name: str | None, db_path: str | Path
+) -> dict | None:
+    """Return the most recent staging run, or None if there is none (RM-4).
+
+    ``pipeline_name`` of None looks across every pipeline.
+    """
+    try:
+        with _connect_staging(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            if pipeline_name is None:
+                row = conn.execute(
+                    "SELECT * FROM rm_staging_runs ORDER BY started_at DESC LIMIT 1"
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    """
+                    SELECT * FROM rm_staging_runs
+                    WHERE pipeline_name = ?
+                    ORDER BY started_at DESC LIMIT 1
+                    """,
+                    (pipeline_name,),
+                ).fetchone()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            "Cannot read staging runs from state database",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return dict(row) if row is not None else None
 
 
 _QM_ROW_COUNTS_DDL = """

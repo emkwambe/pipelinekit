@@ -10,6 +10,7 @@ dbt is invoked **only** via ``subprocess`` — never imported as a Python librar
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import time
 from pathlib import Path
@@ -21,12 +22,22 @@ from pipelinekit.runtime.result import PipelineStatus, StepResult
 _STEP = "transformation"
 _DBT_TIMEOUT_S = 1800
 
+# Env var the dbt profile reads to choose its output schema (RM-4). Set only
+# when staging is enabled; the profile is expected to reference it, e.g.
+# ``schema: "{{ env_var('PK_DBT_SCHEMA', 'main') }}"``. If the profile ignores
+# it, the staging schema stays empty and the promoter refuses to promote —
+# a loud failure rather than a silently stale production.
+_SCHEMA_ENV_VAR = "PK_DBT_SCHEMA"
+
 
 class DbtTransformationAdapter(BaseAdapter):
     """dbt Core adapter. All dbt-specific logic stays inside this file."""
 
-    def __init__(self, config: TransformationSection) -> None:
+    def __init__(
+        self, config: TransformationSection, target_schema: str | None = None
+    ) -> None:
         self.config = config
+        self.target_schema = target_schema
 
     # -- BaseAdapter ---------------------------------------------------------
 
@@ -34,6 +45,16 @@ class DbtTransformationAdapter(BaseAdapter):
         """Verify the dbt project directory exists."""
         if not Path(self.config.project_dir).is_dir():
             return
+
+    def _dbt_env(self) -> dict[str, str] | None:
+        """Return the subprocess environment, or None to inherit unchanged.
+
+        Returning None when no target schema is set keeps the non-staging path
+        byte-identical to the pre-RM-4 invocation.
+        """
+        if self.target_schema is None:
+            return None
+        return {**os.environ, _SCHEMA_ENV_VAR: self.target_schema}
 
     def _run_dbt(self, *args: str) -> subprocess.CompletedProcess[str]:
         """Invoke the dbt CLI in the configured project directory."""
@@ -51,6 +72,7 @@ class DbtTransformationAdapter(BaseAdapter):
             text=True,
             timeout=_DBT_TIMEOUT_S,
             check=False,
+            env=self._dbt_env(),
         )
 
     def validate(self) -> StepResult:

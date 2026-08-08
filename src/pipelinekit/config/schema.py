@@ -70,11 +70,30 @@ class IngestionSection(BaseModel):
     destination: SourceConfig
 
 
+class StagingConfig(BaseModel):
+    """RM-4 staging settings. Opt-in: disabled leaves run behavior unchanged."""
+
+    enabled: bool = False
+    schema_name: str = Field(default="pipelinekit_staging", alias="schema")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class ProductionConfig(BaseModel):
+    """RM-4 production target schema — the schema staging is promoted into."""
+
+    schema_name: str = Field(default="pipelinekit_transformed", alias="schema")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class TransformationSection(BaseModel):
     """Transformation settings. Contract-required section."""
 
     enabled: bool = False
     project_dir: str = "./transform"
+    staging: StagingConfig = StagingConfig()
+    production: ProductionConfig = ProductionConfig()
 
 
 class ContractsSection(BaseModel):

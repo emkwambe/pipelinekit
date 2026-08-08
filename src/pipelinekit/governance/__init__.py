@@ -3,7 +3,8 @@
 GM-1 (SPEC-023) adds deterministic ownership assignment for installed
 blueprints, stored in ``state.db``. GM-2 (SPEC-028) adds regex-based naming
 convention enforcement. GM-3 (SPEC-031) adds a record-only approval workflow for
-pipeline changes. No AI. Governance gaps surface as warnings — never as blockers.
+pipeline changes. GM-4 (SPEC-032) extends ownership from the blueprint down to
+the column level. No AI. Governance gaps surface as warnings — never as blockers.
 """
 
 from __future__ import annotations
@@ -18,6 +19,19 @@ from pipelinekit.governance.approval import (
     get_pending_requests,
     reject_request,
     set_approver,
+)
+from pipelinekit.governance.column_ownership import (
+    ColumnOwner,
+    ColumnOwnershipReport,
+    get_all_column_owners,
+    get_blueprint_column_reports,
+    get_column_owner,
+    get_column_owners_for_contract,
+    get_column_ownership_report,
+    get_contract_columns,
+    list_contract_files,
+    remove_column_owner,
+    set_column_owner,
 )
 from pipelinekit.governance.convention import (
     VALID_SCOPES,
@@ -66,4 +80,16 @@ __all__ = [
     "reject_request",
     "get_pending_requests",
     "get_all_requests",
+    # GM-4 — column-level domain ownership (SPEC-032)
+    "ColumnOwner",
+    "ColumnOwnershipReport",
+    "set_column_owner",
+    "get_column_owner",
+    "get_all_column_owners",
+    "get_column_owners_for_contract",
+    "get_column_ownership_report",
+    "get_blueprint_column_reports",
+    "get_contract_columns",
+    "list_contract_files",
+    "remove_column_owner",
 ]

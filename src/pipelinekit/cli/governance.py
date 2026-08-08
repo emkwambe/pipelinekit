@@ -24,6 +24,14 @@ from pipelinekit.governance.approval import (
     reject_request,
     set_approver,
 )
+from pipelinekit.governance.column_ownership import (
+    get_blueprint_column_reports,
+    get_column_owner,
+    get_column_owners_for_contract,
+    get_contract_columns,
+    remove_column_owner,
+    set_column_owner,
+)
 from pipelinekit.governance.convention import (
     add_convention,
     check_blueprint_conventions,
@@ -51,6 +59,13 @@ owner_app = typer.Typer(
     add_completion=False,
 )
 governance_app.add_typer(owner_app, name="owner")
+
+owner_column_app = typer.Typer(
+    help="Column-level domain ownership.",
+    no_args_is_help=True,
+    add_completion=False,
+)
+owner_app.add_typer(owner_column_app, name="column")
 
 convention_app = typer.Typer(
     help="Naming convention management.",
@@ -183,6 +198,186 @@ def remove_command(
         console.print(f"✓ Owner removed from {blueprint_name}", style="green")
     else:
         console.print(f"No owner was set for {blueprint_name}")
+    raise typer.Exit(0)
+
+
+# --- GM-4: column-level domain ownership ----------------------------------
+
+
+@owner_column_app.command("set")
+def owner_column_set_command(
+    blueprint_name: str = typer.Argument(..., help="Blueprint owning the contract."),
+    contract: str = typer.Option(
+        ..., "--contract", help="Contract file, e.g. charges.yaml."
+    ),
+    column: str = typer.Option(..., "--column", help="Column name."),
+    domain: str = typer.Option(..., "--domain", help="Owning domain, e.g. finance."),
+    email: Optional[str] = typer.Option(None, "--email", help="Domain contact email."),
+    description: Optional[str] = typer.Option(
+        None, "--description", help="What this column means."
+    ),
+) -> None:
+    """Assign or update the domain that owns a contract column."""
+    try:
+        owner = set_column_owner(
+            blueprint_name, contract, column, domain, email, description, _db_path()
+        )
+    except GovernanceError as exc:
+        console.print(f"✗ [{exc.code}] {escape(exc.message)}", style="bold red")
+        raise typer.Exit(1) from exc
+
+    console.print(
+        f"✓ Column owner set for {owner.blueprint_name}/{owner.contract_file}:"
+        f"{owner.column_name} → {owner.owner_domain}",
+        style="green",
+    )
+    raise typer.Exit(0)
+
+
+@owner_column_app.command("get")
+def owner_column_get_command(
+    blueprint_name: str = typer.Argument(..., help="Blueprint owning the contract."),
+    contract: str = typer.Option(..., "--contract", help="Contract file."),
+    column: str = typer.Option(..., "--column", help="Column name."),
+) -> None:
+    """Show the domain that owns a contract column."""
+    owner = get_column_owner(blueprint_name, contract, column, _db_path())
+    if owner is None:
+        console.print(f"No owner assigned for {contract}:{column}.")
+        raise typer.Exit(0)
+
+    console.print(f"Column Owner: {contract}:{column}", style="bold cyan")
+    console.print("─" * 37)
+    console.print(f"  Blueprint:   {owner.blueprint_name}")
+    console.print(f"  Domain:      {owner.owner_domain}")
+    console.print(f"  Email:       {owner.owner_email or '—'}")
+    console.print(f"  Description: {owner.description or '—'}")
+    console.print(f"  Set at:      {owner.updated_at}")
+    raise typer.Exit(0)
+
+
+@owner_column_app.command("list")
+def owner_column_list_command(
+    blueprint_name: str = typer.Argument(..., help="Blueprint to list columns for."),
+    contract: Optional[str] = typer.Option(
+        None, "--contract", help="Limit to one contract file."
+    ),
+) -> None:
+    """List declared column owners for a blueprint."""
+    db_path = _db_path()
+    if contract is not None:
+        owners = get_column_owners_for_contract(blueprint_name, contract, db_path)
+    else:
+        owners = [
+            owner
+            for report in get_blueprint_column_reports(
+                blueprint_name, _blueprints_dir(), db_path
+            )
+            for owner in get_column_owners_for_contract(
+                blueprint_name, report.contract_file, db_path
+            )
+        ]
+
+    if not owners:
+        console.print(f"No column owners declared for {blueprint_name}.")
+        raise typer.Exit(0)
+
+    console.print(f"Column Ownership — {blueprint_name}")
+    console.print("─" * 61)
+    table = Table()
+    table.add_column("Contract", style="cyan", no_wrap=True)
+    table.add_column("Column", no_wrap=True)
+    table.add_column("Domain")
+    table.add_column("Email")
+    for owner in owners:
+        table.add_row(
+            owner.contract_file,
+            owner.column_name,
+            owner.owner_domain,
+            owner.owner_email or "—",
+        )
+    console.print(table)
+    raise typer.Exit(0)
+
+
+@owner_column_app.command("remove")
+def owner_column_remove_command(
+    blueprint_name: str = typer.Argument(..., help="Blueprint owning the contract."),
+    contract: str = typer.Option(..., "--contract", help="Contract file."),
+    column: str = typer.Option(..., "--column", help="Column name."),
+) -> None:
+    """Remove the declared owner of a contract column."""
+    removed = remove_column_owner(blueprint_name, contract, column, _db_path())
+    if removed:
+        console.print(f"✓ Column owner removed from {contract}:{column}", style="green")
+    else:
+        console.print(f"No owner was set for {contract}:{column}")
+    raise typer.Exit(0)
+
+
+@owner_column_app.command("audit")
+def owner_column_audit_command(
+    blueprint_name: str = typer.Argument(..., help="Blueprint to audit."),
+) -> None:
+    """Audit column ownership across every contract in a blueprint.
+
+    Exits 1 if any declared column has no owner — a governance gap the caller is
+    expected to close with 'owner column set'.
+    """
+    db_path = _db_path()
+    blueprints_dir = _blueprints_dir()
+    reports = get_blueprint_column_reports(blueprint_name, blueprints_dir, db_path)
+
+    if not reports:
+        console.print(f"No contracts found for {blueprint_name}.")
+        raise typer.Exit(0)
+
+    total_unowned = 0
+    for report in reports:
+        console.print(
+            f"Column Ownership Audit — {blueprint_name}/{report.contract_file}",
+            style="bold cyan",
+        )
+        console.print("─" * 61)
+
+        owners = {
+            owner.column_name: owner
+            for owner in get_column_owners_for_contract(
+                blueprint_name, report.contract_file, db_path
+            )
+        }
+        columns = get_contract_columns(
+            blueprint_name, report.contract_file, blueprints_dir
+        )
+        for column in columns:
+            owner = owners.get(column)
+            if owner is not None:
+                console.print(
+                    f"  ✓  {column:<16} {owner.owner_domain:<14} "
+                    f"{owner.owner_email or '—'}",
+                    style="green",
+                )
+            else:
+                console.print(f"  ⚠  {column:<16} (no owner)", style="yellow")
+
+        console.print(
+            f"{report.owned_columns}/{report.total_columns} columns declared."
+        )
+        total_unowned += len(report.unowned_columns)
+        console.print()
+
+    if total_unowned:
+        console.print(
+            f"⚠ {total_unowned} column(s) have no declared owner.", style="yellow"
+        )
+        console.print(
+            "  Run: pipelinekit governance owner column set <blueprint> "
+            "--contract <file> --column <col> --domain <domain>",
+            style="dim",
+        )
+        raise typer.Exit(1)
+
+    console.print("✓ All declared columns have an owner.", style="green")
     raise typer.Exit(0)
 
 

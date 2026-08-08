@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     )
     from pipelinekit.contracts.versioning import ContractVersion
     from pipelinekit.governance.approval import ApprovalRequest, Approver
+    from pipelinekit.governance.column_ownership import ColumnOwner
     from pipelinekit.governance.convention import NamingConvention
     from pipelinekit.governance.ownership import BlueprintOwner
     from pipelinekit.observability.slo import SLODefinition
@@ -174,6 +175,22 @@ CREATE TABLE IF NOT EXISTS gm_owners (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS gm_column_owners (
+    id TEXT PRIMARY KEY,
+    blueprint_name TEXT NOT NULL,
+    contract_file TEXT NOT NULL,
+    column_name TEXT NOT NULL,
+    owner_domain TEXT NOT NULL,
+    owner_email TEXT,
+    description TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(blueprint_name, contract_file, column_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_gm_column_owners_contract
+    ON gm_column_owners(blueprint_name, contract_file);
 
 CREATE TABLE IF NOT EXISTS qm_row_counts (
     id TEXT PRIMARY KEY,
@@ -1186,6 +1203,179 @@ def delete_owner(blueprint_name: str, db_path: str | Path) -> bool:
         raise StateError(
             "PK-STATE-002",
             f"Cannot delete owner for blueprint {blueprint_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+_GM_COLUMN_OWNERS_DDL = """
+CREATE TABLE IF NOT EXISTS gm_column_owners (
+    id TEXT PRIMARY KEY,
+    blueprint_name TEXT NOT NULL,
+    contract_file TEXT NOT NULL,
+    column_name TEXT NOT NULL,
+    owner_domain TEXT NOT NULL,
+    owner_email TEXT,
+    description TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(blueprint_name, contract_file, column_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_gm_column_owners_contract
+    ON gm_column_owners(blueprint_name, contract_file);
+"""
+
+
+def _connect_column_owners(db_path: str | Path) -> sqlite3.Connection:
+    """Open ``db_path`` and ensure the ``gm_column_owners`` table exists.
+
+    GM-4 (SPEC-032) threads an explicit ``db_path`` exactly as GM-1 does, so the
+    column-ownership layer is testable against a ``tmp_path`` database. The DDL is
+    idempotent, so a raw path with no prior ``initialize`` still works.
+    """
+    conn = sqlite3.connect(db_path)
+    conn.executescript(_GM_COLUMN_OWNERS_DDL)
+    return conn
+
+
+def upsert_column_owner(owner: ColumnOwner, db_path: str | Path) -> None:
+    """Insert or replace the owner of a single contract column (GM-4).
+
+    Uniqueness is ``(blueprint_name, contract_file, column_name)``, so re-setting
+    an existing column's owner replaces that row rather than adding a second.
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the column owner cannot be written.
+    """
+    try:
+        with _connect_column_owners(db_path) as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO gm_column_owners (
+                    id, blueprint_name, contract_file, column_name,
+                    owner_domain, owner_email, description,
+                    created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    owner.id,
+                    owner.blueprint_name,
+                    owner.contract_file,
+                    owner.column_name,
+                    owner.owner_domain,
+                    owner.owner_email,
+                    owner.description,
+                    owner.created_at,
+                    owner.updated_at,
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot write column owner for {owner.blueprint_name}/"
+            f"{owner.contract_file}:{owner.column_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+
+
+def get_column_owner(
+    blueprint_name: str,
+    contract_file: str,
+    column_name: str,
+    db_path: str | Path,
+) -> dict | None:
+    """Return one column-owner row, or None if that column has no owner (GM-4)."""
+    try:
+        with _connect_column_owners(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                """
+                SELECT * FROM gm_column_owners
+                WHERE blueprint_name = ? AND contract_file = ? AND column_name = ?
+                """,
+                (blueprint_name, contract_file, column_name),
+            ).fetchone()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            f"Cannot read column owner for {blueprint_name}/"
+            f"{contract_file}:{column_name}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return dict(row) if row is not None else None
+
+
+def get_all_column_owners(db_path: str | Path) -> list[dict]:
+    """Return every stored column-owner row, in stable sort order (GM-4)."""
+    try:
+        with _connect_column_owners(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT * FROM gm_column_owners
+                ORDER BY blueprint_name, contract_file, column_name
+                """
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            "Cannot read column owners from state database",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return [dict(row) for row in rows]
+
+
+def get_column_owners_for_contract(
+    blueprint_name: str, contract_file: str, db_path: str | Path
+) -> list[dict]:
+    """Return every column-owner row for one contract file (GM-4)."""
+    try:
+        with _connect_column_owners(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT * FROM gm_column_owners
+                WHERE blueprint_name = ? AND contract_file = ?
+                ORDER BY column_name
+                """,
+                (blueprint_name, contract_file),
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-001",
+            f"Cannot read column owners for {blueprint_name}/{contract_file}",
+            {"path": str(db_path), "detail": str(exc)},
+        ) from exc
+    return [dict(row) for row in rows]
+
+
+def delete_column_owner(
+    blueprint_name: str,
+    contract_file: str,
+    column_name: str,
+    db_path: str | Path,
+) -> bool:
+    """Delete one column's owner. Return True if a row was removed (GM-4).
+
+    Raises:
+        StateError: ``PK-STATE-002`` if the delete cannot be executed.
+    """
+    try:
+        with _connect_column_owners(db_path) as conn:
+            cursor = conn.execute(
+                """
+                DELETE FROM gm_column_owners
+                WHERE blueprint_name = ? AND contract_file = ? AND column_name = ?
+                """,
+                (blueprint_name, contract_file, column_name),
+            )
+            return cursor.rowcount > 0
+    except sqlite3.Error as exc:
+        raise StateError(
+            "PK-STATE-002",
+            f"Cannot delete column owner for {blueprint_name}/"
+            f"{contract_file}:{column_name}",
             {"path": str(db_path), "detail": str(exc)},
         ) from exc
 

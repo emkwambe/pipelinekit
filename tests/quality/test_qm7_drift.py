@@ -167,6 +167,64 @@ def test_qm7_extract_contract_columns_handles_empty_content() -> None:
     assert _extract_contract_columns({"columns": "not-a-list"}) == set()
 
 
+def test_qm7_drift_reads_contract_content_not_columns_json(tmp_path: Path) -> None:
+    """Drift reads the stored contract_content, including list-of-mappings columns.
+
+    Regression: contracts are snapshotted into ``dc_contract_versions``
+    as a JSON ``contract_content`` blob (there is no ``columns_json`` column).
+    Within that blob, columns come in two shapes — a list of names, or a list of
+    ``{name: ...}`` mappings. Reading only the first made every mapping-shaped
+    contract yield zero columns, so each schema.yml column looked newly added
+    and a clean blueprint reported as fully drifted.
+    """
+    db_path = _db(tmp_path)
+    bp = tmp_path / "blueprints" / "mesh-bp"
+    _write_schema(bp, "frame_contracts", ["contract_id", "status", "created_at"])
+
+    # Seed the shape the data-mesh-contracts blueprint actually stores.
+    version_obj = ContractVersion(
+        id="mesh-bp-frame_contracts-1.0.0",
+        blueprint_name="mesh-bp",
+        contract_file="frame_contracts.yaml",
+        version="1.0.0",
+        version_major=1,
+        version_minor=0,
+        version_patch=0,
+        content_hash="hash",
+        contract_content={
+            "table": "frame_contracts",
+            "columns": [
+                {"name": "contract_id", "type": "varchar", "nullable": False},
+                {"name": "status", "type": "varchar", "nullable": False},
+                {"name": "created_at", "type": "timestamp", "nullable": False},
+            ],
+        },
+        created_at="2026-01-01T00:00:00+00:00",
+        created_by="test",
+    )
+    db.insert_contract_version(version_obj, db_path)
+
+    # The stored row carries contract_content; no columns_json column exists.
+    stored = db.get_latest_contracts_for_blueprint("mesh-bp", db_path)
+    assert "contract_content" in stored[0]
+    assert "columns_json" not in stored[0]
+
+    results = check_blueprint_drift("mesh-bp", str(bp), db_path)
+
+    assert (
+        results[0].status == "CLEAN"
+    ), f"mapping-shaped contract columns not read: {results[0].drift_items}"
+    assert results[0].drift_items == []
+
+    # Both shapes are understood, and a genuine difference still drifts.
+    assert _extract_contract_columns({"columns": [{"name": "a"}, {"name": "b"}]}) == {
+        "a",
+        "b",
+    }
+    assert _extract_contract_columns({"required_columns": ["a", "b"]}) == {"a", "b"}
+    assert _extract_contract_columns({"columns": [{"name": "a"}]}) != {"a", "b"}
+
+
 def test_qm7_clean_status_when_no_drift_items(tmp_path: Path) -> None:
     """status is CLEAN (has_drift False) when there are no drift items."""
     db_path = _db(tmp_path)

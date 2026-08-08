@@ -1,0 +1,28 @@
+table: detail_product_contracts
+version: "1.0.0"
+description: "Product Detail contract — columns the Product domain owns."
+columns:
+  - name: contract_id
+    type: varchar
+    nullable: false
+    unique: true
+    owner_domain: engineering
+  - name: active_users
+    type: integer
+    nullable: false
+    owner_domain: product
+  - name: licensed_users
+    type: integer
+    nullable: false
+    owner_domain: product
+  - name: licenses_purchased
+    type: integer
+    nullable: false
+    owner_domain: product
+  - name: last_active_at
+    type: timestamp
+    nullable: false
+    owner_domain: product
+quality:
+  row_count_min: 1
+  freshness_hours: 24

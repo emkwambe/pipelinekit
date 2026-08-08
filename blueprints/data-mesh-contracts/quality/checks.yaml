@@ -1,0 +1,29 @@
+checks for frame_contracts:
+  - row_count > 0:
+      name: frame_contracts_not_empty
+  - missing_count(contract_id) = 0:
+      name: frame_contract_id_not_null
+  - duplicate_count(contract_id) = 0:
+      name: frame_contract_id_unique
+
+checks for detail_finance_contracts:
+  - row_count > 0:
+      name: finance_contracts_not_empty
+  - missing_count(contract_id) = 0:
+      name: finance_contract_id_not_null
+
+checks for detail_sales_contracts:
+  - row_count > 0:
+      name: sales_contracts_not_empty
+
+checks for detail_product_contracts:
+  - row_count > 0:
+      name: product_contracts_not_empty
+
+checks for core_contracts:
+  - row_count > 0:
+      name: core_contracts_not_empty
+  - missing_count(contract_id) = 0:
+      name: core_contract_id_not_null
+  - duplicate_count(contract_id) = 0:
+      name: core_contract_id_unique

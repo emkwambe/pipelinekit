@@ -1,0 +1,28 @@
+version: 2
+models:
+  - name: detail_sales_contracts
+    description: >
+      Sales Detail table: columns the Sales domain owns for contracts.
+      Sales is the authoritative source for account ownership, open
+      opportunity value, and account tier.
+      Owner: Sales domain (sales-data@company.com)
+    columns:
+      - name: contract_id
+        description: "Foreign key to frame_contracts. One row per contract."
+        tests:
+          - unique
+          - not_null
+      - name: employee_owners
+        description: "Assigned sales employees. Owned by Sales."
+        tests:
+          - not_null
+      - name: opportunity_value
+        description: "Open opportunity value in USD cents. Owned by Sales."
+        tests:
+          - not_null
+      - name: account_tier
+        description: "Account tier. Owned by Sales."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [enterprise, mid-market, smb, startup]

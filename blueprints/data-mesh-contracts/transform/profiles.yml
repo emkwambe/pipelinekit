@@ -1,0 +1,14 @@
+# dbt profile for the data-mesh-contracts blueprint.
+#
+# The output schema is read from PK_DBT_SCHEMA so RM-4 staging promotion can
+# route a build into the staging schema and promote it only once the whole run
+# succeeds. With staging disabled the variable is unset and the default applies,
+# leaving behavior unchanged.
+pipelinekit:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('DUCKDB_PATH', './pipeline.duckdb') }}"
+      schema: "{{ env_var('PK_DBT_SCHEMA', 'pipelinekit_transformed') }}"
+      threads: 4

@@ -1,0 +1,26 @@
+table: frame_contracts
+version: "1.0.0"
+description: "Frame table contract — one row per contract_id. Owned by Engineering."
+columns:
+  - name: contract_id
+    type: varchar
+    nullable: false
+    unique: true
+    owner_domain: engineering
+  - name: status
+    type: varchar
+    nullable: false
+    accepted_values: [active, expired, pending, cancelled]
+    owner_domain: engineering
+  - name: type
+    type: varchar
+    nullable: false
+    accepted_values: [new, renewal, expansion, amendment]
+    owner_domain: engineering
+  - name: created_at
+    type: timestamp
+    nullable: false
+    owner_domain: engineering
+quality:
+  row_count_min: 1
+  freshness_hours: 24

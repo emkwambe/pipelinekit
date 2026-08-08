@@ -1,0 +1,17 @@
+name: data_mesh_contracts
+version: '1.0.0'
+config-version: 2
+profile: pipelinekit
+model-paths: ['models']
+target-path: '../target'
+clean-targets: ['../target']
+models:
+  data_mesh_contracts:
+    # Frame and Detail layers are views: cheap to rebuild, always consistent
+    # with their sources. Core is a table because analytics consumers query it.
+    frame:
+      +materialized: view
+    detail:
+      +materialized: view
+    core:
+      +materialized: table

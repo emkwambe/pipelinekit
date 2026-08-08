@@ -1,0 +1,34 @@
+version: 2
+models:
+  - name: detail_finance_contracts
+    description: >
+      Finance Detail table: columns the Finance domain owns for contracts.
+      Finance is the authoritative source for renewal dates, payment status,
+      and ARR values. Do not read revenue data from any other table.
+      Owner: Finance domain (finance-data@company.com)
+    columns:
+      - name: contract_id
+        description: "Foreign key to frame_contracts. One row per contract."
+        tests:
+          - unique
+          - not_null
+      - name: renewal_date
+        description: "Contract renewal date. Owned by Finance."
+        tests:
+          - not_null
+      - name: payment_status
+        description: "Current payment status. Owned by Finance."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [current, overdue, pending, cancelled]
+      - name: arr_value
+        description: "Annual Recurring Revenue in USD cents. Owned by Finance."
+        tests:
+          - not_null
+      - name: payment_terms
+        description: "Payment terms (e.g. net-30, net-60). Owned by Finance."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [net-30, net-60, net-90, prepaid]

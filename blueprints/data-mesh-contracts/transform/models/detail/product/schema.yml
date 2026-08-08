@@ -1,0 +1,31 @@
+version: 2
+models:
+  - name: detail_product_contracts
+    description: >
+      Product Detail table: columns the Product domain owns for contracts.
+      Product is the authoritative source for licence counts and usage.
+      Seat utilisation is licensed_users vs licenses_purchased — do not
+      derive it from Sales or Finance columns.
+      Owner: Product domain (product-data@company.com)
+    columns:
+      - name: contract_id
+        description: "Foreign key to frame_contracts. One row per contract."
+        tests:
+          - unique
+          - not_null
+      - name: active_users
+        description: "Users active in the trailing 30 days. Owned by Product."
+        tests:
+          - not_null
+      - name: licensed_users
+        description: "Users currently assigned a licence. Owned by Product."
+        tests:
+          - not_null
+      - name: licenses_purchased
+        description: "Licences purchased under the contract. Owned by Product."
+        tests:
+          - not_null
+      - name: last_active_at
+        description: "Most recent user activity timestamp. Owned by Product."
+        tests:
+          - not_null

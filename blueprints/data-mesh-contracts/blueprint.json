@@ -1,0 +1,56 @@
+{
+  "name": "data-mesh-contracts",
+  "version": "1.0.0",
+  "status": "proposed",
+  "description": "Data Mesh implementation: Frame → Detail → Core → Utility pattern. Implements column-level domain ownership as described by Smartsheet Analytics Engineering.",
+  "source": {
+    "type": "postgres",
+    "dlt_source": "sql_database",
+    "description": "PostgreSQL source with contracts, finance, sales, and product data"
+  },
+  "destination": {
+    "type": "duckdb",
+    "dlt_destination": "duckdb",
+    "description": "Local DuckDB — zero cloud credentials required"
+  },
+  "contracts": [
+    "contracts/frame_contracts.yaml",
+    "contracts/finance_contracts.yaml",
+    "contracts/sales_contracts.yaml",
+    "contracts/product_contracts.yaml",
+    "contracts/core_contracts.yaml"
+  ],
+  "data_mesh": {
+    "pattern": "frame_detail_core_utility",
+    "object": "contract",
+    "domains": ["engineering", "finance", "sales", "product"],
+    "frame_table": "frame_contracts",
+    "core_table": "core_contracts"
+  },
+  "best_practices": {
+    "primary_key_tests": true,
+    "source_freshness": true,
+    "model_documentation": true,
+    "column_coverage": "100%",
+    "accepted_values": true,
+    "naming_convention": "frame_|detail_{domain}_|core_|{domain}_utility_",
+    "contract_coverage": true,
+    "column_ownership": true
+  },
+  "tables": [
+    "frame_contracts",
+    "detail_finance_contracts",
+    "detail_sales_contracts",
+    "detail_product_contracts",
+    "core_contracts"
+  ],
+  "dbt_models": 5,
+  "soda_checks": 8,
+  "tags": ["data-mesh", "duckdb", "postgres", "contracts", "reference"],
+  "dlt_source": "sql_database",
+  "dlt_destination": "duckdb",
+  "requirements": {
+    "source_credentials": "POSTGRES_HOST, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB",
+    "destination_credentials": "none — DuckDB is a local file"
+  }
+}

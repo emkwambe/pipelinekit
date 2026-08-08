@@ -1,0 +1,30 @@
+table: detail_finance_contracts
+version: "1.0.0"
+description: "Finance Detail contract — columns the Finance domain owns."
+columns:
+  - name: contract_id
+    type: varchar
+    nullable: false
+    unique: true
+    owner_domain: engineering
+  - name: renewal_date
+    type: date
+    nullable: false
+    owner_domain: finance
+  - name: payment_status
+    type: varchar
+    nullable: false
+    accepted_values: [current, overdue, pending, cancelled]
+    owner_domain: finance
+  - name: arr_value
+    type: integer
+    nullable: false
+    owner_domain: finance
+  - name: payment_terms
+    type: varchar
+    nullable: false
+    accepted_values: [net-30, net-60, net-90, prepaid]
+    owner_domain: finance
+quality:
+  row_count_min: 1
+  freshness_hours: 24

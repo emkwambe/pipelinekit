@@ -1,0 +1,30 @@
+version: 2
+models:
+  - name: frame_contracts
+    description: >
+      Frame table: one row per contract_id. The shared backbone
+      that all domain Detail tables LEFT JOIN to.
+      Owned by: Engineering domain.
+      Do not add domain-specific columns here — they belong in Detail tables.
+    columns:
+      - name: contract_id
+        description: "Primary key — unique contract identifier. Owned by Engineering."
+        tests:
+          - unique
+          - not_null
+      - name: status
+        description: "Contract status. Owned by Engineering."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [active, expired, pending, cancelled]
+      - name: type
+        description: "Contract type. Owned by Engineering."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [new, renewal, expansion, amendment]
+      - name: created_at
+        description: "Contract creation timestamp. Owned by Engineering."
+        tests:
+          - not_null

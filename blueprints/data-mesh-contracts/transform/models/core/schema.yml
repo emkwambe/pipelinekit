@@ -1,0 +1,93 @@
+version: 2
+models:
+  - name: core_contracts
+    description: >
+      Core Contracts: the wide analytics table joining all domain Detail tables.
+      Every column is owned by the domain that provided it via its Detail table.
+      See detail_finance_contracts, detail_sales_contracts and
+      detail_product_contracts for authoritative ownership of each column.
+      Materialized as a table (not a view) for query performance.
+
+      The not_null tests on domain columns are deliberate. The mesh contract is
+      that every domain provides data for every contract in the Frame; a null
+      here means a domain is missing rows, which should fail loudly rather than
+      reach analytics consumers as a silent gap.
+    columns:
+      # --- Frame columns (Engineering domain) ---
+      - name: contract_id
+        description: "Primary key from frame_contracts. Owned by Engineering."
+        tests:
+          - unique
+          - not_null
+      - name: status
+        description: "Contract status from frame_contracts. Owned by Engineering."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [active, expired, pending, cancelled]
+      - name: type
+        description: "Contract type from frame_contracts. Owned by Engineering."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [new, renewal, expansion, amendment]
+      - name: created_at
+        description: "Creation timestamp from frame_contracts. Owned by Engineering."
+        tests:
+          - not_null
+
+      # --- Finance domain columns ---
+      - name: renewal_date
+        description: "From Finance — contract renewal date."
+        tests:
+          - not_null
+      - name: payment_status
+        description: "From Finance — current payment status."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [current, overdue, pending, cancelled]
+      - name: arr_value
+        description: "From Finance — Annual Recurring Revenue in USD cents."
+        tests:
+          - not_null
+      - name: payment_terms
+        description: "From Finance — payment terms."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [net-30, net-60, net-90, prepaid]
+
+      # --- Sales domain columns ---
+      - name: employee_owners
+        description: "From Sales — assigned sales employees."
+        tests:
+          - not_null
+      - name: opportunity_value
+        description: "From Sales — open opportunity value in USD cents."
+        tests:
+          - not_null
+      - name: account_tier
+        description: "From Sales — account tier."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [enterprise, mid-market, smb, startup]
+
+      # --- Product domain columns ---
+      - name: active_users
+        description: "From Product — users active in the trailing 30 days."
+        tests:
+          - not_null
+      - name: licensed_users
+        description: "From Product — users currently assigned a licence."
+        tests:
+          - not_null
+      - name: licenses_purchased
+        description: "From Product — licences purchased under the contract."
+        tests:
+          - not_null
+      - name: last_active_at
+        description: "From Product — most recent user activity timestamp."
+        tests:
+          - not_null

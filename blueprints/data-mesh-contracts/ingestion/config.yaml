@@ -1,0 +1,20 @@
+source:
+  type: postgres
+  host: "${POSTGRES_HOST}"
+  port: 5432
+  user: "${POSTGRES_USER}"
+  password: "${POSTGRES_PASSWORD}"
+  database: "${POSTGRES_DB}"
+  tables:
+    - contracts
+    - finance_contract_data
+    - sales_contract_data
+    - product_contract_data
+
+destination:
+  type: duckdb
+  path: "${DUCKDB_PATH:-./pipeline.duckdb}"
+
+pipeline:
+  write_disposition: replace
+  batch_size: 10000

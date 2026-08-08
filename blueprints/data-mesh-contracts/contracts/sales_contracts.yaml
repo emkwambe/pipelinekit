@@ -1,0 +1,25 @@
+table: detail_sales_contracts
+version: "1.0.0"
+description: "Sales Detail contract — columns the Sales domain owns."
+columns:
+  - name: contract_id
+    type: varchar
+    nullable: false
+    unique: true
+    owner_domain: engineering
+  - name: employee_owners
+    type: varchar
+    nullable: false
+    owner_domain: sales
+  - name: opportunity_value
+    type: integer
+    nullable: false
+    owner_domain: sales
+  - name: account_tier
+    type: varchar
+    nullable: false
+    accepted_values: [enterprise, mid-market, smb, startup]
+    owner_domain: sales
+quality:
+  row_count_min: 1
+  freshness_hours: 24

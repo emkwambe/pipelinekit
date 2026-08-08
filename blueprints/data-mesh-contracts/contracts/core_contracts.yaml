@@ -1,0 +1,76 @@
+table: core_contracts
+version: "1.0.0"
+description: >
+  Core contract — the wide analytics table. Every column carries the domain
+  that owns it; the authoritative definition lives in that domain's Detail
+  contract, not here.
+columns:
+  - name: contract_id
+    type: varchar
+    nullable: false
+    unique: true
+    owner_domain: engineering
+  - name: status
+    type: varchar
+    nullable: false
+    accepted_values: [active, expired, pending, cancelled]
+    owner_domain: engineering
+  - name: type
+    type: varchar
+    nullable: false
+    accepted_values: [new, renewal, expansion, amendment]
+    owner_domain: engineering
+  - name: created_at
+    type: timestamp
+    nullable: false
+    owner_domain: engineering
+  - name: renewal_date
+    type: date
+    nullable: false
+    owner_domain: finance
+  - name: payment_status
+    type: varchar
+    nullable: false
+    accepted_values: [current, overdue, pending, cancelled]
+    owner_domain: finance
+  - name: arr_value
+    type: integer
+    nullable: false
+    owner_domain: finance
+  - name: payment_terms
+    type: varchar
+    nullable: false
+    accepted_values: [net-30, net-60, net-90, prepaid]
+    owner_domain: finance
+  - name: employee_owners
+    type: varchar
+    nullable: false
+    owner_domain: sales
+  - name: opportunity_value
+    type: integer
+    nullable: false
+    owner_domain: sales
+  - name: account_tier
+    type: varchar
+    nullable: false
+    accepted_values: [enterprise, mid-market, smb, startup]
+    owner_domain: sales
+  - name: active_users
+    type: integer
+    nullable: false
+    owner_domain: product
+  - name: licensed_users
+    type: integer
+    nullable: false
+    owner_domain: product
+  - name: licenses_purchased
+    type: integer
+    nullable: false
+    owner_domain: product
+  - name: last_active_at
+    type: timestamp
+    nullable: false
+    owner_domain: product
+quality:
+  row_count_min: 1
+  freshness_hours: 24
